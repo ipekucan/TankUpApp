@@ -5,6 +5,7 @@ import 'dart:async';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/axolotl_provider.dart';
+import '../providers/user_provider.dart';
 import '../models/axolotl_model.dart';
 import 'shop_screen.dart';
 
@@ -18,21 +19,10 @@ class TankRoomScreen extends StatefulWidget {
 class _TankRoomScreenState extends State<TankRoomScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _messageController;
-  int _currentMessageIndex = 0;
+  String _currentMessage = 'Merhaba! 💙'; // Başlangıç mesajı
   bool _showMessage = false;
   Timer? _dirtyCheckTimer;
-
-  // Aksolotun günlüğü mesajları
-  final List<String> _axolotlMessages = [
-    'Bugün harika bir gün! 💙',
-    'Su içmeyi unutma! 💧',
-    'Seni çok seviyorum! 🌊',
-    'Birlikte büyüyoruz! ✨',
-    'Her gün daha iyi oluyoruz! 💪',
-    'Su içmek çok önemli! 💙',
-    'Seninle olmak harika! 🌟',
-    'Bugün de harika bir gün olacak! ☀️',
-  ];
+  Timer? _messageTimer; // 30 saniyede bir mesaj değiştirmek için
   
   // Tank kirliyse gösterilecek özel mesaj
   final String _dirtyTankMessage = 'Burası çok yosunlanmış, temizlemek için biraz su içelim mi? 💧';
@@ -64,15 +54,27 @@ class _TankRoomScreenState extends State<TankRoomScreen>
       }
     });
     
-    // Her 8 saniyede bir yeni mesaj göster (tank temizse)
+    // Her 30 saniyede bir yeni mesaj göster (tank temizse)
+    _messageTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+        if (!waterProvider.isTankDirty) {
+          _showRandomMessage();
+          if (!_messageController.isAnimating) {
+            _messageController.forward();
+          }
+        }
+      }
+    });
+    
+    // Mesaj animasyonu tamamlandığında tekrar başlat
     _messageController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _messageController.reset();
-        Future.delayed(const Duration(seconds: 4), () {
+        Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             final waterProvider = Provider.of<WaterProvider>(context, listen: false);
             if (!waterProvider.isTankDirty) {
-              _showRandomMessage();
               _messageController.forward();
             }
           }
@@ -84,6 +86,7 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   @override
   void dispose() {
     _dirtyCheckTimer?.cancel();
+    _messageTimer?.cancel();
     _messageController.dispose();
     super.dispose();
   }
@@ -108,10 +111,17 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   }
 
   void _showRandomMessage() {
-    setState(() {
-      _showMessage = true;
-      _currentMessageIndex = math.Random().nextInt(_axolotlMessages.length);
-    });
+    if (mounted) {
+      final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final userName = userProvider.userData.name;
+      
+      setState(() {
+        _showMessage = true;
+        // WaterProvider'dan rastgele mesaj al
+        _currentMessage = waterProvider.getRandomMessage(userName);
+      });
+    }
   }
 
   @override
@@ -262,7 +272,7 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                             child: _buildSpeechBubble(
                               isDirty 
                                   ? _dirtyTankMessage 
-                                  : _axolotlMessages[_currentMessageIndex],
+                                  : (_currentMessage.isEmpty ? 'Merhaba! 💙' : _currentMessage),
                             ),
                           ),
                         ),

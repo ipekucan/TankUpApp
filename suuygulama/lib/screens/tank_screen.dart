@@ -15,7 +15,86 @@ class TankScreen extends StatefulWidget {
   State<TankScreen> createState() => _TankScreenState();
 }
 
-class _TankScreenState extends State<TankScreen> {
+class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
+  late AnimationController _coinAnimationController;
+  late Animation<double> _coinScaleAnimation;
+  
+  // Aksolotun günlüğü mesajları
+  final List<String> _axolotlMessages = [
+    'Harikasın! 💙',
+    'Su içmek sana çok yakışıyor! ✨',
+    'Seni çok seviyorum! 🌊',
+    'Birlikte büyüyoruz! 💪',
+    'Her gün daha iyi oluyoruz! 🌟',
+    'Su içmek çok önemli! 💧',
+    'Seninle olmak harika! ☀️',
+    'Bugün de harika bir gün olacak! 💙',
+    'Mükemmel gidiyorsun! 🎉',
+    'Su içmek sağlıklı! 💪',
+  ];
+  int _currentMessageIndex = 0;
+  bool _showMessage = false;
+  late AnimationController _messageController;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Coin animasyonu için controller
+    _coinAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _coinScaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(
+        parent: _coinAnimationController,
+        curve: Curves.elasticOut,
+      ),
+    );
+    
+    // Mesaj animasyonu için controller
+    _messageController = AnimationController(
+      duration: const Duration(seconds: 4),
+      vsync: this,
+    );
+    
+    // İlk mesajı göster
+    _showRandomMessage();
+    _messageController.forward();
+    
+    // Her 8 saniyede bir yeni mesaj göster
+    _messageController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _messageController.reset();
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) {
+            _showRandomMessage();
+            _messageController.forward();
+          }
+        });
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _coinAnimationController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+  
+  void _showRandomMessage() {
+    setState(() {
+      _showMessage = true;
+      _currentMessageIndex = math.Random().nextInt(_axolotlMessages.length);
+    });
+  }
+  
+  void _animateCoin() {
+    _coinAnimationController.forward().then((_) {
+      _coinAnimationController.reverse();
+    });
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,47 +113,50 @@ class _TankScreenState extends State<TankScreen> {
         
         return Column(
           children: [
-            // Coin sayacı - En üstte sağda
+            // Coin sayacı - En üstte sağda (animasyonlu)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldCoin,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.goldCoin.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.monetization_on,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${waterProvider.tankCoins}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
+                  ScaleTransition(
+                    scale: _coinScaleAnimation,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.goldCoin,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.goldCoin.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.monetization_on,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${waterProvider.tankCoins}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -142,6 +224,18 @@ class _TankScreenState extends State<TankScreen> {
                       buildAxolotl: _buildAxolotl,
                     ),
                   ),
+                  
+                  // Konuşma balonu - Aksolotun günlüğü (sadece tank doluysa)
+                  if (_showMessage && fillPercentage > 0)
+                    Positioned(
+                      top: MediaQuery.of(context).size.height * 0.05,
+                      left: MediaQuery.of(context).size.width * 0.05,
+                      right: MediaQuery.of(context).size.width * 0.05,
+                      child: FadeTransition(
+                        opacity: _messageController,
+                        child: _buildSpeechBubble(_axolotlMessages[_currentMessageIndex]),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -393,32 +487,20 @@ class _TankScreenState extends State<TankScreen> {
                   // Toplam su miktarını güncelle
                   await userProvider.addToTotalWater(250.0);
                   
-                  bool achievementUnlocked = false;
-                  bool dailyGoalReached = false;
-                  String? achievementName;
-                  int achievementCoins = 0;
-                  
                   // Başarı kontrolü - İlk Adım
                   if (result.isFirstDrink) {
                     final coins = await achievementProvider.checkFirstStep();
                     if (coins > 0) {
-                      achievementUnlocked = true;
-                      achievementName = 'İlk Adım';
-                      achievementCoins = coins;
                       await waterProvider.addCoins(coins);
                       await userProvider.addAchievement('first_step');
                     }
                   }
                   
-                  // Başarı kontrolü - Günlük Hedef (ilk kez ulaşıldığında)
+                  // Başarı kontrolü - Günlük Hedef
                   final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
                   if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
                     final coins = await achievementProvider.checkDailyGoal();
                     if (coins > 0) {
-                      dailyGoalReached = true;
-                      achievementUnlocked = true;
-                      achievementName = 'Günlük Hedef';
-                      achievementCoins = coins;
                       await waterProvider.addCoins(coins);
                       await userProvider.addAchievement('daily_goal');
                       await userProvider.updateConsecutiveDays(true);
@@ -433,9 +515,6 @@ class _TankScreenState extends State<TankScreen> {
                   final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
                   final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
                   if (waterMasterCoins > 0 && !wasWaterMasterUnlocked) {
-                    achievementUnlocked = true;
-                    achievementName = 'Su Ustası';
-                    achievementCoins = waterMasterCoins;
                     await waterProvider.addCoins(waterMasterCoins);
                     await userProvider.addAchievement('water_master');
                   }
@@ -445,9 +524,6 @@ class _TankScreenState extends State<TankScreen> {
                   final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
                   final streak3Coins = await achievementProvider.checkStreak3(consecutiveDays);
                   if (streak3Coins > 0 && !wasStreak3Unlocked) {
-                    achievementUnlocked = true;
-                    achievementName = 'Seri Başlangıcı';
-                    achievementCoins = streak3Coins;
                     await waterProvider.addCoins(streak3Coins);
                     await userProvider.addAchievement('streak_3');
                   }
@@ -456,55 +532,17 @@ class _TankScreenState extends State<TankScreen> {
                   final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
                   final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
                   if (streak7Coins > 0 && !wasStreak7Unlocked) {
-                    achievementUnlocked = true;
-                    achievementName = 'Haftalık Şampiyon';
-                    achievementCoins = streak7Coins;
                     await waterProvider.addCoins(streak7Coins);
                     await userProvider.addAchievement('streak_7');
                   }
                   
-                  // Özel başarı ekranı sadece achievement kazanıldığında veya günlük hedefe ilk kez ulaşıldığında
+                  // Sessiz geri bildirim - hiçbir bildirim gösterilmiyor
+                  // Sadece coin sayacı animasyonlu güncelleniyor
                   if (mounted) {
-                    if (achievementUnlocked || dailyGoalReached) {
-                      // Büyük başarı ekranı göster
-                      _showAchievementDialog(
-                        context,
-                        achievementName ?? 'Günlük Hedef',
-                        achievementCoins,
-                        dailyGoalReached,
-                      );
-                    } else {
-                      // Normal su içiş - sadece küçük SnackBar
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.monetization_on, color: Colors.white, size: 20),
-                              const SizedBox(width: 8),
-                              Text('+${result.coinsReward} Coin! 💧'),
-                            ],
-                          ),
-                          backgroundColor: AppColors.softPinkButton,
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                          margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-                        ),
-                      );
-                    }
-                  }
-                } else {
-                  // Hata durumu
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(result.message),
-                        backgroundColor: Colors.orange,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
+                    _animateCoin();
                   }
                 }
+                // Hata durumunda da sessiz kal (hiçbir bildirim gösterilmiyor)
               }
             : null,
         style: ElevatedButton.styleFrom(
@@ -529,6 +567,45 @@ class _TankScreenState extends State<TankScreen> {
             letterSpacing: 0.8,
           ),
         ),
+      ),
+    );
+  }
+  
+  // Konuşma balonu widget'ı
+  Widget _buildSpeechBubble(String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            color: AppColors.softPinkButton,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF4A5568),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -739,7 +816,7 @@ class _FloatingAxolotl extends StatefulWidget {
 }
 
 class _FloatingAxolotlState extends State<_FloatingAxolotl>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 
@@ -789,111 +866,6 @@ class _FloatingAxolotlState extends State<_FloatingAxolotl>
           child: widget.buildAxolotl(widget.axolotlProvider),
         );
       },
-    );
-  }
-}
-
-// Başarı dialog'u - Sadece özel durumlarda gösterilir
-extension _TankScreenDialogExtension on _TankScreenState {
-  void _showAchievementDialog(
-    BuildContext context,
-    String achievementName,
-    int coins,
-    bool isDailyGoal,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(30),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.softPinkButton.withValues(alpha: 0.9),
-                AppColors.waterColor.withValues(alpha: 0.9),
-              ],
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.celebration,
-                size: 80,
-                color: Colors.white,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                isDailyGoal ? '🎉 Günlük Hedefe Ulaştın!' : '🎉 Başarı Kazandın!',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                achievementName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.monetization_on, color: Colors.white, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+$coins Coin',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.softPinkButton,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  'Harika!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

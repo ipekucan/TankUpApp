@@ -6,7 +6,7 @@ import 'providers/water_provider.dart';
 import 'providers/axolotl_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/achievement_provider.dart';
-import 'screens/main_navigation_screen.dart';
+import 'screens/initial_screen.dart';
 import 'utils/app_colors.dart';
 import 'services/notification_service.dart';
 
@@ -86,7 +86,7 @@ class TankUpApp extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        home: MainNavigationScreen(),
+        home: const InitialScreen(),
       ),
     );
   }

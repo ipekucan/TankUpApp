@@ -102,6 +102,14 @@ class UserProvider extends ChangeNotifier {
     await _saveUserData();
     notifyListeners();
   }
+  
+  // Kullanıcı adını güncelle (updateName alias)
+  Future<void> updateName(String name) async {
+    await setName(name);
+  }
+  
+  // İsim var mı kontrolü
+  bool get hasName => _userData.name.isNotEmpty;
 
   // Toplam su miktarını güncelle
   Future<void> addToTotalWater(double amount) async {

@@ -776,6 +776,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   // Günlük hedef slider
   Widget _buildDailyGoalSlider(WaterProvider waterProvider) {
+    // Slider değerini güncelle
+    if (_dailyGoalSlider != waterProvider.dailyGoal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _dailyGoalSlider = waterProvider.dailyGoal;
+          });
+        }
+      });
+    }
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

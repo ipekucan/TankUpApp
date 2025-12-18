@@ -113,9 +113,18 @@ class WaterProvider extends ChangeNotifier {
       // Gün kontrolü yap (yeni gün başladıysa verileri sıfırla)
       await _checkAndResetDay();
       
+      // consumedAmount'un kesinlikle 0.0 olduğundan emin ol (son kontrol)
+      // Eski veriyi temizle - bir kerelik sıfırlama (tank dolu başlama sorununu çözmek için)
+      if (_waterData.consumedAmount != 0.0) {
+        _waterData = _waterData.copyWith(consumedAmount: 0.0);
+        // Eski veriyi hafızadan da temizle
+        await prefs.setString(_waterDataKey, jsonEncode(_waterData.toJson()));
+      }
+      
       // İlerleme yüzdesini güncelle
       _updateProgress();
       
+      // UI'ı güncelle
       notifyListeners();
     } catch (e) {
       // Hata durumunda varsayılan değerlerle devam et (consumedAmount = 0.0)
@@ -262,6 +271,47 @@ class WaterProvider extends ChangeNotifier {
       coinsReward: coinsReward,
       isFirstDrink: wasFirstDrink,
     );
+  }
+
+  // Aksolot mesajları listesi (15-20 mesaj)
+  static final List<String> axolotlMessages = [
+    'Harika görünüyorsun! 💙',
+    'Su içmek cildine iyi gelecek! ✨',
+    'Tankımız pırıl pırıl! 🌊',
+    'Bugün harika bir gün! 💪',
+    'Su içmeyi unutma! 💧',
+    'Seni çok seviyorum! 🌟',
+    'Birlikte büyüyoruz! ☀️',
+    'Her gün daha iyi oluyoruz! 💙',
+    'Su içmek çok önemli! 💪',
+    'Seninle olmak harika! ✨',
+    'Bugün de harika bir gün olacak! 🌊',
+    'Mükemmel gidiyorsun! 🎉',
+    'Su içmek sağlıklı! 💧',
+    'Tankımız çok temiz! 🌟',
+    'Sen harikasın! 💙',
+    'Su içmek seni güçlendirir! 💪',
+    'Birlikte çok güzeliz! ✨',
+    'Her gün daha iyi! 🌊',
+    'Su içmek zindelik verir! 💧',
+    'Seni seviyorum! 💙',
+  ];
+  
+  // Rastgele mesaj al
+  String getRandomMessage(String? userName) {
+    final random = DateTime.now().millisecondsSinceEpoch % axolotlMessages.length;
+    String message = axolotlMessages[random];
+    
+    // Eğer isim varsa mesaja ekle
+    if (userName != null && userName.isNotEmpty) {
+      // Bazı mesajlarda ismi kullan
+      if (random % 3 == 0) {
+        message = message.replaceFirst('görünüyorsun', '$userName, görünüyorsun');
+        message = message.replaceFirst('Sen', '$userName, sen');
+      }
+    }
+    
+    return message;
   }
 
   // Tank temizlik durumu - Gerçek 24 saatlik mantık
