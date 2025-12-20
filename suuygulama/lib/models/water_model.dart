@@ -4,6 +4,7 @@ class WaterModel {
   final double progressPercentage; // İlerleme yüzdesi (%)
   final int tankCoins; // Kazanılan TankCoin miktarı
   final DateTime? lastDrinkTime; // Son su içme zamanı
+  final double dailyCalories; // Günlük toplam kalori
 
   WaterModel({
     required this.dailyGoal,
@@ -11,6 +12,7 @@ class WaterModel {
     required this.progressPercentage,
     required this.tankCoins,
     this.lastDrinkTime,
+    this.dailyCalories = 0.0,
   });
 
   // Varsayılan değerlerle başlangıç modeli
@@ -21,6 +23,7 @@ class WaterModel {
       progressPercentage: 0.0, // Başlangıçta %0
       tankCoins: 0,
       lastDrinkTime: null,
+      dailyCalories: 0.0, // Başlangıçta 0 kalori
     );
   }
 
@@ -31,6 +34,7 @@ class WaterModel {
     double? progressPercentage,
     int? tankCoins,
     DateTime? lastDrinkTime,
+    double? dailyCalories,
   }) {
     return WaterModel(
       dailyGoal: dailyGoal ?? this.dailyGoal,
@@ -38,6 +42,7 @@ class WaterModel {
       progressPercentage: progressPercentage ?? this.progressPercentage,
       tankCoins: tankCoins ?? this.tankCoins,
       lastDrinkTime: lastDrinkTime ?? this.lastDrinkTime,
+      dailyCalories: dailyCalories ?? this.dailyCalories,
     );
   }
 
@@ -49,6 +54,7 @@ class WaterModel {
       'progressPercentage': progressPercentage,
       'tankCoins': tankCoins,
       'lastDrinkTime': lastDrinkTime?.toIso8601String(),
+      'dailyCalories': dailyCalories,
     };
   }
 
@@ -62,6 +68,7 @@ class WaterModel {
       lastDrinkTime: json['lastDrinkTime'] != null
           ? DateTime.parse(json['lastDrinkTime'] as String)
           : null,
+      dailyCalories: (json['dailyCalories'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

@@ -4,9 +4,8 @@ import 'dart:math' as math;
 import 'dart:async';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
-import '../providers/axolotl_provider.dart';
-import '../providers/user_provider.dart';
-import '../models/axolotl_model.dart';
+import '../providers/aquarium_provider.dart';
+import '../models/decoration_item.dart';
 import 'shop_screen.dart';
 
 class TankRoomScreen extends StatefulWidget {
@@ -17,68 +16,17 @@ class TankRoomScreen extends StatefulWidget {
 }
 
 class _TankRoomScreenState extends State<TankRoomScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _messageController;
-  String _currentMessage = 'Merhaba! 💙'; // Başlangıç mesajı
-  bool _showMessage = false;
+    with TickerProviderStateMixin {
   Timer? _dirtyCheckTimer;
-  Timer? _messageTimer; // 30 saniyede bir mesaj değiştirmek için
-  
-  // Tank kirliyse gösterilecek özel mesaj
-  final String _dirtyTankMessage = 'Burası çok yosunlanmış, temizlemek için biraz su içelim mi? 💧';
 
   @override
   void initState() {
     super.initState();
-    _messageController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    );
-    
-    // İlk mesajı göster
-    _showRandomMessage();
-    _messageController.forward();
     
     // Her saniye tank kirliliğini kontrol et
     _dirtyCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-        if (waterProvider.isTankDirty) {
-          setState(() {
-            _showMessage = true;
-          });
-          if (!_messageController.isAnimating) {
-            _messageController.forward();
-          }
-        }
-      }
-    });
-    
-    // Her 30 saniyede bir yeni mesaj göster (tank temizse)
-    _messageTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) {
-        final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-        if (!waterProvider.isTankDirty) {
-          _showRandomMessage();
-          if (!_messageController.isAnimating) {
-            _messageController.forward();
-          }
-        }
-      }
-    });
-    
-    // Mesaj animasyonu tamamlandığında tekrar başlat
-    _messageController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _messageController.reset();
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-            if (!waterProvider.isTankDirty) {
-              _messageController.forward();
-            }
-          }
-        });
+        setState(() {}); // Kirlilik durumunu güncelle
       }
     });
   }
@@ -86,52 +34,17 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   @override
   void dispose() {
     _dirtyCheckTimer?.cancel();
-    _messageTimer?.cancel();
-    _messageController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Tank durumunu kontrol et ve mesaj göster
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-    if (waterProvider.isTankDirty && !_showMessage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _showMessage = true;
-          });
-          if (!_messageController.isAnimating) {
-            _messageController.forward();
-          }
-        }
-      });
-    }
-  }
-
-  void _showRandomMessage() {
-    if (mounted) {
-      final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final userName = userProvider.userData.name;
-      
-      setState(() {
-        _showMessage = true;
-        // WaterProvider'dan rastgele mesaj al
-        _currentMessage = waterProvider.getRandomMessage(userName);
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.verySoftBlue,
-      body: Consumer2<WaterProvider, AxolotlProvider>(
-        builder: (context, waterProvider, axolotlProvider, child) {
+      body: Consumer2<WaterProvider, AquariumProvider>(
+        builder: (context, waterProvider, aquariumProvider, child) {
           // Zen Odası'nda tank her zaman %100 dolu (sabit)
-          const fillPercentage = 1.0; // %100 dolu
+          const fillPercentage = 1.0;
           final isDirty = waterProvider.isTankDirty;
           
           return Stack(
@@ -151,13 +64,13 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                   ),
                   child: Stack(
                     children: [
-                      // Yosunlanma efekti - Yeşil %30 opaklıkta overlay (24 saat geçtiyse)
+                      // Yosunlanma efekti - Yeşil %30 opaklıkta overlay
                       Visibility(
                         visible: isDirty,
                         child: Positioned.fill(
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.3), // %30 opaklık
+                              color: Colors.green.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(40),
                             ),
                             child: Stack(
@@ -213,7 +126,7 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                         ),
                       ),
                       
-                      // Su seviyesi
+                      // Su seviyesi (her zaman %100)
                       Positioned(
                         bottom: 0,
                         left: 0,
@@ -241,41 +154,14 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                         ),
                       ),
                       
-                      // Tank dekorasyonları
-                      ...axolotlProvider.tankDecorations.map((decoration) {
-                        return _buildTankDecoration(
+                      // Modüler dekorasyonlar - Katmanlı yapı (layerOrder'a göre sıralı)
+                      ...aquariumProvider.activeDecorationsList.map((decoration) {
+                        return _buildDecoration(
                           decoration,
                           MediaQuery.of(context).size.width * 0.9,
                           MediaQuery.of(context).size.height * 0.85,
                         );
-                      }).toList(),
-                      
-                      // Aksolot maskot
-                      Center(
-                        child: _FloatingAxolotl(
-                          axolotlProvider: axolotlProvider,
-                          fillPercentage: fillPercentage,
-                          tankHeight: MediaQuery.of(context).size.height * 0.85,
-                          buildAxolotl: _buildAxolotl,
-                        ),
-                      ),
-                      
-                      // Konuşma balonu - Aksolotun günlüğü
-                      // Tank kirliyse özel mesaj göster, değilse normal mesajlar
-                      if (_showMessage || isDirty)
-                        Positioned(
-                          top: MediaQuery.of(context).size.height * 0.1,
-                          left: MediaQuery.of(context).size.width * 0.05,
-                          right: MediaQuery.of(context).size.width * 0.05,
-                          child: FadeTransition(
-                            opacity: _messageController,
-                            child: _buildSpeechBubble(
-                              isDirty 
-                                  ? _dirtyTankMessage 
-                                  : (_currentMessage.isEmpty ? 'Merhaba! 💙' : _currentMessage),
-                            ),
-                          ),
-                        ),
+                      }),
                     ],
                   ),
                 ),
@@ -310,382 +196,93 @@ class _TankRoomScreenState extends State<TankRoomScreen>
     );
   }
 
-  // Konuşma balonu widget'ı
-  Widget _buildSpeechBubble(String message) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            color: AppColors.softPinkButton,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF4A5568),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Dekorasyon çizimi
+  Widget _buildDecoration(DecorationItem decoration, double tankWidth, double tankHeight) {
+    final x = decoration.left * tankWidth;
+    final y = (1.0 - decoration.bottom) * tankHeight; // bottom 0.0 = alt, 1.0 = üst
 
-  // Aksolot maskot çizimi
-  Widget _buildAxolotl(AxolotlProvider provider) {
-    final skinColor = _getSkinColor(provider.skinColor);
-    final eyeColor = _getEyeColor(provider.eyeColor);
-    
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Aksolot gövdesi
-        Container(
-          width: 110,
-          height: 90,
-          decoration: BoxDecoration(
-            color: skinColor,
-            borderRadius: BorderRadius.circular(55),
-            boxShadow: [
-              BoxShadow(
-                color: skinColor.withValues(alpha: 0.4),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-        ),
-        // Sol yanak
-        Positioned(
-          left: 15,
-          top: 35,
-          child: Container(
-            width: 25,
-            height: 25,
-            decoration: BoxDecoration(
-              color: skinColor.withValues(alpha: 0.7),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        // Sağ yanak
-        Positioned(
-          right: 15,
-          top: 35,
-          child: Container(
-            width: 25,
-            height: 25,
-            decoration: BoxDecoration(
-              color: skinColor.withValues(alpha: 0.7),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        // Sol göz
-        Positioned(
-          left: 30,
-          top: 25,
-          child: Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: eyeColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: eyeColor.withValues(alpha: 0.5),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Sağ göz
-        Positioned(
-          right: 30,
-          top: 25,
-          child: Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: eyeColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: eyeColor.withValues(alpha: 0.5),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Gülümseme
-        Positioned(
-          bottom: 25,
-          child: Container(
-            width: 40,
-            height: 20,
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: eyeColor.withValues(alpha: 0.8),
-                  width: 3,
-                ),
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
-              ),
-            ),
-          ),
-        ),
-        // Şapka (varsa)
-        if (provider.accessories.any((a) => a.type == 'hat'))
-          Positioned(
-            top: -15,
-            child: Container(
-              width: 75,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.hatColor,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.hatColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        // Gözlük (varsa)
-        if (provider.accessories.any((a) => a.type == 'glasses'))
-          Positioned(
-            top: 20,
-            child: Container(
-              width: 65,
-              height: 20,
-              decoration: BoxDecoration(
-                color: AppColors.glassesColor.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.glassesColor,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-        // Atkı (varsa)
-        if (provider.accessories.any((a) => a.type == 'scarf'))
-          Positioned(
-            bottom: -8,
-            child: Container(
-              width: 90,
-              height: 15,
-              decoration: BoxDecoration(
-                color: AppColors.scarfColor,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.scarfColor.withValues(alpha: 0.4),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // Tank dekorasyonu çizimi
-  Widget _buildTankDecoration(TankDecoration decoration, double tankWidth, double tankHeight) {
-    final x = decoration.x * tankWidth;
-    final y = decoration.y * tankHeight;
-
-    Widget decorationWidget;
-    
-    switch (decoration.type) {
-      case 'coral':
-        decorationWidget = Container(
-          width: 40,
-          height: 50,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF6B9D).withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6B9D).withValues(alpha: 0.4),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(left: 5, top: 10, child: Container(width: 8, height: 20, decoration: BoxDecoration(color: const Color(0xFFFF8FAB).withValues(alpha: 0.9), borderRadius: BorderRadius.circular(4)))),
-              Positioned(right: 5, top: 15, child: Container(width: 8, height: 18, decoration: BoxDecoration(color: const Color(0xFFFF8FAB).withValues(alpha: 0.9), borderRadius: BorderRadius.circular(4)))),
-              Positioned(left: 16, top: 5, child: Container(width: 8, height: 15, decoration: BoxDecoration(color: const Color(0xFFFF8FAB).withValues(alpha: 0.9), borderRadius: BorderRadius.circular(4)))),
-            ],
-          ),
-        );
-        break;
-      case 'starfish':
-        decorationWidget = Container(
-          width: 35,
-          height: 35,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFD93D).withValues(alpha: 0.9),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFD93D).withValues(alpha: 0.4),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: CustomPaint(
-            painter: _StarfishPainter(),
-          ),
-        );
-        break;
-      case 'bubbles':
-        decorationWidget = Stack(
-          children: [
-            Container(width: 20, height: 20, decoration: BoxDecoration(color: AppColors.waterColor.withValues(alpha: 0.6), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2))),
-            Positioned(left: 15, top: 5, child: Container(width: 15, height: 15, decoration: BoxDecoration(color: AppColors.waterColor.withValues(alpha: 0.5), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5)))),
-            Positioned(left: 8, top: 20, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: AppColors.waterColor.withValues(alpha: 0.4), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1)))),
-          ],
-        );
-        break;
-      default:
-        decorationWidget = const SizedBox.shrink();
-    }
+    // Kategoriye göre dekorasyon widget'ı
+    Widget decorationWidget = _buildDecorationByCategory(decoration);
 
     return Positioned(
-      left: x - (decoration.type == 'coral' ? 20 : decoration.type == 'starfish' ? 17.5 : 15),
-      top: y - (decoration.type == 'coral' ? 25 : decoration.type == 'starfish' ? 17.5 : 15),
+      left: x - 30, // Merkezleme için
+      top: y - 30,
       child: decorationWidget,
     );
   }
 
-  Color _getSkinColor(String colorName) {
-    switch (colorName.toLowerCase()) {
-      case 'pink':
-        return AppColors.pinkSkin;
-      case 'blue':
-        return AppColors.blueSkin;
-      case 'yellow':
-        return AppColors.yellowSkin;
-      case 'green':
-        return AppColors.greenSkin;
-      default:
-        return AppColors.pinkSkin;
-    }
-  }
-
-  Color _getEyeColor(String colorName) {
-    switch (colorName.toLowerCase()) {
-      case 'black':
-        return AppColors.blackEye;
-      case 'brown':
-        return AppColors.brownEye;
-      case 'blue':
-        return AppColors.blueEye;
-      default:
-        return AppColors.blackEye;
-    }
-  }
-}
-
-// Floating animasyonlu aksolot widget'ı
-class _FloatingAxolotl extends StatefulWidget {
-  final AxolotlProvider axolotlProvider;
-  final double fillPercentage;
-  final double tankHeight;
-  final Widget Function(AxolotlProvider) buildAxolotl;
-
-  const _FloatingAxolotl({
-    required this.axolotlProvider,
-    required this.fillPercentage,
-    required this.tankHeight,
-    required this.buildAxolotl,
-  });
-
-  @override
-  State<_FloatingAxolotl> createState() => _FloatingAxolotlState();
-}
-
-class _FloatingAxolotlState extends State<_FloatingAxolotl>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _animation = Tween<double>(begin: -10.0, end: 10.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final waterHeight = widget.tankHeight * widget.fillPercentage;
-    final minPosition = widget.tankHeight * 0.2;
-    final waterTopPosition = waterHeight;
-    final targetPosition = waterTopPosition > minPosition 
-        ? waterTopPosition - 60
-        : minPosition;
-    final baseOffset = targetPosition - (widget.tankHeight / 2);
-
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, baseOffset + _animation.value),
-          child: widget.buildAxolotl(widget.axolotlProvider),
+  // Kategoriye göre dekorasyon widget'ı
+  Widget _buildDecorationByCategory(DecorationItem decoration) {
+    switch (decoration.category) {
+      case 'Zemin/Kum':
+        return Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: const Color(0xFFD4A574).withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: const Color(0xFFD4A574).withValues(alpha: 0.9),
+              width: 2,
+            ),
+          ),
+          child: const Icon(
+            Icons.landscape,
+            color: Color(0xFF8B6F47),
+            size: 32,
+          ),
         );
-      },
-    );
+      case 'Arka Plan':
+        return Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: const Color(0xFF6B9BD1).withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(40),
+            border: Border.all(
+              color: const Color(0xFF6B9BD1).withValues(alpha: 0.8),
+              width: 2,
+            ),
+          ),
+          child: const Icon(
+            Icons.water,
+            color: Color(0xFF4A7BA7),
+            size: 40,
+          ),
+        );
+      case 'Süs':
+        return Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF6B9D).withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(
+              color: const Color(0xFFFF6B9D).withValues(alpha: 0.9),
+              width: 2,
+            ),
+          ),
+          child: const Icon(
+            Icons.star,
+            color: Color(0xFFFF8FAB),
+            size: 28,
+          ),
+        );
+      default:
+        return Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: AppColors.softPink.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: const Icon(
+            Icons.auto_awesome,
+            color: AppColors.softPink,
+            size: 28,
+          ),
+        );
+    }
   }
 }
 
@@ -741,35 +338,3 @@ class _AlgaePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-// Deniz yıldızı çizim painter'ı
-class _StarfishPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFFFE66D)
-      ..style = PaintingStyle.fill;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 2;
-
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final angle = (i * 2 * 3.14159 / 5) - (3.14159 / 2);
-      final x = center.dx + radius * 0.8 * math.cos(angle);
-      final y = center.dy + radius * 0.8 * math.sin(angle);
-      
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-

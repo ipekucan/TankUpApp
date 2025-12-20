@@ -78,6 +78,7 @@ class UserProvider extends ChangeNotifier {
   // Kullanıcı verilerini kaydet
   Future<void> _saveUserData() async {
     try {
+      // SharedPreferences işlemini optimize et
       final prefs = await SharedPreferences.getInstance();
       
       // Kullanıcı verilerini kaydet
@@ -93,6 +94,9 @@ class UserProvider extends ChangeNotifier {
       await prefs.setInt(_consecutiveDaysKey, _consecutiveDays);
     } catch (e) {
       // Hata durumunda sessizce devam et
+      if (kDebugMode) {
+        print('UserProvider kayıt hatası: $e');
+      }
     }
   }
 
@@ -106,6 +110,98 @@ class UserProvider extends ChangeNotifier {
   // Kullanıcı adını güncelle (updateName alias)
   Future<void> updateName(String name) async {
     await setName(name);
+  }
+  
+  // Boy ve kilo güncelle
+  Future<void> updateHeightWeight(double? height, double? weight) async {
+    _userData = _userData.copyWith(height: height, weight: weight);
+    await _saveUserData();
+    notifyListeners();
+  }
+  
+  // Vücut Kitle Endeksi (VKE/BMI) hesapla
+  double? get bmi {
+    if (_userData.height == null || _userData.weight == null) return null;
+    if (_userData.height! <= 0 || _userData.weight! <= 0) return null;
+    
+    // BMI = kilo / (boy/100)²
+    final heightInMeters = _userData.height! / 100.0;
+    return _userData.weight! / (heightInMeters * heightInMeters);
+  }
+  
+  // Gelişmiş su hedefi hesapla (kilo, aktivite, yaş faktörleri)
+  double calculateIdealWaterGoal() {
+    if (_userData.weight == null) {
+      return 5000.0; // Varsayılan 5L
+    }
+    
+    // Temel formül: 35ml/kg
+    double baseGoal = 35.0 * _userData.weight!;
+    
+    // Aktivite faktörü
+    double activityBonus = 0.0;
+    if (_userData.activityLevel == 'high') {
+      activityBonus = 500.0; // Yüksek aktivite için +500ml
+    } else if (_userData.activityLevel == 'medium') {
+      activityBonus = 250.0; // Orta aktivite için +250ml
+    }
+    // Düşük aktivite için bonus yok
+    
+    // Yaş faktörü
+    double ageAdjustment = 0.0;
+    if (_userData.age != null) {
+      if (_userData.age! < 18) {
+        // Gençler için hafif artış
+        ageAdjustment = baseGoal * 0.05; // %5 artış
+      } else if (_userData.age! > 65) {
+        // Yaşlılar için hafif azalış (doktor kontrolü önerilir)
+        ageAdjustment = -baseGoal * 0.05; // %5 azalış
+      }
+    }
+    
+    // Toplam hedef
+    final idealGoal = baseGoal + activityBonus + ageAdjustment;
+    
+    // Minimum 1500ml, maksimum 5000ml
+    return idealGoal.clamp(1500.0, 5000.0);
+  }
+  
+  // Profil verilerini güncelle
+  Future<void> updateProfile({
+    String? name,
+    double? height,
+    double? weight,
+    String? gender,
+    int? age,
+    String? activityLevel,
+    String? wakeUpTime,
+    String? sleepTime,
+  }) async {
+    // Önce state'i güncelle (name opsiyonel, eğer null ise mevcut değeri koru)
+    _userData = _userData.copyWith(
+      name: name ?? _userData.name,
+      height: height,
+      weight: weight,
+      gender: gender,
+      age: age,
+      activityLevel: activityLevel,
+      wakeUpTime: wakeUpTime,
+      sleepTime: sleepTime,
+    );
+    
+    // UI'ı hemen güncelle
+    notifyListeners();
+    
+    // Kayıt işlemini arka planda yap
+    await _saveUserData();
+  }
+  
+  // Profil tamamlanmış mı kontrolü (sadece temel bilgiler)
+  bool get isProfileComplete {
+    return _userData.height != null &&
+        _userData.weight != null &&
+        _userData.gender != null &&
+        _userData.activityLevel != null;
   }
   
   // İsim var mı kontrolü

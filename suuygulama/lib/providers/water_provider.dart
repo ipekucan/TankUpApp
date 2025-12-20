@@ -2,17 +2,20 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/water_model.dart';
+import '../models/drink_model.dart';
 
 class WaterProvider extends ChangeNotifier {
   static const String _waterDataKey = 'water_data';
   static const String _lastDrinkTimeKey = 'last_drink_time';
   static const String _lastResetDateKey = 'last_reset_date';
+  static const String _drinkHistoryKey = 'drink_history'; // Son 30 günün verileri
   static const double _dailyLimit = 5000.0; // 5 litre günlük limit (ml)
   
   WaterModel _waterData = WaterModel.initial();
   DateTime? _lastDrinkTime;
   DateTime? _lastResetDate;
   bool _isFirstDrink = true;
+  Map<String, double> _drinkHistory = {}; // Tarih (YYYY-MM-DD) -> Miktar (ml)
 
   // Günlük su hedefi
   double get dailyGoal => _waterData.dailyGoal;
@@ -25,6 +28,12 @@ class WaterProvider extends ChangeNotifier {
 
   // TankCoin miktarı
   int get tankCoins => _waterData.tankCoins;
+
+  // Günlük toplam kalori
+  double get dailyCalories => _waterData.dailyCalories;
+
+  // Son 30 günün içme verileri
+  Map<String, double> get drinkHistory => Map.unmodifiable(_drinkHistory);
 
   // Tüm su verileri
   WaterModel get waterData => _waterData;
@@ -110,8 +119,26 @@ class WaterProvider extends ChangeNotifier {
         _lastResetDate = null;
       }
       
+      // İçme geçmişini yükle (30 günlük veri)
+      final drinkHistoryJson = prefs.getString(_drinkHistoryKey);
+      if (drinkHistoryJson != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(drinkHistoryJson);
+          _drinkHistory = decoded.map((key, value) => MapEntry(key, (value as num).toDouble()));
+          // 30 günden eski verileri temizle
+          _cleanOldHistory();
+        } catch (e) {
+          _drinkHistory = {};
+        }
+      } else {
+        _drinkHistory = {};
+      }
+      
       // Gün kontrolü yap (yeni gün başladıysa verileri sıfırla)
       await _checkAndResetDay();
+      
+      // Eski içme geçmişini temizle
+      _cleanOldHistory();
       
       // consumedAmount'un kesinlikle 0.0 olduğundan emin ol (son kontrol)
       // Eski veriyi temizle - bir kerelik sıfırlama (tank dolu başlama sorununu çözmek için)
@@ -153,6 +180,9 @@ class WaterProvider extends ChangeNotifier {
       if (_lastResetDate != null) {
         await prefs.setString(_lastResetDateKey, _lastResetDate!.toIso8601String());
       }
+      
+      // İçme geçmişini kaydet (30 günlük veri)
+      await prefs.setString(_drinkHistoryKey, jsonEncode(_drinkHistory));
     } catch (e) {
       // Hata durumunda sessizce devam et
     }
@@ -180,6 +210,7 @@ class WaterProvider extends ChangeNotifier {
       _waterData = _waterData.copyWith(
         consumedAmount: 0.0, // Günlük içilen su sıfırlanır
         progressPercentage: 0.0, // İlerleme sıfırlanır
+        dailyCalories: 0.0, // Günlük kalori sıfırlanır
         dailyGoal: 5000.0, // Günlük hedef 5L olarak ayarlanır
         lastDrinkTime: null, // Son su içme zamanı sıfırlanır
       );
@@ -211,9 +242,14 @@ class WaterProvider extends ChangeNotifier {
     }
   }
 
-  // Su içme fonksiyonu - 'Su İç' butonuna basıldığında çağrılır
-  // Sadece günlük limit kontrolü yapar (5 litre)
+  // Su içme fonksiyonu - Varsayılan olarak su içer (geriye uyumluluk için)
   Future<DrinkWaterResult> drinkWater() async {
+    final water = DrinkData.getDrinks().firstWhere((d) => d.id == 'water');
+    return drink(water, 250.0);
+  }
+
+  // İçecek içme fonksiyonu - İçecek ve miktar parametreleri ile
+  Future<DrinkWaterResult> drink(Drink drink, double amount) async {
     // Günlük limit kontrolü (5 litre)
     if (hasReachedDailyLimit) {
       return DrinkWaterResult(
@@ -223,11 +259,17 @@ class WaterProvider extends ChangeNotifier {
       );
     }
 
-    const waterAmount = 250.0; // 250ml su miktarı
-    const coinsReward = 10; // Her içişte 10 TankCoin
+    // Hidrasyon faktörüne göre efektif miktarı hesapla
+    final effectiveAmount = amount * drink.hydrationFactor;
+    
+    // Kalori hesapla (100ml başına kalori * miktar / 100)
+    final calories = (drink.caloriePer100ml * amount) / 100.0;
 
-    // Su miktarını 250ml artır
-    final newConsumedAmount = _waterData.consumedAmount + waterAmount;
+    // Su miktarını efektif miktar kadar artır
+    final newConsumedAmount = _waterData.consumedAmount + effectiveAmount;
+    
+    // Kaloriyi ekle
+    final newDailyCalories = _waterData.dailyCalories + calories;
 
     // Günlük limit kontrolü (ekstra güvenlik - 5 litre)
     if (newConsumedAmount > _dailyLimit) {
@@ -238,18 +280,23 @@ class WaterProvider extends ChangeNotifier {
       );
     }
 
-    // TankCoin miktarını 10 artır
+    const coinsReward = 10; // Her içişte 10 TankCoin
     final newTankCoins = _waterData.tankCoins + coinsReward;
 
     // Son su içme zamanını güncelle
     final now = DateTime.now();
     _lastDrinkTime = now;
 
+    // Bugünün tarihini al (YYYY-MM-DD formatında)
+    final todayKey = _getDateKey(now);
+    _drinkHistory[todayKey] = (_drinkHistory[todayKey] ?? 0.0) + effectiveAmount;
+
     // Verileri güncelle
     _waterData = _waterData.copyWith(
       consumedAmount: newConsumedAmount,
       tankCoins: newTankCoins,
       lastDrinkTime: now,
+      dailyCalories: newDailyCalories,
     );
 
     // İlerleme yüzdesini güncelle
@@ -267,10 +314,27 @@ class WaterProvider extends ChangeNotifier {
 
     return DrinkWaterResult(
       success: true,
-      message: 'Su içildi! +$coinsReward Coin',
+      message: '${drink.name} içildi! +$coinsReward Coin',
       coinsReward: coinsReward,
       isFirstDrink: wasFirstDrink,
     );
+  }
+
+  // Tarih anahtarı oluştur (YYYY-MM-DD)
+  String _getDateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  // 30 günden eski verileri temizle
+  void _cleanOldHistory() {
+    final now = DateTime.now();
+    final cutoffDate = now.subtract(const Duration(days: 30));
+    final cutoffKey = _getDateKey(cutoffDate);
+    
+    _drinkHistory.removeWhere((key, value) {
+      // Tarih karşılaştırması (string karşılaştırması yeterli çünkü YYYY-MM-DD formatı)
+      return key.compareTo(cutoffKey) < 0;
+    });
   }
 
   // Aksolot mesajları listesi (15-20 mesaj)
@@ -376,6 +440,7 @@ class WaterProvider extends ChangeNotifier {
     _lastDrinkTime = null;
     _lastResetDate = null;
     _isFirstDrink = true;
+    _drinkHistory = {};
     await _saveWaterData();
     notifyListeners();
   }
@@ -402,6 +467,15 @@ class WaterProvider extends ChangeNotifier {
       await _saveWaterData();
       notifyListeners();
     }
+  }
+
+  // Coin'i sıfırla (onboarding tamamlandığında)
+  Future<void> resetCoins() async {
+    _waterData = _waterData.copyWith(
+      tankCoins: 0,
+    );
+    await _saveWaterData();
+    notifyListeners();
   }
 
   // Tüm verileri sıfırlama

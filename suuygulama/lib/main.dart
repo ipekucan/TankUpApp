@@ -1,11 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/water_provider.dart';
-import 'providers/axolotl_provider.dart';
+import 'providers/aquarium_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/achievement_provider.dart';
+import 'providers/drink_provider.dart';
 import 'screens/initial_screen.dart';
 import 'utils/app_colors.dart';
 import 'services/notification_service.dart';
@@ -13,21 +15,32 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // TEST: Tüm eski hatalı verileri temizle (bir kez çalıştırılacak, sonra silinebilir)
-  // Bu satırı test sonrası silebilirsiniz
+  // HAFIZA RESET (Geçici - bir kez çalıştırılacak, sonra silinebilir)
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   } catch (e) {
-    // Hata durumunda sessizce devam et
+    if (kDebugMode) {
+      print('Hafıza temizleme hatası: $e');
+    }
   }
   
-  // Bildirim servisini başlat
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  
-  // Günlük bildirimleri ayarla
-  await notificationService.scheduleDailyNotifications();
+  // Bildirim servisini arka planda başlat - uygulama başlatmayı engellemesin
+  Future.microtask(() async {
+    try {
+      final notificationService = NotificationService();
+      await notificationService.initialize();
+      
+      // Günlük bildirimleri ayarla (varsayılan saatlerle)
+      // Profil tamamlandığında güncellenecek
+      await notificationService.scheduleDailyNotifications();
+    } catch (e) {
+      // Bildirim hatası uygulama başlatmayı engellemesin
+      if (kDebugMode) {
+        print('Bildirim servisi başlatma hatası: $e');
+      }
+    }
+  });
   
   runApp(const TankUpApp());
 }
@@ -41,19 +54,23 @@ class TankUpApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => WaterProvider(),
-          lazy: false, // Verilerin hemen yüklenmesi için
+          lazy: true, // İhtiyaç duyulduğunda yükle
         ),
         ChangeNotifierProvider(
-          create: (_) => AxolotlProvider(),
-          lazy: false,
+          create: (_) => AquariumProvider(),
+          lazy: true,
         ),
         ChangeNotifierProvider(
           create: (_) => UserProvider(),
-          lazy: false,
+          lazy: true,
         ),
         ChangeNotifierProvider(
           create: (_) => AchievementProvider(),
-          lazy: false,
+          lazy: true,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DrinkProvider(),
+          lazy: true,
         ),
       ],
       child: MaterialApp(

@@ -10,28 +10,28 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  // Şirin bildirim mesajları (aksolotun ağzından)
+  // Şirin bildirim mesajları
   final List<String> _notificationMessages = [
-    '💧 Susadım! Bana bir bardak su getirir misin?',
-    '🌊 Su içme zamanı geldi! Ben de içeyim mi?',
-    '💙 Aksolotun susadı! Hadi birlikte su içelim!',
-    '💧 Tankımda su azaldı, beni besler misin?',
-    '🌊 Su içmeyi unutma! Ben de seninle içmek istiyorum!',
-    '💙 Biraz susadım, bir bardak su içer misin?',
-    '💧 Su içme vakti! Aksolotun seni bekliyor!',
-    '🌊 Hadi su içelim! Ben de çok susadım!',
+    '💧 Su içme zamanı geldi!',
+    '🌊 Hidrasyon için bir bardak su iç!',
+    '💙 Su içmeyi unutma!',
+    '💧 Vücudun suya ihtiyacı var!',
+    '🌊 Bir bardak su iç ve kendini iyi hisset!',
+    '💙 Su içme vakti!',
+    '💧 Hidrasyon önemli!',
+    '🌊 Su içmeyi hatırla!',
   ];
 
   // Bildirim başlıkları
   final List<String> _notificationTitles = [
-    'Aksolotun Susadı! 💧',
-    'Su İçme Zamanı! 🌊',
-    'Aksolotun Mesajı 💙',
-    'Su Hatırlatıcısı 💧',
-    'Birlikte Su İçelim! 🌊',
-    'Aksolotun İsteği 💙',
-    'Su Vakti! 💧',
-    'Susadım! 🌊',
+    'Su İçme Zamanı! 💧',
+    'Hidrasyon Hatırlatıcısı 🌊',
+    'Su Hatırlatıcısı 💙',
+    'Su İçme Vakti 💧',
+    'Hidrasyon Önemli 🌊',
+    'Su Hatırlatıcısı 💙',
+    'Su İçme Zamanı 💧',
+    'Hidrasyon Hatırlatıcısı 🌊',
   ];
 
   // Bildirim servisini başlat
@@ -89,30 +89,88 @@ class NotificationService {
     // (örneğin uygulamayı açmak)
   }
 
-  // Periyodik bildirimleri ayarla (günde 8 kez, 2 saatte bir)
-  Future<void> scheduleDailyNotifications() async {
+  // Periyodik bildirimleri ayarla (uyku düzenine göre)
+  Future<void> scheduleDailyNotifications({
+    String? wakeUpTime,
+    String? sleepTime,
+  }) async {
     // Önce mevcut bildirimleri iptal et
     await cancelAllNotifications();
 
-    // İlk bildirim saati (sabah 8:00)
+    // Varsayılan saatler (eğer kullanıcı ayarlamadıysa)
+    int wakeHour = 7;
+    int wakeMinute = 0;
+    int sleepHour = 23;
+    int sleepMinute = 0;
+
+    // Kullanıcının uyku düzenini parse et
+    if (wakeUpTime != null) {
+      final wakeParts = wakeUpTime.split(':');
+      if (wakeParts.length == 2) {
+        wakeHour = int.tryParse(wakeParts[0]) ?? 7;
+        wakeMinute = int.tryParse(wakeParts[1]) ?? 0;
+      }
+    }
+
+    if (sleepTime != null) {
+      final sleepParts = sleepTime.split(':');
+      if (sleepParts.length == 2) {
+        sleepHour = int.tryParse(sleepParts[0]) ?? 23;
+        sleepMinute = int.tryParse(sleepParts[1]) ?? 0;
+      }
+    }
+
+    // Uyanık saat aralığını hesapla
     final now = tz.TZDateTime.now(tz.local);
     var firstNotificationTime = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
       now.day,
-      8, // Saat 8
-      0, // Dakika 0
+      wakeHour,
+      wakeMinute,
     );
 
-    // Eğer şu anki saat 8:00'dan geçtiyse, yarın 8:00'dan başlat
+    // Eğer şu anki saat uyanma saatinden geçtiyse, yarın başlat
     if (now.isAfter(firstNotificationTime)) {
       firstNotificationTime = firstNotificationTime.add(const Duration(days: 1));
     }
 
-    // Günde 8 bildirim (2 saatte bir: 8:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00)
-    for (int i = 0; i < 8; i++) {
-      final notificationTime = firstNotificationTime.add(Duration(hours: i * 2));
+    // Uyanık saat aralığı (dakika cinsinden)
+    int wakeMinutes = wakeHour * 60 + wakeMinute;
+    int sleepMinutes = sleepHour * 60 + sleepMinute;
+    
+    // Eğer uyuma saati uyanma saatinden önceyse (gece yarısını geçiyorsa)
+    if (sleepMinutes < wakeMinutes) {
+      sleepMinutes += 24 * 60; // 24 saat ekle
+    }
+    
+    int awakeDuration = sleepMinutes - wakeMinutes; // Dakika cinsinden uyanık süre
+    
+    // Her 2 saatte bir bildirim gönder (maksimum 8 bildirim)
+    int notificationCount = (awakeDuration / 120).ceil().clamp(1, 8);
+    int intervalMinutes = (awakeDuration / notificationCount).round();
+
+    // Bildirimleri zamanla
+    for (int i = 0; i < notificationCount; i++) {
+      final notificationTime = firstNotificationTime.add(Duration(minutes: i * intervalMinutes));
+      
+      // Uyuma saatinden sonra bildirim gönderme
+      final notificationMinutes = notificationTime.hour * 60 + notificationTime.minute;
+      final sleepMinutesToday = sleepHour * 60 + sleepMinute;
+      
+      // Eğer bildirim uyuma saatinden sonraysa, atla
+      if (sleepMinutes < wakeMinutes) {
+        // Gece yarısını geçen durum
+        if (notificationMinutes >= sleepMinutesToday && notificationMinutes < wakeMinutes) {
+          continue;
+        }
+      } else {
+        // Normal durum
+        if (notificationMinutes >= sleepMinutesToday) {
+          continue;
+        }
+      }
       
       // Mesaj ve başlık seç (döngüsel olarak)
       final messageIndex = i % _notificationMessages.length;

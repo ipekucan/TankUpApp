@@ -3,9 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../utils/app_colors.dart';
-import '../models/axolotl_model.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/drink_provider.dart';
+import '../models/drink_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,46 +18,16 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
-  AxolotlPreset? _selectedPreset; // Sadece profil avatar'ı için seçili preset
   double _dailyGoalSlider = 5000.0; // Günlük hedef slider değeri
-
-  // Niş Aksolot Taslakları - Profil 1, Profil 2, vb.
-  final List<AxolotlPreset> _presets = [
-    AxolotlPreset(
-      name: 'Profil 1',
-      description: 'Yazlık Gözlüklü',
-      skinColor: 'Pink',
-      eyeColor: 'Black',
-      accessories: [
-        Accessory(type: 'glasses', name: 'Güneş Gözlüğü', color: 'Gray'),
-      ],
-    ),
-    AxolotlPreset(
-      name: 'Profil 2',
-      description: 'Kışlık Atkılı',
-      skinColor: 'Blue',
-      eyeColor: 'Brown',
-      accessories: [
-        Accessory(type: 'scarf', name: 'Kırmızı Atkı', color: 'Red'),
-      ],
-    ),
-    AxolotlPreset(
-      name: 'Profil 3',
-      description: 'Şapkalı Şık',
-      skinColor: 'Pink',
-      eyeColor: 'Blue',
-      accessories: [
-        Accessory(type: 'hat', name: 'Şık Şapka', color: 'Gold'),
-      ],
-    ),
-    AxolotlPreset(
-      name: 'Profil 4',
-      description: 'Minimalist',
-      skinColor: 'Pink',
-      eyeColor: 'Black',
-      accessories: [],
-    ),
-  ];
+  final TextEditingController _heightController = TextEditingController();
+  final TextEditingController _weightController = TextEditingController();
+  
+  @override
+  void dispose() {
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -76,11 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _selectPreset(AxolotlPreset preset) {
-    setState(() {
-      _selectedPreset = preset;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +77,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             });
           }
           
+          // Boy ve kilo değerlerini yükle
+          if (_heightController.text.isEmpty && userProvider.userData.height != null) {
+            _heightController.text = userProvider.userData.height!.toStringAsFixed(0);
+          }
+          if (_weightController.text.isEmpty && userProvider.userData.weight != null) {
+            _weightController.text = userProvider.userData.weight!.toStringAsFixed(1);
+          }
+          
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -135,176 +109,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildWeeklyChart(),
                 const SizedBox(height: 30),
                 
+                // Boy ve Kilo Girişi
+                _buildHeightWeightInput(waterProvider, userProvider),
+                const SizedBox(height: 30),
+                
                 // Günlük Hedef Ayarı
                 _buildDailyGoalSlider(waterProvider),
                 const SizedBox(height: 30),
                 
-                // Niş Aksolot Taslakları başlığı
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Niş Aksolot Taslakları',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4A5568),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Yatay kaydırma çubuğu - Taslaklar
-            SizedBox(
-              height: 140,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _presets.length,
-                itemBuilder: (context, index) {
-                  final preset = _presets[index];
-                  final isSelected = _selectedPreset == preset;
-                  
-                  return Container(
-                    width: 120,
-                    margin: const EdgeInsets.only(right: 16),
-                    child: InkWell(
-                      onTap: () => _selectPreset(preset),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.softPinkButton
-                                : Colors.grey.withValues(alpha: 0.2),
-                            width: isSelected ? 3 : 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Mini aksolot önizleme
-                            Container(
-                              width: 70,
-                              height: 70,
-                              decoration: BoxDecoration(
-                                color: _getSkinColor(preset.skinColor).withValues(alpha: 0.3),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _getSkinColor(preset.skinColor),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Gövde
-                                  Container(
-                                    width: 50,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: _getSkinColor(preset.skinColor),
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                  ),
-                                  // Gözler
-                                  Positioned(
-                                    left: 12,
-                                    top: 10,
-                                    child: Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: _getEyeColor(preset.eyeColor),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 12,
-                                    top: 10,
-                                    child: Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: _getEyeColor(preset.eyeColor),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                  // Aksesuarlar
-                                  if (preset.accessories.any((a) => a.type == 'hat'))
-                                    Positioned(
-                                      top: -5,
-                                      child: Container(
-                                        width: 40,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.hatColor,
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                    ),
-                                  if (preset.accessories.any((a) => a.type == 'glasses'))
-                                    Positioned(
-                                      top: 8,
-                                      child: Container(
-                                        width: 35,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.glassesColor.withValues(alpha: 0.8),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
-                                  if (preset.accessories.any((a) => a.type == 'scarf'))
-                                    Positioned(
-                                      bottom: 0,
-                                      child: Container(
-                                        width: 45,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.scarfColor,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              preset.name,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                color: isSelected
-                                    ? AppColors.softPinkButton
-                                    : const Color(0xFF4A5568),
-                              ),
-                            ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppColors.softPinkButton,
-                                size: 20,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
+                // İçecek Yönetimi
+                _buildDrinkManagement(),
+                const SizedBox(height: 30),
             
             // Test Butonları
             Row(
@@ -314,14 +129,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ElevatedButton.icon(
                   onPressed: () async {
                     await waterProvider.simulateDirtyTank();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Tank kirliliği simüle edildi (25 saat öncesi)'),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
-                    }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Tank kirliliği simüle edildi (25 saat öncesi)'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.water_drop, size: 18),
                   label: const Text('Kirliliği Simüle Et'),
@@ -338,6 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Verileri Sıfırla Butonu (uzun basışla)
                 GestureDetector(
                   onLongPress: () async {
+                    if (!context.mounted) return;
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -357,11 +172,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     );
                     if (confirm == true) {
                       await waterProvider.resetData();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Veriler sıfırlandı')),
-                        );
-                      }
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Veriler sıfırlandı')),
+                      );
                     }
                   },
                   child: Container(
@@ -422,161 +236,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
     
-    // Eğer preset seçildiyse, preset'e göre aksolot avatar'ı göster
-    if (_selectedPreset != null) {
-      return GestureDetector(
-        onTap: _pickImage,
-        child: Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.5),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.softPinkButton.withValues(alpha: 0.3),
-              width: 3,
-            ),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Gövde
-              Container(
-                width: 80,
-                height: 65,
-                decoration: BoxDecoration(
-                  color: _getSkinColor(_selectedPreset!.skinColor),
-                  borderRadius: BorderRadius.circular(40),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _getSkinColor(_selectedPreset!.skinColor).withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-              ),
-              // Sol yanak
-              Positioned(
-                left: 20,
-                top: 25,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: _getSkinColor(_selectedPreset!.skinColor).withValues(alpha: 0.7),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Sağ yanak
-              Positioned(
-                right: 20,
-                top: 25,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: _getSkinColor(_selectedPreset!.skinColor).withValues(alpha: 0.7),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Sol göz
-              Positioned(
-                left: 25,
-                top: 20,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _getEyeColor(_selectedPreset!.eyeColor),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Sağ göz
-              Positioned(
-                right: 25,
-                top: 20,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _getEyeColor(_selectedPreset!.eyeColor),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Gülümseme
-              Positioned(
-                bottom: 20,
-                child: Container(
-                  width: 30,
-                  height: 15,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: _getEyeColor(_selectedPreset!.eyeColor).withValues(alpha: 0.8),
-                        width: 2,
-                      ),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(15),
-                      bottomRight: Radius.circular(15),
-                    ),
-                  ),
-                ),
-              ),
-              // Şapka (varsa)
-              if (_selectedPreset!.accessories.any((a) => a.type == 'hat'))
-                Positioned(
-                  top: -10,
-                  child: Container(
-                    width: 55,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: AppColors.hatColor,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                ),
-              // Gözlük (varsa)
-              if (_selectedPreset!.accessories.any((a) => a.type == 'glasses'))
-                Positioned(
-                  top: 15,
-                  child: Container(
-                    width: 50,
-                    height: 15,
-                    decoration: BoxDecoration(
-                      color: AppColors.glassesColor.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.glassesColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              // Atkı (varsa)
-              if (_selectedPreset!.accessories.any((a) => a.type == 'scarf'))
-                Positioned(
-                  bottom: -5,
-                  child: Container(
-                    width: 65,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: AppColors.scarfColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
-    
     // Varsayılan avatar
     return GestureDetector(
       onTap: _pickImage,
@@ -599,64 +258,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
-  Color _getSkinColor(String colorName) {
-    switch (colorName.toLowerCase()) {
-      case 'pink':
-        return AppColors.pinkSkin;
-      case 'blue':
-        return AppColors.blueSkin;
-      case 'yellow':
-        return AppColors.yellowSkin;
-      case 'green':
-        return AppColors.greenSkin;
-      default:
-        return AppColors.pinkSkin;
-    }
-  }
-
-  Color _getEyeColor(String colorName) {
-    switch (colorName.toLowerCase()) {
-      case 'black':
-        return AppColors.blackEye;
-      case 'brown':
-        return AppColors.brownEye;
-      case 'blue':
-        return AppColors.blueEye;
-      default:
-        return AppColors.blackEye;
-    }
-  }
   
   // İstatistik kartları
   Widget _buildStatsCards(WaterProvider waterProvider, UserProvider userProvider) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildStatCard(
-            'Toplam İçilen',
-            '${(userProvider.userData.totalWaterConsumed / 1000).toStringAsFixed(1)}L',
-            Icons.water_drop,
-            AppColors.waterColor,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Toplam İçilen',
+                '${(userProvider.userData.totalWaterConsumed / 1000).toStringAsFixed(1)}L',
+                Icons.water_drop,
+                AppColors.waterColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                'Seri',
+                '${userProvider.consecutiveDays} gün',
+                Icons.local_fire_department,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                'Coin',
+                '${waterProvider.tankCoins}',
+                Icons.monetization_on,
+                AppColors.goldCoin,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Seri',
-            '${userProvider.consecutiveDays} gün',
-            Icons.local_fire_department,
-            Colors.orange,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Coin',
-            '${waterProvider.tankCoins}',
-            Icons.monetization_on,
-            AppColors.goldCoin,
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Günlük Kalori',
+                '${waterProvider.dailyCalories.toStringAsFixed(0)} kcal',
+                Icons.local_fire_department,
+                Colors.red,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -774,6 +422,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   
+  // Boy ve Kilo girişi
+  Widget _buildHeightWeightInput(WaterProvider waterProvider, UserProvider userProvider) {
+    final bmi = userProvider.bmi;
+    final idealGoal = userProvider.calculateIdealWaterGoal();
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Vücut Bilgileri',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4A5568),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _heightController,
+                  decoration: InputDecoration(
+                    labelText: 'Boy (cm)',
+                    hintText: 'Örn: 170',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) async {
+                    if (value.isNotEmpty) {
+                      final height = double.tryParse(value);
+                      final weight = _weightController.text.isNotEmpty
+                          ? double.tryParse(_weightController.text)
+                          : userProvider.userData.weight;
+                      if (height != null && height > 0) {
+                        await userProvider.updateHeightWeight(height, weight);
+                        // İdeal hedefi güncelle
+                        if (weight != null) {
+                          final newIdealGoal = userProvider.calculateIdealWaterGoal();
+                          await waterProvider.updateDailyGoal(newIdealGoal);
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextField(
+                  controller: _weightController,
+                  decoration: InputDecoration(
+                    labelText: 'Kilo (kg)',
+                    hintText: 'Örn: 70',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) async {
+                    if (value.isNotEmpty) {
+                      final weight = double.tryParse(value);
+                      final height = _heightController.text.isNotEmpty
+                          ? double.tryParse(_heightController.text)
+                          : userProvider.userData.height;
+                      if (weight != null && weight > 0) {
+                        await userProvider.updateHeightWeight(height, weight);
+                        // İdeal hedefi güncelle
+                        if (height != null) {
+                          final newIdealGoal = userProvider.calculateIdealWaterGoal();
+                          await waterProvider.updateDailyGoal(newIdealGoal);
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (bmi != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'VKE: ${bmi.toStringAsFixed(1)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4A5568),
+                  ),
+                ),
+                Text(
+                  'İdeal Hedef: ${(idealGoal / 1000).toStringAsFixed(1)}L',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.softPinkButton,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
   // Günlük hedef slider
   Widget _buildDailyGoalSlider(WaterProvider waterProvider) {
     // Slider değerini güncelle
@@ -864,21 +638,329 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  // İçecek Yönetimi Bölümü
+  Widget _buildDrinkManagement() {
+    return Consumer<DrinkProvider>(
+      builder: (context, drinkProvider, child) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'İçecekleri Yönet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4A5568),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showAddDrinkDialog(drinkProvider),
+                    icon: const Icon(Icons.add, size: 20),
+                    label: const Text('Yeni Ekle'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.softPinkButton,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Özel İçecekler Listesi
+              if (drinkProvider.customDrinks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Center(
+                    child: Text(
+                      'Henüz özel içecek eklenmemiş',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...drinkProvider.customDrinks.map((drink) {
+                  return _buildDrinkManagementItem(drink, drinkProvider);
+                }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrinkManagementItem(Drink drink, DrinkProvider drinkProvider) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  drink.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4A5568),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${(drink.hydrationFactor * 100).toStringAsFixed(0)}% hidrasyon • ${drink.caloriePer100ml.toStringAsFixed(0)} kcal/100ml',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20),
+            color: AppColors.softPinkButton,
+            onPressed: () => _showEditDrinkDialog(drink, drinkProvider),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, size: 20),
+            color: Colors.red,
+            onPressed: () => _showDeleteDrinkDialog(drink, drinkProvider),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddDrinkDialog(DrinkProvider drinkProvider) {
+    final nameController = TextEditingController();
+    final calorieController = TextEditingController();
+    final hydrationController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Yeni İçecek Ekle'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'İçecek Adı',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: calorieController,
+                decoration: InputDecoration(
+                  labelText: 'Kalori (100ml başına)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: hydrationController,
+                decoration: InputDecoration(
+                  labelText: 'Hidrasyon Faktörü (0.0-1.0)',
+                  hintText: 'Örn: 0.8 (%80)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final calorie = double.tryParse(calorieController.text);
+              final hydration = double.tryParse(hydrationController.text);
+              
+              if (name.isNotEmpty && calorie != null && hydration != null && 
+                  hydration >= 0.0 && hydration <= 1.0) {
+                final newDrink = Drink(
+                  id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                  name: name,
+                  caloriePer100ml: calorie,
+                  hydrationFactor: hydration,
+                );
+                await drinkProvider.addCustomDrink(newDrink);
+                if (!context.mounted) return;
+                Navigator.pop(context);
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Lütfen tüm alanları doğru şekilde doldurun'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Ekle'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditDrinkDialog(Drink drink, DrinkProvider drinkProvider) {
+    final nameController = TextEditingController(text: drink.name);
+    final calorieController = TextEditingController(text: drink.caloriePer100ml.toString());
+    final hydrationController = TextEditingController(text: drink.hydrationFactor.toString());
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('İçeceği Düzenle'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'İçecek Adı',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: calorieController,
+                decoration: InputDecoration(
+                  labelText: 'Kalori (100ml başına)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: hydrationController,
+                decoration: InputDecoration(
+                  labelText: 'Hidrasyon Faktörü (0.0-1.0)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final calorie = double.tryParse(calorieController.text);
+              final hydration = double.tryParse(hydrationController.text);
+              
+              if (name.isNotEmpty && calorie != null && hydration != null && 
+                  hydration >= 0.0 && hydration <= 1.0) {
+                final updatedDrink = Drink(
+                  id: drink.id,
+                  name: name,
+                  caloriePer100ml: calorie,
+                  hydrationFactor: hydration,
+                );
+                await drinkProvider.updateCustomDrink(drink.id, updatedDrink);
+                if (!context.mounted) return;
+                Navigator.pop(context);
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Lütfen tüm alanları doğru şekilde doldurun'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDrinkDialog(Drink drink, DrinkProvider drinkProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('İçeceği Sil'),
+        content: Text('${drink.name} içeceğini silmek istediğinizden emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await drinkProvider.deleteCustomDrink(drink.id);
+              if (!context.mounted) return;
+              Navigator.pop(context);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// Aksolot preset modeli
-class AxolotlPreset {
-  final String name;
-  final String description;
-  final String skinColor;
-  final String eyeColor;
-  final List<Accessory> accessories;
-
-  AxolotlPreset({
-    required this.name,
-    required this.description,
-    required this.skinColor,
-    required this.eyeColor,
-    required this.accessories,
-  });
-}
