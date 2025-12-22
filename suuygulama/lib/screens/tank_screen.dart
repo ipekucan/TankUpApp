@@ -1,11 +1,15 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
 import '../models/decoration_item.dart';
+import '../models/drink_model.dart';
+import '../widgets/interactive_cup_modal.dart';
 import 'drink_gallery_screen.dart';
 import 'history_screen.dart';
 
@@ -19,8 +23,10 @@ class TankScreen extends StatefulWidget {
 class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late AnimationController _coinAnimationController;
   late Animation<double> _coinScaleAnimation;
-  late AnimationController _tipAnimationController;
-  String _currentTip = '';
+  late AnimationController _scrollIndicatorController;
+  late Animation<double> _scrollIndicatorAnimation;
+  late AnimationController _waveController;
+  late Animation<double> _waveAnimation;
   
   @override
   void initState() {
@@ -37,45 +43,39 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       ),
     );
     
-    // Günün Tavsiyesi animasyonu
-    _tipAnimationController = AnimationController(
-      duration: const Duration(seconds: 2),
+    // Scroll göstergesi animasyonu
+    _scrollIndicatorController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
+    _scrollIndicatorAnimation = Tween<double>(begin: 0.0, end: 10.0).animate(
+      CurvedAnimation(
+        parent: _scrollIndicatorController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _scrollIndicatorController.repeat(reverse: true);
     
-    // İlk tavsiyeyi göster
-    _showRandomTip();
-    _tipAnimationController.forward();
-    
-    // Her 30 saniyede bir yeni tavsiye göster
-    _tipAnimationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _tipAnimationController.reset();
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            _showRandomTip();
-            _tipAnimationController.forward();
-          }
-        });
-      }
-    });
+    // Dalga animasyonu
+    _waveController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+    _waveAnimation = Tween<double>(begin: 0.0, end: 2 * 3.14159).animate(
+      CurvedAnimation(
+        parent: _waveController,
+        curve: Curves.linear,
+      ),
+    );
+    _waveController.repeat();
   }
   
   @override
   void dispose() {
     _coinAnimationController.dispose();
-    _tipAnimationController.dispose();
+    _scrollIndicatorController.dispose();
+    _waveController.dispose();
     super.dispose();
-  }
-  
-  void _showRandomTip() {
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final userName = userProvider.userData.name;
-    
-    setState(() {
-      _currentTip = waterProvider.getRandomMessage(userName);
-    });
   }
   
   void _animateCoin() {
@@ -98,149 +98,174 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   Widget _buildTankView() {
     return Consumer4<WaterProvider, AquariumProvider, UserProvider, AchievementProvider>(
       builder: (context, waterProvider, aquariumProvider, userProvider, achievementProvider, child) {
+        // Performans optimizasyonu: Hesaplamaları önceden yap
         final fillPercentage = waterProvider.tankFillPercentage;
-        
         final consumedAmount = waterProvider.consumedAmount;
         final dailyGoal = waterProvider.dailyGoal;
-        final progressPercentage = (consumedAmount / dailyGoal * 100).clamp(0.0, 100.0);
+        final progressPercentage = dailyGoal > 0 
+            ? (consumedAmount / dailyGoal * 100).clamp(0.0, 100.0)
+            : 0.0;
+        
+        // Dekorasyonları önceden hesapla (build içinde map kullanmamak için)
+        final decorations = aquariumProvider.activeDecorationsList;
         
         return SingleChildScrollView(
           child: Column(
             children: [
-              // Sol Üst Seri Butonu ve Sağ Üst Coin
+              // Sağ Üst: Coin + Streak Butonu (Dikey)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Seri Butonu
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HistoryScreen(),
+                    // Sağ Üst: Coin + Streak (Dikey)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Coin sayacı (animasyonlu)
+                        ScaleTransition(
+                          scale: _coinScaleAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.goldCoin,
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.goldCoin.withValues(alpha: 0.4),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.monetization_on,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${waterProvider.tankCoins}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.local_fire_department,
-                              color: AppColors.softPinkButton,
-                              size: 24,
-                            ),
-                            Text(
-                              '${userProvider.consecutiveDays}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.softPinkButton,
+                        const SizedBox(height: 12),
+                        // Streak Butonu (Sol üstten taşındı)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const HistoryScreen(),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Coin sayacı - Sağda (animasyonlu)
-                    ScaleTransition(
-                      scale: _coinScaleAnimation,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.goldCoin,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.goldCoin.withValues(alpha: 0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.monetization_on,
+                            );
+                          },
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
                               color: Colors.white,
-                              size: 22,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${waterProvider.tankCoins}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department,
+                                  color: AppColors.softPinkButton,
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${userProvider.consecutiveDays}. Gün',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.softPinkButton,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
               
-              // Başlık ve İlerleme
+              // Modern Başlık ve İlerleme - Ferah Düzen
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 8),
                     Text(
                       '${consumedAmount.toStringAsFixed(0)} ml İçildi',
-                      style: const TextStyle(
-                        fontSize: 32,
+                      style: TextStyle(
+                        fontSize: 42,
                         fontWeight: FontWeight.w300,
-                        color: Color(0xFF4A5568),
-                        letterSpacing: 1.2,
+                        color: AppColors.softPinkButton,
+                        letterSpacing: 0.5,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 20),
                     Row(
                       children: [
                         Text(
                           'Hedef: ${(dailyGoal / 1000.0).toStringAsFixed(1)}L',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w400,
                             color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 20),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                           decoration: BoxDecoration(
-                            color: AppColors.softPinkButton.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
+                            color: AppColors.softPinkButton,
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Text(
                             '%${progressPercentage.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: const TextStyle(
+                              fontSize: 17,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.softPinkButton,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
@@ -252,95 +277,190 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               
               const SizedBox(height: 20),
               
-              // Tank Container - Merkezde
+              // Yuvarlak Fanus Tank Tasarımı
               Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                height: MediaQuery.of(context).size.height * 0.5,
+                width: MediaQuery.of(context).size.width * 0.75,
+                height: MediaQuery.of(context).size.width * 0.75, // Kare form (küre için)
                 margin: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                ),
                 child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    // Su seviyesi (doluluk)
-                    if (fillPercentage > 0)
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeInOut,
-                          height: MediaQuery.of(context).size.height * 0.5 * fillPercentage,
-                          decoration: BoxDecoration(
-                            color: AppColors.waterColor.withValues(alpha: 0.7),
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(40),
-                              bottomRight: Radius.circular(40),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.waterColor.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
+                    // Dış Çerçeve - Kalın Border ile Yuvarlak Fanus
+                    Container(
+                      width: MediaQuery.of(context).size.width * 0.75,
+                      height: MediaQuery.of(context).size.width * 0.75,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.softPinkButton,
+                          width: 6, // Kalın border
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.softPinkButton.withValues(alpha: 0.1),
+                            const Color(0xFF9B7EDE).withValues(alpha: 0.1), // Mor
+                            const Color(0xFF6B9BD1).withValues(alpha: 0.1), // Mavi
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
+                            spreadRadius: 5,
                           ),
+                          BoxShadow(
+                            color: const Color(0xFF9B7EDE).withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            offset: const Offset(-5, -5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Su Seviyesi - ClipOval ile Taşma Önleme
+                    ClipOval(
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.75,
+                        height: MediaQuery.of(context).size.width * 0.75,
+                        child: Stack(
+                          children: [
+                            // Su doluluk animasyonu
+                            if (fillPercentage > 0)
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: AnimatedBuilder(
+                                  animation: _waveAnimation,
+                                  builder: (context, child) {
+                                    final waterHeight = MediaQuery.of(context).size.width * 0.75 * fillPercentage;
+                                    return Container(
+                                      height: waterHeight,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            AppColors.waterColor.withValues(alpha: 0.9),
+                                            const Color(0xFF6B9BD1).withValues(alpha: 0.8), // Mavi ton
+                                            AppColors.softPinkButton.withValues(alpha: 0.6), // Pembe ton
+                                          ],
+                                        ),
+                                      ),
+                                      child: CustomPaint(
+                                        size: Size(
+                                          MediaQuery.of(context).size.width * 0.75,
+                                          waterHeight,
+                                        ),
+                                        painter: CircularTankWavePainter(
+                                          waveOffset: _waveAnimation.value,
+                                          fillPercentage: fillPercentage,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                    ),
                     
-                    // Modüler dekorasyonlar - Katmanlı yapı
-                    ...aquariumProvider.activeDecorationsList.map((decoration) {
-                      return _buildDecoration(
+                    // Modüler dekorasyonlar - Yuvarlak tank için optimize edilmiş
+                    ...decorations.map((decoration) {
+                      return _buildCircularDecoration(
                         decoration,
-                        MediaQuery.of(context).size.width * 0.85,
-                        MediaQuery.of(context).size.height * 0.5,
+                        MediaQuery.of(context).size.width * 0.75,
                       );
                     }),
                   ],
                 ),
               ),
               
-              // Su İç Butonu ve İçecek Seçici
+              const SizedBox(height: 20),
+              
+              // Üçlü Yuvarlak Buton Sistemi - Standardize Edilmiş
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // İçecek seçici butonu (+)
-                    GestureDetector(
-                      onTap: () => _showDrinkSelector(context, waterProvider, userProvider, achievementProvider),
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: AppColors.softPinkButton.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AppColors.softPinkButton,
-                            width: 2,
+                    // Sol Buton - Şeffaf (Yer Tutucu) - Aynı Boyutta
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Colors.transparent,
+                    ),
+                    
+                    // Orta Buton - Su Bardağı (Dinamik Metin ile)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Üstte küçük metin (sadece su eklendikten sonra)
+                        FutureBuilder<Map<String, dynamic>>(
+                          future: _getLastAddedAmountWithUnit(),
+                          builder: (context, snapshot) {
+                            final data = snapshot.data;
+                            if (data != null) {
+                              final amount = data['amount'];
+                              final unit = data['unit'] as String;
+                              final hasAmount = amount != null && (amount as num) > 0;
+                              
+                              if (hasAmount) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.softPinkButton.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '+${(amount as double).toStringAsFixed(unit == 'oz' ? 1 : 0)} $unit',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        // Ana Buton - CircleAvatar ile Standardize
+                        GestureDetector(
+                          onTap: () => _showInteractiveCupModal(
+                            context,
+                            waterProvider,
+                            userProvider,
+                            achievementProvider,
+                          ),
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: AppColors.softPinkButton,
+                            child: const Icon(
+                              Icons.local_drink,
+                              color: Colors.white,
+                              size: 32,
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                    
+                    // Sağ Buton - Menü - CircleAvatar ile Standardize
+                    GestureDetector(
+                      onTap: () => _showDrinkSelector(context, waterProvider, userProvider, achievementProvider),
+                      child: CircleAvatar(
+                        radius: 32,
+                        backgroundColor: Colors.white,
                         child: Icon(
-                          Icons.add,
+                          Icons.grid_view,
                           color: AppColors.softPinkButton,
                           size: 28,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Ana su iç butonu
-                    Expanded(
-                      child: GestureDetector(
-                        onLongPress: () => _showDrinkSelector(context, waterProvider, userProvider, achievementProvider),
-                        child: _buildDrinkWaterButton(
-                          waterProvider,
-                          userProvider,
-                          achievementProvider,
                         ),
                       ),
                     ),
@@ -355,7 +475,15 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 achievementProvider,
               ),
               
+              const SizedBox(height: 30),
+              
+              // Hızlı Ekle Barı
+              _buildQuickAddBar(waterProvider, userProvider, achievementProvider),
+              
               const SizedBox(height: 20),
+              
+              // Scroll Göstergesi (Animasyonlu)
+              _buildScrollIndicator(),
             ],
           ),
         );
@@ -363,52 +491,16 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     );
   }
 
-  // Günün Tavsiyesi Şeridi
-  Widget _buildTipBanner() {
-    return FadeTransition(
-      opacity: _tipAnimationController,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.lightbulb_outline,
-              color: Colors.white.withValues(alpha: 0.9),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _currentTip.isEmpty ? 'Günün Tavsiyesi' : _currentTip,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Dekorasyon çizimi
-  Widget _buildDecoration(DecorationItem decoration, double tankWidth, double tankHeight) {
-    final x = decoration.left * tankWidth;
-    final y = (1.0 - decoration.bottom) * tankHeight; // bottom 0.0 = alt, 1.0 = üst
+  // Yuvarlak tank için dekorasyon çizimi
+  Widget _buildCircularDecoration(DecorationItem decoration, double tankDiameter) {
+    // Yuvarlak tank için açı ve yarıçap hesaplama
+    final angle = decoration.left * 2 * math.pi; // 0-1 arası değeri 0-2π'ye çevir
+    final radius = (tankDiameter / 2) * (0.3 + decoration.bottom * 0.4); // Merkezden uzaklık
+    final centerX = tankDiameter / 2;
+    final centerY = tankDiameter / 2;
+    
+    final x = centerX + radius * math.cos(angle) - 25; // Merkezleme için -25
+    final y = centerY + radius * math.sin(angle) - 25;
 
     // Basit dekorasyon widget'ı (icon tabanlı)
     Widget decorationWidget = Container(
@@ -416,11 +508,18 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       height: 50,
       decoration: BoxDecoration(
         color: _getDecorationColor(decoration.category).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(25),
+        shape: BoxShape.circle,
         border: Border.all(
           color: _getDecorationColor(decoration.category).withValues(alpha: 0.8),
           width: 2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Icon(
         _getDecorationIcon(decoration.category),
@@ -430,8 +529,8 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     );
 
     return Positioned(
-      left: x - 25, // Merkezleme için
-      top: y - 25,
+      left: x,
+      top: y,
       child: decorationWidget,
     );
   }
@@ -450,6 +549,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     }
   }
 
+
   // Kategoriye göre icon
   IconData _getDecorationIcon(String category) {
     switch (category) {
@@ -464,104 +564,211 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     }
   }
 
-  // Su İç butonu widget'ı
-  Widget _buildDrinkWaterButton(
+
+  // Hızlı Ekle Barı
+  Widget _buildQuickAddBar(
     WaterProvider waterProvider,
     UserProvider userProvider,
     AchievementProvider achievementProvider,
   ) {
-    final hasReachedLimit = waterProvider.hasReachedDailyLimit;
-    
-    String buttonText = 'Su İç (250ml)';
-    bool isEnabled = !hasReachedLimit;
-    
-    if (hasReachedLimit) {
-      buttonText = 'Günlük Limit Doldu (5 litre)';
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isEnabled
-            ? () async {
-                final result = await waterProvider.drinkWater();
-                
-                if (result.success) {
-                  await userProvider.addToTotalWater(250.0);
-                  
-                  if (result.isFirstDrink) {
-                    final coins = await achievementProvider.checkFirstStep();
-                    if (coins > 0) {
-                      await waterProvider.addCoins(coins);
-                      await userProvider.addAchievement('first_step');
-                    }
-                  }
-                  
-                  final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
-                  if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
-                    final coins = await achievementProvider.checkDailyGoal();
-                    if (coins > 0) {
-                      await waterProvider.addCoins(coins);
-                      await userProvider.addAchievement('daily_goal');
-                      await userProvider.updateConsecutiveDays(true);
-                    }
-                  } else if (waterProvider.hasReachedDailyGoal) {
-                    await userProvider.updateConsecutiveDays(true);
-                  }
-                  
-                  final totalWater = userProvider.userData.totalWaterConsumed;
-                  final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
-                  final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
-                  if (waterMasterCoins > 0 && !wasWaterMasterUnlocked) {
-                    await waterProvider.addCoins(waterMasterCoins);
-                    await userProvider.addAchievement('water_master');
-                  }
-                  
-                  final consecutiveDays = userProvider.consecutiveDays;
-                  final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
-                  final streak3Coins = await achievementProvider.checkStreak3(consecutiveDays);
-                  if (streak3Coins > 0 && !wasStreak3Unlocked) {
-                    await waterProvider.addCoins(streak3Coins);
-                    await userProvider.addAchievement('streak_3');
-                  }
-                  
-                  final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
-                  final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
-                  if (streak7Coins > 0 && !wasStreak7Unlocked) {
-                    await waterProvider.addCoins(streak7Coins);
-                    await userProvider.addAchievement('streak_7');
-                  }
-                  
-                  if (mounted) {
-                    _animateCoin();
-                  }
-                }
-              }
-            : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isEnabled
-              ? AppColors.softPinkButton
-              : Colors.grey[400],
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 60,
-            vertical: 22,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(35),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Hızlı Ekle',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4A5568),
+            ),
           ),
-          elevation: 0,
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Su (250ml)
+              _buildQuickAddButton(
+                icon: Icons.water_drop,
+                label: 'Su',
+                amount: '250ml',
+                color: const Color(0xFF4A9ED8),
+                onTap: () => _quickAddDrink(
+                  waterProvider,
+                  userProvider,
+                  achievementProvider,
+                  DrinkData.getDrinks().firstWhere((d) => d.id == 'water'),
+                  250.0,
+                ),
+              ),
+              // Kahve (150ml)
+              _buildQuickAddButton(
+                icon: Icons.local_cafe,
+                label: 'Kahve',
+                amount: '150ml',
+                color: const Color(0xFF8B4513),
+                onTap: () => _quickAddDrink(
+                  waterProvider,
+                  userProvider,
+                  achievementProvider,
+                  DrinkData.getDrinks().firstWhere((d) => d.id == 'coffee'),
+                  150.0,
+                ),
+              ),
+              // Çay (100ml)
+              _buildQuickAddButton(
+                icon: Icons.emoji_food_beverage,
+                label: 'Çay',
+                amount: '100ml',
+                color: const Color(0xFF6B8E23),
+                onTap: () => _quickAddDrink(
+                  waterProvider,
+                  userProvider,
+                  achievementProvider,
+                  DrinkData.getDrinks().firstWhere((d) => d.id == 'tea'),
+                  100.0,
+                ),
+              ),
+              // Diğer İçecekler (+)
+              _buildQuickAddButton(
+                icon: Icons.add_circle_outline,
+                label: 'Diğer',
+                amount: '',
+                color: AppColors.softPinkButton,
+                onTap: () => _showDrinkSelector(context, waterProvider, userProvider, achievementProvider),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildQuickAddButton({
+    required IconData icon,
+    required String label,
+    required String amount,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
         ),
-        child: Text(
-          buttonText,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.8,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+            if (amount.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                amount,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  color: color.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
+  }
+  
+  Future<void> _quickAddDrink(
+    WaterProvider waterProvider,
+    UserProvider userProvider,
+    AchievementProvider achievementProvider,
+    Drink drink,
+    double amount,
+  ) async {
+    final result = await waterProvider.drink(drink, amount);
+    
+    if (result.success) {
+      await userProvider.addToTotalWater(amount * drink.hydrationFactor);
+      
+      if (result.isFirstDrink) {
+        final coins = await achievementProvider.checkFirstStep();
+        if (coins > 0) {
+          await waterProvider.addCoins(coins);
+          await userProvider.addAchievement('first_step');
+        }
+      }
+      
+      final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
+      if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
+        final coins = await achievementProvider.checkDailyGoal();
+        if (coins > 0) {
+          await waterProvider.addCoins(coins);
+          await userProvider.addAchievement('daily_goal');
+          await userProvider.updateConsecutiveDays(true);
+        }
+      } else if (waterProvider.hasReachedDailyGoal) {
+        await userProvider.updateConsecutiveDays(true);
+      }
+      
+      final totalWater = userProvider.userData.totalWaterConsumed;
+      final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
+      final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
+      if (waterMasterCoins > 0 && !wasWaterMasterUnlocked) {
+        await waterProvider.addCoins(waterMasterCoins);
+        await userProvider.addAchievement('water_master');
+      }
+      
+      final consecutiveDays = userProvider.consecutiveDays;
+      final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
+      final streak3Coins = await achievementProvider.checkStreak3(consecutiveDays);
+      if (streak3Coins > 0 && !wasStreak3Unlocked) {
+        await waterProvider.addCoins(streak3Coins);
+        await userProvider.addAchievement('streak_3');
+      }
+      
+      final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
+      final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
+      if (streak7Coins > 0 && !wasStreak7Unlocked) {
+        await waterProvider.addCoins(streak7Coins);
+        await userProvider.addAchievement('streak_7');
+      }
+      
+      if (mounted) {
+        _animateCoin();
+      }
+    }
   }
 
   // İçecek galerisi ekranına yönlendir
@@ -577,6 +784,52 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         builder: (context) => const DrinkGalleryScreen(),
       ),
     );
+  }
+  
+  // Son eklenen miktarı ve birimi al
+  Future<Map<String, dynamic>> _getLastAddedAmountWithUnit() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final amount = prefs.getDouble('last_added_amount');
+      final unit = prefs.getString('preferred_unit') ?? 'ml';
+      
+      if (amount != null && amount > 0) {
+        // Birime göre dönüştür
+        double displayAmount = amount;
+        if (unit == 'oz') {
+          displayAmount = amount / 29.5735;
+        }
+        return {'amount': displayAmount, 'unit': unit};
+      }
+      return {'amount': null, 'unit': unit};
+    } catch (e) {
+      return {'amount': null, 'unit': 'ml'};
+    }
+  }
+
+  // İnteraktif Bardak Modal'ını göster
+  void _showInteractiveCupModal(
+    BuildContext context,
+    WaterProvider waterProvider,
+    UserProvider userProvider,
+    AchievementProvider achievementProvider,
+  ) async {
+    final result = await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      isScrollControlled: true,
+      builder: (context) => const InteractiveCupModal(),
+    );
+    
+    // Modal'dan döndükten sonra son eklenen miktarı kaydet
+    if (result != null && result is double) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('last_added_amount', result);
+      if (mounted) {
+        setState(() {}); // Buton metnini güncelle
+      }
+    }
   }
 
   // Günlük Mücadeleler Bölümü
@@ -782,5 +1035,128 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+
+  // Animasyonlu Scroll Göstergesi
+  Widget _buildScrollIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: AnimatedBuilder(
+        animation: _scrollIndicatorAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, _scrollIndicatorAnimation.value),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.grey[400],
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Mücadeleler için kaydır',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// Tank dalga animasyonu için CustomPainter (Eski - Dikdörtgen tank için)
+class TankWavePainter extends CustomPainter {
+  final double waveOffset;
+  final double fillPercentage;
+
+  TankWavePainter({
+    required this.waveOffset,
+    required this.fillPercentage,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fillPercentage <= 0) return;
+
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    // Yumuşak dalga çizgisi (üst kısım)
+    final path = Path();
+    final waveHeight = 8.0;
+
+    path.moveTo(0, size.height - 10);
+
+    for (double x = 0; x <= size.width; x += 2) {
+      final y = size.height - 10 +
+          waveHeight * math.sin(x / size.width * 2 * math.pi + waveOffset);
+      path.lineTo(x, y);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(TankWavePainter oldDelegate) {
+    return oldDelegate.waveOffset != waveOffset ||
+        oldDelegate.fillPercentage != fillPercentage;
+  }
+}
+
+// Yuvarlak tank dalga animasyonu için CustomPainter
+class CircularTankWavePainter extends CustomPainter {
+  final double waveOffset;
+  final double fillPercentage;
+
+  CircularTankWavePainter({
+    required this.waveOffset,
+    required this.fillPercentage,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fillPercentage <= 0) return;
+
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+
+    // Yuvarlak tank için yumuşak dalga çizgisi (üst kısım)
+    final path = Path();
+    final waveHeight = 6.0;
+    final centerX = size.width / 2;
+    final radius = size.width / 2;
+
+    // Yuvarlak formda dalga çizgisi
+    path.moveTo(0, size.height - 10);
+
+    for (double x = 0; x <= size.width; x += 1.5) {
+      // Yuvarlak form için y koordinatını hesapla
+      final normalizedX = (x - centerX) / radius;
+      if (normalizedX.abs() <= 1.0) {
+        final y = size.height - 10 +
+            waveHeight * math.sin(x / size.width * 2 * math.pi + waveOffset);
+        path.lineTo(x, y);
+      }
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CircularTankWavePainter oldDelegate) {
+    return oldDelegate.waveOffset != waveOffset ||
+        oldDelegate.fillPercentage != fillPercentage;
   }
 }

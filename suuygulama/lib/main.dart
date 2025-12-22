@@ -8,7 +8,7 @@ import 'providers/aquarium_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/achievement_provider.dart';
 import 'providers/drink_provider.dart';
-import 'screens/initial_screen.dart';
+import 'screens/splash_screen.dart';
 import 'utils/app_colors.dart';
 import 'services/notification_service.dart';
 
@@ -103,7 +103,7 @@ class TankUpApp extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        home: const InitialScreen(),
+        home: const SplashScreen(),
       ),
     );
   }

@@ -8,14 +8,10 @@ import '../services/notification_service.dart';
 import 'main_navigation_screen.dart';
 
 class PlanLoadingScreen extends StatefulWidget {
-  final String? wakeUpTime;
-  final String? sleepTime;
   final double? customGoal;
 
   const PlanLoadingScreen({
     super.key,
-    this.wakeUpTime,
-    this.sleepTime,
     this.customGoal,
   });
 
@@ -61,12 +57,9 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> {
     
     if (!mounted) return;
     
-    // Bildirimleri uyku düzenine göre güncelle
+    // Bildirimleri varsayılan saatlerle ayarla
     final notificationService = NotificationService();
-    notificationService.scheduleDailyNotifications(
-      wakeUpTime: widget.wakeUpTime,
-      sleepTime: widget.sleepTime,
-    ).catchError((e) {
+    notificationService.scheduleDailyNotifications().catchError((e) {
       // Hata durumunda sessizce devam et
     });
     

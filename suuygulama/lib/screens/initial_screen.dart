@@ -31,12 +31,14 @@ class _InitialScreenState extends State<InitialScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final hasWeight = userProvider.userData.weight != null;
       
+      if (!mounted) return;
       setState(() {
         _shouldShowOnboarding = !onboardingCompleted || !hasWeight;
         _isLoading = false;
       });
     } catch (e) {
       // Hata durumunda onboarding göster
+      if (!mounted) return;
       setState(() {
         _shouldShowOnboarding = true;
         _isLoading = false;
