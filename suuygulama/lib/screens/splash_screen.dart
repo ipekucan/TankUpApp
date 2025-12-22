@@ -76,6 +76,8 @@ class _SplashScreenState extends State<SplashScreen>
     
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      
       final preferredUnit = prefs.getString('preferred_unit');
       
       // Eğer birim seçilmemişse unit selection ekranına yönlendir

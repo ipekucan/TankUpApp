@@ -27,6 +27,8 @@ class _InitialScreenState extends State<InitialScreen> {
       final prefs = await SharedPreferences.getInstance();
       final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
       
+      if (!mounted) return;
+      
       // Eğer onboarding tamamlanmamışsa veya weight verisi yoksa onboarding göster
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final hasWeight = userProvider.userData.weight != null;

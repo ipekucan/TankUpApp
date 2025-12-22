@@ -126,16 +126,16 @@ class _UnitSelectionScreenState extends State<UnitSelectionScreen>
                       ),
                       const SizedBox(height: 60),
                       
-                      // ml Butonu
+                      // ml Butonu - Uzun ince dikdörtgen
                       _buildUnitButton(
                         label: 'ml',
                         subtitle: 'Mililitre',
                         onTap: () => _selectUnit('ml'),
                       ),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       
-                      // oz Butonu
+                      // oz Butonu - Uzun ince dikdörtgen
                       _buildUnitButton(
                         label: 'oz',
                         subtitle: 'Ons',
@@ -160,11 +160,11 @@ class _UnitSelectionScreenState extends State<UnitSelectionScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 200,
-        height: 200,
+        width: MediaQuery.of(context).size.width * 0.75,
+        height: 80,
         decoration: BoxDecoration(
           color: Colors.white,
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(40), // Oval köşeler
           boxShadow: [
             BoxShadow(
               color: AppColors.softPinkButton.withValues(alpha: 0.2),
@@ -173,23 +173,23 @@ class _UnitSelectionScreenState extends State<UnitSelectionScreen>
             ),
           ],
         ),
-        child: Column(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               label,
               style: TextStyle(
-                fontSize: 48,
+                fontSize: 32,
                 fontWeight: FontWeight.w700,
                 color: AppColors.softPinkButton,
                 letterSpacing: 2.0,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(width: 12),
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w400,
                 color: const Color(0xFF4A5568).withValues(alpha: 0.7),
               ),

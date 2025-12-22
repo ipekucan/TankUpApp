@@ -217,8 +217,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   void _onVerticalDragUpdate(DragUpdateDetails details) {
     setState(() {
       // Yukarı kaydırma = artır, aşağı kaydırma = azalt
-      // Hassasiyeti artırmak için delta'yı 2.0 ile çarp
-      final delta = -details.delta.dy * 2.0; // 2.0x hassasiyet çarpanı
+      // Hassasiyeti artırmak için delta'yı 2.5 ile çarp
+      final delta = -details.delta.dy * 2.5; // 2.5x hassasiyet çarpanı
       
       // 10'ar 10'ar artış için hassasiyet ayarı
       double stepSize;
@@ -284,8 +284,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     final water = DrinkData.getDrinks().firstWhere((d) => d.id == 'water');
     final result = await waterProvider.drink(water, _currentAmount);
 
+    if (!mounted) return;
+
     if (result.success) {
       await userProvider.addToTotalWater(_currentAmount * water.hydrationFactor);
+
+      if (!mounted) return;
 
       if (result.isFirstDrink) {
         final coins = await achievementProvider.checkFirstStep();
@@ -294,6 +298,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
           await userProvider.addAchievement('first_step');
         }
       }
+
+      if (!mounted) return;
 
       final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
       if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
@@ -307,6 +313,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         await userProvider.updateConsecutiveDays(true);
       }
 
+      if (!mounted) return;
+
       final totalWater = userProvider.userData.totalWaterConsumed;
       final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
       final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
@@ -314,6 +322,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         await waterProvider.addCoins(waterMasterCoins);
         await userProvider.addAchievement('water_master');
       }
+
+      if (!mounted) return;
 
       final consecutiveDays = userProvider.consecutiveDays;
       final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
@@ -323,6 +333,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         await userProvider.addAchievement('streak_3');
       }
 
+      if (!mounted) return;
+
       final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
       final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
       if (streak7Coins > 0 && !wasStreak7Unlocked) {
@@ -330,14 +342,15 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         await userProvider.addAchievement('streak_7');
       }
 
-      if (mounted) {
-        // Son eklenen miktarı ve birimi kaydet
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setDouble('last_added_amount', _currentAmount);
-        await prefs.setString('preferred_unit', _preferredUnit);
-        
-        Navigator.pop(context, _currentAmount); // Son eklenen miktarı döndür
-      }
+      if (!mounted) return;
+      
+      // Son eklenen miktarı ve birimi kaydet
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('last_added_amount', _currentAmount);
+      await prefs.setString('preferred_unit', _preferredUnit);
+      
+      if (!mounted) return;
+      Navigator.pop(context, _currentAmount); // Son eklenen miktarı döndür
     }
   }
 

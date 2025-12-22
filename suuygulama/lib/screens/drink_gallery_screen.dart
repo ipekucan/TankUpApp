@@ -415,6 +415,9 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
   }
 
   Future<void> _drinkWithAmount(Drink drink, double amount) async {
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    
     final waterProvider = Provider.of<WaterProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
@@ -422,10 +425,14 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     // WaterProvider'ın drink metodunu kullan (bilimsel hesaplama içinde yapılıyor)
     final result = await waterProvider.drink(drink, amount);
     
+    if (!context.mounted) return;
+    
     if (result.success) {
       // Hidrasyon faktörüne göre efektif miktarı ekle
       final effectiveAmount = amount * drink.hydrationFactor;
       await userProvider.addToTotalWater(effectiveAmount);
+      
+      if (!context.mounted) return;
       
       // Başarı kontrolü
       if (result.isFirstDrink) {
@@ -435,6 +442,8 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
           await userProvider.addAchievement('first_step');
         }
       }
+      
+      if (!context.mounted) return;
       
       final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
       if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
@@ -448,6 +457,8 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
         await userProvider.updateConsecutiveDays(true);
       }
       
+      if (!context.mounted) return;
+      
       final totalWater = userProvider.userData.totalWaterConsumed;
       final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
       final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
@@ -455,6 +466,8 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
         await waterProvider.addCoins(waterMasterCoins);
         await userProvider.addAchievement('water_master');
       }
+      
+      if (!context.mounted) return;
       
       final consecutiveDays = userProvider.consecutiveDays;
       final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
@@ -464,6 +477,8 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
         await userProvider.addAchievement('streak_3');
       }
       
+      if (!context.mounted) return;
+      
       final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
       final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
       if (streak7Coins > 0 && !wasStreak7Unlocked) {
@@ -471,27 +486,26 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
         await userProvider.addAchievement('streak_7');
       }
       
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${drink.name} içildi! (${effectiveAmount.toStringAsFixed(0)}ml etkili) +${result.coinsReward} Coin',
-            ),
-            backgroundColor: AppColors.softPinkButton,
-            duration: const Duration(seconds: 2),
+      if (!context.mounted) return;
+      
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${drink.name} içildi! (${effectiveAmount.toStringAsFixed(0)}ml etkili) +${result.coinsReward} Coin',
           ),
-        );
-      }
+          backgroundColor: AppColors.softPinkButton,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
