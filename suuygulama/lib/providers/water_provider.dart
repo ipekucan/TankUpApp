@@ -9,6 +9,9 @@ class WaterProvider extends ChangeNotifier {
   static const String _lastDrinkTimeKey = 'last_drink_time';
   static const String _lastResetDateKey = 'last_reset_date';
   static const String _drinkHistoryKey = 'drink_history'; // Son 30 günün verileri
+  static const String _earlyBirdClaimedKey = 'early_bird_claimed'; // Erken Kuş bonusu alındı mı?
+  static const String _nightOwlClaimedKey = 'night_owl_claimed'; // Gece Kuşu bonusu alındı mı?
+  static const String _dailyGoalBonusClaimedKey = 'daily_goal_bonus_claimed'; // Günlük hedef bonusu alındı mı?
   static const double _dailyLimit = 5000.0; // 5 litre günlük limit (ml)
   
   WaterModel _waterData = WaterModel.initial();
@@ -16,6 +19,9 @@ class WaterProvider extends ChangeNotifier {
   DateTime? _lastResetDate;
   bool _isFirstDrink = true;
   Map<String, double> _drinkHistory = {}; // Tarih (YYYY-MM-DD) -> Miktar (ml)
+  bool _earlyBirdClaimed = false; // Erken Kuş bonusu bugün alındı mı?
+  bool _nightOwlClaimed = false; // Gece Kuşu bonusu bugün alındı mı?
+  bool _dailyGoalBonusClaimed = false; // Günlük hedef bonusu bugün alındı mı?
 
   // Günlük su hedefi
   double get dailyGoal => _waterData.dailyGoal;
@@ -134,6 +140,11 @@ class WaterProvider extends ChangeNotifier {
         _drinkHistory = {};
       }
       
+      // Bonus flag'lerini yükle
+      _earlyBirdClaimed = prefs.getBool(_earlyBirdClaimedKey) ?? false;
+      _nightOwlClaimed = prefs.getBool(_nightOwlClaimedKey) ?? false;
+      _dailyGoalBonusClaimed = prefs.getBool(_dailyGoalBonusClaimedKey) ?? false;
+      
       // Gün kontrolü yap (yeni gün başladıysa verileri sıfırla)
       await _checkAndResetDay();
       
@@ -183,6 +194,11 @@ class WaterProvider extends ChangeNotifier {
       
       // İçme geçmişini kaydet (30 günlük veri)
       await prefs.setString(_drinkHistoryKey, jsonEncode(_drinkHistory));
+      
+      // Bonus flag'lerini kaydet
+      await prefs.setBool(_earlyBirdClaimedKey, _earlyBirdClaimed);
+      await prefs.setBool(_nightOwlClaimedKey, _nightOwlClaimed);
+      await prefs.setBool(_dailyGoalBonusClaimedKey, _dailyGoalBonusClaimed);
     } catch (e) {
       // Hata durumunda sessizce devam et
     }
@@ -191,6 +207,13 @@ class WaterProvider extends ChangeNotifier {
   // Gün kontrolü ve sıfırlama
   Future<void> _checkAndResetDay() async {
     final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Reset time'ı al (varsayılan: 00:00)
+    final resetHour = prefs.getInt('reset_time_hour') ?? 0;
+    final resetMinute = prefs.getInt('reset_time_minute') ?? 0;
+    
+    // Bugünün tarihini al
     final today = DateTime(now.year, now.month, now.day);
     
     if (_lastResetDate == null) {
@@ -205,18 +228,53 @@ class WaterProvider extends ChangeNotifier {
       _lastResetDate!.day,
     );
     
-    // Yeni gün başladıysa günlük verileri sıfırla
+    // Bugünün reset zamanını hesapla
+    final todayResetTime = DateTime(now.year, now.month, now.day, resetHour, resetMinute);
+    
+    // Yeni gün başladıysa (reset time geçtiyse) günlük verileri sıfırla
+    bool shouldReset = false;
+    
     if (today.isAfter(lastReset)) {
-      _waterData = _waterData.copyWith(
-        consumedAmount: 0.0, // Günlük içilen su sıfırlanır
-        progressPercentage: 0.0, // İlerleme sıfırlanır
-        dailyCalories: 0.0, // Günlük kalori sıfırlanır
-        dailyGoal: 5000.0, // Günlük hedef 5L olarak ayarlanır
-        lastDrinkTime: null, // Son su içme zamanı sıfırlanır
+      // Tarih değişti, reset yapılmalı
+      shouldReset = true;
+    } else if (today.isAtSameMomentAs(lastReset) && now.isAfter(todayResetTime)) {
+      // Aynı gün ama reset time geçti ve henüz reset yapılmamış
+      // Bu durumda reset yapılmalı (ilk açılışta reset time geçmişse)
+      final lastResetTime = DateTime(
+        lastReset.year,
+        lastReset.month,
+        lastReset.day,
+        resetHour,
+        resetMinute,
       );
+      if (now.isAfter(lastResetTime)) {
+        shouldReset = true;
+      }
+    }
+    
+    if (shouldReset) {
+      // Gün tamamlandı - 10 Coin ödülü ver
+      _waterData = _waterData.copyWith(
+        consumedAmount: 0.0,
+        progressPercentage: 0.0,
+        dailyCalories: 0.0,
+        dailyGoal: 5000.0,
+        lastDrinkTime: null,
+        tankCoins: _waterData.tankCoins + 10, // Gün tamamlandı - 10 Coin
+      );
+      
       _lastResetDate = today;
       _lastDrinkTime = null;
       _isFirstDrink = true;
+      
+      // Bonus flag'lerini sıfırla
+      _earlyBirdClaimed = false;
+      _nightOwlClaimed = false;
+      _dailyGoalBonusClaimed = false;
+      await prefs.setBool(_earlyBirdClaimedKey, false);
+      await prefs.setBool(_nightOwlClaimedKey, false);
+      await prefs.setBool(_dailyGoalBonusClaimedKey, false);
+      
       await _saveWaterData();
       notifyListeners();
     }
@@ -280,9 +338,6 @@ class WaterProvider extends ChangeNotifier {
       );
     }
 
-    const coinsReward = 10; // Her içişte 10 TankCoin
-    final newTankCoins = _waterData.tankCoins + coinsReward;
-
     // Son su içme zamanını güncelle
     final now = DateTime.now();
     _lastDrinkTime = now;
@@ -290,6 +345,50 @@ class WaterProvider extends ChangeNotifier {
     // Bugünün tarihini al (YYYY-MM-DD formatında)
     final todayKey = _getDateKey(now);
     _drinkHistory[todayKey] = (_drinkHistory[todayKey] ?? 0.0) + effectiveAmount;
+
+    // Coin hesaplamaları
+    int totalCoinsReward = 0;
+    bool isLuckyDrink = false;
+    bool isEarlyBird = false;
+    bool isNightOwl = false;
+    bool isDailyGoalBonus = false;
+
+    // 1. Temel Coin (her içişte 10 Coin kaldırıldı - artık sadece bonuslar var)
+    
+    // 2. Şanslı Yudum (%5 ihtimal)
+    final random = (now.millisecondsSinceEpoch % 100);
+    if (random < 5) { // %5 ihtimal
+      totalCoinsReward += 10;
+      isLuckyDrink = true;
+    }
+
+    // 3. Erken Kuş Bonusu (Sabah 09:00'dan önce, ilk 500ml için tek seferlik)
+    final currentHour = now.hour;
+    if (!_earlyBirdClaimed && currentHour < 9 && newConsumedAmount <= 500.0) {
+      totalCoinsReward += 5;
+      isEarlyBird = true;
+      _earlyBirdClaimed = true;
+    }
+
+    // 4. Gece Kuşu Bonusu (Akşam 20:00'dan sonra, günün son su ekleme işlemi)
+    if (!_nightOwlClaimed && currentHour >= 20) {
+      totalCoinsReward += 5;
+      isNightOwl = true;
+      _nightOwlClaimed = true;
+    }
+
+    // 5. Günlük Hedef Bonusu (Hedefe ulaşıldığında ekstra 15 Coin - tek seferlik)
+    final wasGoalReachedBefore = _waterData.consumedAmount >= _waterData.dailyGoal;
+    final isGoalReachedNow = newConsumedAmount >= _waterData.dailyGoal;
+    
+    if (!_dailyGoalBonusClaimed && !wasGoalReachedBefore && isGoalReachedNow) {
+      totalCoinsReward += 15;
+      isDailyGoalBonus = true;
+      _dailyGoalBonusClaimed = true;
+    }
+
+    // Coin'leri ekle
+    final newTankCoins = _waterData.tankCoins + totalCoinsReward;
 
     // Verileri güncelle
     _waterData = _waterData.copyWith(
@@ -312,11 +411,33 @@ class WaterProvider extends ChangeNotifier {
     final wasFirstDrink = _isFirstDrink;
     _isFirstDrink = false;
 
+    // Mesaj oluştur
+    String message = '${drink.name} içildi!';
+    if (totalCoinsReward > 0) {
+      message += ' +$totalCoinsReward Coin';
+      if (isLuckyDrink) {
+        message += ' (Şanslı Yudum! 🍀)';
+      }
+      if (isEarlyBird) {
+        message += ' (Erken Kuş! 🌅)';
+      }
+      if (isNightOwl) {
+        message += ' (Gece Kuşu! 🌙)';
+      }
+      if (isDailyGoalBonus) {
+        message += ' (Hedefe Ulaşıldı! 🎯)';
+      }
+    }
+
     return DrinkWaterResult(
       success: true,
-      message: '${drink.name} içildi! +$coinsReward Coin',
-      coinsReward: coinsReward,
+      message: message,
+      coinsReward: totalCoinsReward,
       isFirstDrink: wasFirstDrink,
+      isLuckyDrink: isLuckyDrink,
+      isEarlyBird: isEarlyBird,
+      isNightOwl: isNightOwl,
+      isDailyGoalBonus: isDailyGoalBonus,
     );
   }
 
@@ -495,11 +616,19 @@ class DrinkWaterResult {
   final String message;
   final int coinsReward;
   final bool isFirstDrink;
+  final bool isLuckyDrink; // Şanslı Yudum (%5 ihtimal)
+  final bool isEarlyBird; // Erken Kuş bonusu
+  final bool isNightOwl; // Gece Kuşu bonusu
+  final bool isDailyGoalBonus; // Günlük hedef bonusu
 
   DrinkWaterResult({
     required this.success,
     required this.message,
     this.coinsReward = 0,
     this.isFirstDrink = false,
+    this.isLuckyDrink = false,
+    this.isEarlyBird = false,
+    this.isNightOwl = false,
+    this.isDailyGoalBonus = false,
   });
 }

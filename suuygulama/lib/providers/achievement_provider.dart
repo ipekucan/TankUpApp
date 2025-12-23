@@ -38,38 +38,47 @@ class AchievementProvider extends ChangeNotifier {
     }
   }
 
-  // Varsayılan başarıları oluştur
+  // Varsayılan başarıları oluştur (Zorluk Seviyeleri: Kolay: 20, Orta: 50, Zor: 100)
   void _initializeDefaultAchievements() {
     _achievements = [
+      // Kolay (20 Coin)
+      Achievement(
+        id: 'first_cup',
+        name: 'İlk Bardak',
+        description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
+        coinReward: 20,
+      ),
       Achievement(
         id: 'first_step',
         name: 'İlk Adım',
         description: 'İlk su içişini tamamla',
-        coinReward: 50,
-      ),
-      Achievement(
-        id: 'streak_3',
-        name: 'Seri Başlangıcı',
-        description: '3 gün üst üste hedefe ulaş',
-        coinReward: 100,
-      ),
-      Achievement(
-        id: 'streak_7',
-        name: 'Haftalık Şampiyon',
-        description: '7 gün üst üste hedefe ulaş',
-        coinReward: 250,
+        coinReward: 20,
       ),
       Achievement(
         id: 'daily_goal',
         name: 'Günlük Hedef',
         description: 'Günlük su hedefine ulaş',
-        coinReward: 75,
+        coinReward: 20,
+      ),
+      // Orta (50 Coin)
+      Achievement(
+        id: 'streak_3',
+        name: 'Seri Başlangıcı',
+        description: '3 gün üst üste hedefe ulaş',
+        coinReward: 50,
       ),
       Achievement(
         id: 'water_master',
         name: 'Su Ustası',
         description: 'Toplamda 10 litre su iç',
-        coinReward: 200,
+        coinReward: 50,
+      ),
+      // Zor (100 Coin)
+      Achievement(
+        id: 'streak_7',
+        name: 'Haftalık Şampiyon',
+        description: '7 gün üst üste hedefe ulaş',
+        coinReward: 100,
       ),
     ];
   }
@@ -102,6 +111,11 @@ class AchievementProvider extends ChangeNotifier {
     }
     
     return 0;
+  }
+
+  // Başarı kontrolü - İlk Bardak
+  Future<int> checkFirstCup() {
+    return unlockAchievement('first_cup');
   }
 
   // Başarı kontrolü - İlk Adım

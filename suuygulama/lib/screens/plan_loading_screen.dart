@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,11 +20,50 @@ class PlanLoadingScreen extends StatefulWidget {
   State<PlanLoadingScreen> createState() => _PlanLoadingScreenState();
 }
 
-class _PlanLoadingScreenState extends State<PlanLoadingScreen> {
+class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProviderStateMixin {
+  late AnimationController _waveController;
+  late AnimationController _fillController;
+  late Animation<double> _fillAnimation;
+  double _fillProgress = 0.0;
+
   @override
   void initState() {
     super.initState();
+    
+    // Dalga animasyonu
+    _waveController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+    
+    // Dolum animasyonu
+    _fillController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    _fillAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _fillController,
+        curve: Curves.easeInOut,
+      ),
+    )..addListener(() {
+      setState(() {
+        _fillProgress = _fillAnimation.value;
+      });
+    });
+    
+    // Dolum animasyonunu başlat
+    _fillController.forward();
+    
     _calculateAndSavePlan();
+  }
+  
+  @override
+  void dispose() {
+    _waveController.dispose();
+    _fillController.dispose();
+    super.dispose();
   }
 
   Future<void> _calculateAndSavePlan() async {
@@ -81,34 +121,139 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Boş alan (ileride animasyon için)
+              // Tank Animasyonu
               Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                width: 250,
+                height: 250,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Dış Çerçeve - Yuvarlak Fanus
+                    Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.softPinkButton,
+                          width: 6,
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.softPinkButton.withValues(alpha: 0.1),
+                            const Color(0xFF9B7EDE).withValues(alpha: 0.1),
+                            const Color(0xFF6B9BD1).withValues(alpha: 0.1),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Su Dolumu - Animasyonlu
+                    ClipOval(
+                      child: AnimatedBuilder(
+                        animation: _fillAnimation,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            size: const Size(250, 250),
+                            painter: CircularTankWavePainter(
+                              fillPercentage: _fillProgress,
+                              waveOffset: _waveController.value * 2 * math.pi,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              
               const SizedBox(height: 40),
+              
               const Text(
-                'Kişisel planınız oluşturuluyor...',
+                'Sizin için kişisel planınız oluşturuluyor...',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w300,
                   color: Color(0xFF4A5568),
                   letterSpacing: 1.2,
                 ),
-              ),
-              const SizedBox(height: 20),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.softPinkButton),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+// Tank dalga animasyonu için CustomPainter
+class CircularTankWavePainter extends CustomPainter {
+  final double fillPercentage;
+  final double waveOffset;
+
+  CircularTankWavePainter({
+    required this.fillPercentage,
+    required this.waveOffset,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fillPercentage <= 0) return;
+    
+    // Su seviyesi hesaplama (alt kısımdan yukarı doğru)
+    final waterHeight = size.height * fillPercentage;
+    final waterTop = size.height - waterHeight;
+    
+    // Su rengi
+    final waterPaint = Paint()
+      ..color = AppColors.waterColor.withValues(alpha: 0.8)
+      ..style = PaintingStyle.fill;
+    
+    // Yuvarlak tank için su dolumu
+    final centerX = size.width / 2;
+    final radius = size.width / 2 - 6; // Border için boşluk
+    
+    // Su dolu alanı çiz (yuvarlak formda)
+    final path = Path();
+    
+    // Alt kısımdan başla
+    path.moveTo(0, size.height);
+    
+    // Su seviyesine kadar düz çizgi
+    if (waterTop < size.height) {
+      path.lineTo(0, waterTop);
+      
+      // Dalga çizgisi (yuvarlak form için)
+      for (double x = 0; x <= size.width; x += 1.5) {
+        final normalizedX = (x - centerX) / radius;
+        if (normalizedX.abs() <= 1.0) {
+          final y = waterTop + 
+              5 * math.sin((x / size.width * 2 * math.pi) + waveOffset);
+          path.lineTo(x, y);
+        }
+      }
+      
+      path.lineTo(size.width, size.height);
+      path.close();
+      
+      canvas.drawPath(path, waterPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CircularTankWavePainter oldDelegate) {
+    return oldDelegate.fillPercentage != fillPercentage ||
+        oldDelegate.waveOffset != waveOffset;
   }
 }
 

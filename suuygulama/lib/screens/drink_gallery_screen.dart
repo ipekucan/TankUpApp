@@ -258,6 +258,64 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                           ],
                         ),
                       ),
+                      // Sağ Üst İkonlar: Favori (Kalp) ve Hızlı Erişim (Artı)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Favori Butonu (Kalp)
+                          Consumer<DrinkProvider>(
+                            builder: (context, drinkProvider, child) {
+                              final isFavorite = drinkProvider.isFavorite(drink.id);
+                              return IconButton(
+                                icon: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  color: isFavorite ? Colors.red : Colors.grey[600],
+                                  size: 28,
+                                ),
+                                onPressed: () async {
+                                  if (isFavorite) {
+                                    // Favoriden çıkar
+                                    await drinkProvider.removeFavorite(drink.id);
+                                  } else {
+                                    // Favoriye ekle - varsayılan miktar ile
+                                    await drinkProvider.addFavorite(drink.id, amount: 200.0);
+                                  }
+                                  setDialogState(() {});
+                                },
+                                tooltip: isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle',
+                              );
+                            },
+                          ),
+                          // Hızlı Erişim Butonu (Artı) - Pembe
+                          Consumer<DrinkProvider>(
+                            builder: (context, drinkProvider, child) {
+                              final isQuickAccess = drinkProvider.isQuickAccess(drink.id);
+                              return IconButton(
+                                icon: Icon(
+                                  isQuickAccess ? Icons.add_circle : Icons.add_circle_outline,
+                                  color: isQuickAccess ? AppColors.softPinkButton : AppColors.softPinkButton,
+                                  size: 28,
+                                ),
+                                onPressed: () async {
+                                  if (isQuickAccess) {
+                                    // Hızlı erişimden çıkar
+                                    await drinkProvider.removeQuickAccess(drink.id);
+                                    setDialogState(() {});
+                                  } else {
+                                    // Hızlı erişime ekle - varsayılan miktar ile
+                                    await drinkProvider.addQuickAccess(drink.id, amount: 200.0);
+                                    // Modalı kapat ve ana ekrana geri dön
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  }
+                                },
+                                tooltip: isQuickAccess ? 'Hızlı erişimden çıkar' : 'Hızlı erişime ekle',
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -488,15 +546,87 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
       
       if (!context.mounted) return;
       
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '${drink.name} içildi! (${effectiveAmount.toStringAsFixed(0)}ml etkili) +${result.coinsReward} Coin',
+      // Şanslı Yudum ve diğer bonus bildirimleri
+      if (result.isLuckyDrink) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.stars, color: Colors.amber, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Şanslı Yudum! +10 Coin kazandın! 🍀',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.amber.shade700,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: AppColors.softPinkButton,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: result.isDailyGoalBonus
+                ? Colors.green.shade600
+                : result.isEarlyBird || result.isNightOwl
+                    ? Colors.orange.shade400
+                    : AppColors.softPinkButton,
+            duration: result.isDailyGoalBonus
+                ? const Duration(seconds: 3)
+                : const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      if (result.isEarlyBird && !result.isLuckyDrink) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (context.mounted) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('Erken Kuş Bonusu! +5 Coin 🌅'),
+                backgroundColor: Colors.orange.shade400,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        });
+      }
+      
+      if (result.isNightOwl && !result.isLuckyDrink) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (context.mounted) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('Gece Kuşu Bonusu! +5 Coin 🌙'),
+                backgroundColor: Colors.indigo.shade400,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        });
+      }
+      
+      if (result.isDailyGoalBonus && !result.isLuckyDrink) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (context.mounted) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('Günlük Hedefe Ulaşıldı! +15 Coin 🎯'),
+                backgroundColor: Colors.green.shade600,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        });
+      }
     } else {
       if (!context.mounted) return;
       messenger.showSnackBar(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import 'tank_screen.dart';
 import 'tank_room_screen.dart';
+import 'history_screen.dart';
 import 'profile_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -12,11 +13,12 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0; // 0: Ana Sayfa, 1: Zen Oda, 2: Profil
+  int _currentIndex = 0; // 0: Ana Sayfa, 1: Zen Oda, 2: Geçmiş, 3: Profil
 
   final List<Widget> _screens = [
     const TankScreen(), // Ana Sayfa
     const TankRoomScreen(), // Zen Oda
+    const HistoryScreen(), // Geçmiş/İstatistikler
     const ProfileScreen(), // Profil
   ];
 
@@ -26,6 +28,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
+        sizing: StackFit.expand, // Siyah ekran hatasını önlemek için
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -39,13 +42,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         unselectedItemColor: Colors.grey[400],
         selectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontSize: 11,
         ),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w400,
-          fontSize: 12,
+          fontSize: 11,
         ),
         type: BottomNavigationBarType.fixed,
+        iconSize: 24,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -54,6 +58,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.spa),
             label: 'Zen Oda',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Geçmiş',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

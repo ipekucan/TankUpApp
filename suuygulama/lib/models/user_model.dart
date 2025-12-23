@@ -84,6 +84,10 @@ class UserModel {
 
   // JSON'dan oluşturma
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Height ve weight için 0 veya geçersiz değerleri null'a çevir
+    final heightValue = (json['height'] as num?)?.toDouble();
+    final weightValue = (json['weight'] as num?)?.toDouble();
+    
     return UserModel(
       name: json['name'] as String? ?? '',
       totalWaterConsumed: (json['totalWaterConsumed'] as num?)?.toDouble() ?? 0.0,
@@ -91,8 +95,8 @@ class UserModel {
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      height: (json['height'] as num?)?.toDouble(),
-      weight: (json['weight'] as num?)?.toDouble(),
+      height: (heightValue != null && heightValue > 0) ? heightValue : null,
+      weight: (weightValue != null && weightValue > 0) ? weightValue : null,
       gender: json['gender'] as String?,
       age: json['age'] as int?,
       activityLevel: json['activityLevel'] as String?,

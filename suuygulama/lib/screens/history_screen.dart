@@ -1,30 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final bool hideAppBar;
+  
+  const HistoryScreen({super.key, this.hideAppBar = false});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProviderStateMixin {
+class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-  DateTime _selectedDate = DateTime.now();
+  int _selectedBarIndex = -1;
+  double? _selectedBarValue;
+  String? _selectedBarLabel;
+  late AnimationController _animationController;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // Takvim, Gün, Hafta, Ay, Yıl
+    _tabController = TabController(length: 4, vsync: this); // Gün, Hafta, Ay, Yıl
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    );
+    _animationController.forward();
+    
+    // Tab değiştiğinde animasyonu yeniden başlat
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        _animationController.reset();
+        _animationController.forward();
+        setState(() {
+          _selectedBarIndex = -1;
+          _selectedBarValue = null;
+          _selectedBarLabel = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -32,13 +61,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.verySoftBlue,
-      appBar: AppBar(
+      appBar: widget.hideAppBar ? null : AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF4A5568)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'İstatistikler',
           style: TextStyle(
@@ -54,7 +80,6 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           indicatorColor: AppColors.softPinkButton,
           isScrollable: true,
           tabs: const [
-            Tab(text: 'Takvim'),
             Tab(text: 'Gün'),
             Tab(text: 'Hafta'),
             Tab(text: 'Ay'),
@@ -62,152 +87,40 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildCalendarView(),
-          _buildDayView(),
-          _buildWeekView(),
-          _buildMonthView(),
-          _buildYearView(),
+          // AppBar yoksa TabBar'ı üstte göster
+          if (widget.hideAppBar)
+            Container(
+              color: Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.softPinkButton,
+                unselectedLabelColor: Colors.grey[600],
+                indicatorColor: AppColors.softPinkButton,
+                isScrollable: true,
+                tabs: const [
+                  Tab(text: 'Gün'),
+                  Tab(text: 'Hafta'),
+                  Tab(text: 'Ay'),
+                  Tab(text: 'Yıl'),
+                ],
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDayView(),
+                _buildWeekView(),
+                _buildMonthView(),
+                _buildYearView(),
+              ],
+            ),
+          ),
         ],
       ),
     );
-  }
-
-  Widget _buildCalendarView() {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Takvim Widget'ı
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: TableCalendar(
-                  firstDay: DateTime.utc(2020, 1, 1),
-                  lastDay: DateTime.utc(2030, 12, 31),
-                  focusedDay: _selectedDate,
-                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDate = selectedDay;
-                    });
-                  },
-                  calendarFormat: CalendarFormat.month,
-                  startingDayOfWeek: StartingDayOfWeek.monday,
-                  calendarStyle: CalendarStyle(
-                    selectedDecoration: BoxDecoration(
-                      color: AppColors.softPinkButton,
-                      shape: BoxShape.circle,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: AppColors.softPinkButton.withValues(alpha: 0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    markerDecoration: BoxDecoration(
-                      color: AppColors.waterColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    titleTextStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4A5568),
-                    ),
-                  ),
-                  eventLoader: (day) {
-                    final dateKey = _getDateKey(day);
-                    final amount = waterProvider.drinkHistory[dateKey] ?? 0.0;
-                    return amount > 0 ? [1] : [];
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Seçilen günün detayları (Genişletilebilir)
-              _buildExpandableDayDetail(waterProvider, _selectedDate),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildExpandableDayDetail(WaterProvider waterProvider, DateTime date) {
-    final dateKey = _getDateKey(date);
-    final amount = waterProvider.drinkHistory[dateKey] ?? 0.0;
-    final isToday = isSameDay(date, DateTime.now());
-    
-    return ExpansionTile(
-      title: Text(
-        isToday ? 'Bugün' : '${date.day}/${date.month}/${date.year}',
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF4A5568),
-        ),
-      ),
-      subtitle: Text(
-        '${(amount / 1000.0).toStringAsFixed(2)}L içildi',
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[600],
-        ),
-      ),
-      leading: Icon(
-        Icons.calendar_today,
-        color: AppColors.softPinkButton,
-      ),
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _buildStatCard(
-                title: 'Toplam Su',
-                amount: amount,
-                unit: 'ml',
-                icon: Icons.water_drop,
-              ),
-              const SizedBox(height: 12),
-              _buildStatCard(
-                title: 'Günlük Hedef',
-                amount: waterProvider.dailyGoal,
-                unit: 'ml',
-                icon: Icons.flag,
-              ),
-              const SizedBox(height: 12),
-              _buildStatCard(
-                title: 'İlerleme',
-                amount: (amount / waterProvider.dailyGoal * 100).clamp(0.0, 100.0),
-                unit: '%',
-                icon: Icons.trending_up,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  bool isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   Widget _buildDayView() {
@@ -216,37 +129,35 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
         final today = DateTime.now();
         final todayKey = _getDateKey(today);
         final todayAmount = waterProvider.drinkHistory[todayKey] ?? 0.0;
+        final dailyGoal = waterProvider.dailyGoal;
         
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExpandableStatCard(
-                title: 'Bugün',
-                amount: todayAmount,
-                unit: 'ml',
-                icon: Icons.today,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 12),
-              _buildExpandableStatCard(
-                title: 'Günlük Hedef',
-                amount: waterProvider.dailyGoal,
-                unit: 'ml',
-                icon: Icons.flag,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 12),
-              _buildExpandableStatCard(
-                title: 'İlerleme',
-                amount: (todayAmount / waterProvider.dailyGoal * 100).clamp(0.0, 100.0),
-                unit: '%',
-                icon: Icons.trending_up,
-                waterProvider: waterProvider,
-              ),
-            ],
-          ),
+        // Son 7 günü göster (bugün dahil)
+        final chartData = <BarDataPoint>[];
+        final labels = <String>[];
+        
+        for (int i = 6; i >= 0; i--) {
+          final date = today.subtract(Duration(days: i));
+          final dateKey = _getDateKey(date);
+          final amount = waterProvider.drinkHistory[dateKey] ?? 0.0;
+          final isReached = amount >= dailyGoal;
+          
+          labels.add('${date.day}/${date.month}');
+          chartData.add(BarDataPoint(
+            x: 6 - i,
+            y: amount,
+            isReached: isReached,
+            dateKey: dateKey,
+            date: date,
+          ));
+        }
+        
+        return _buildChartView(
+          chartData: chartData,
+          labels: labels,
+          title: 'Bugün',
+          currentAmount: todayAmount,
+          dailyGoal: dailyGoal,
+          waterProvider: waterProvider,
         );
       },
     );
@@ -256,92 +167,39 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     return Consumer2<WaterProvider, UserProvider>(
       builder: (context, waterProvider, userProvider, child) {
         final now = DateTime.now();
-        double weekTotal = 0.0;
-        final weekData = <String, double>{};
+        final dailyGoal = waterProvider.dailyGoal;
         
-        // Son 7 günü hesapla
-        for (int i = 0; i < 7; i++) {
+        // Son 7 günü göster
+        final chartData = <BarDataPoint>[];
+        final labels = <String>[];
+        double weekTotal = 0.0;
+        
+        for (int i = 6; i >= 0; i--) {
           final date = now.subtract(Duration(days: i));
           final dateKey = _getDateKey(date);
           final amount = waterProvider.drinkHistory[dateKey] ?? 0.0;
+          final isReached = amount >= dailyGoal;
           weekTotal += amount;
-          weekData[dateKey] = amount;
+          
+          labels.add('${date.day}/${date.month}');
+          chartData.add(BarDataPoint(
+            x: 6 - i,
+            y: amount,
+            isReached: isReached,
+            dateKey: dateKey,
+            date: date,
+          ));
         }
         
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExpandableStatCard(
-                title: 'Bu Hafta',
-                amount: weekTotal,
-                unit: 'ml',
-                icon: Icons.calendar_view_week,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 12),
-              _buildExpandableStatCard(
-                title: 'Günlük Ortalama',
-                amount: weekTotal / 7,
-                unit: 'ml',
-                icon: Icons.bar_chart,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 20),
-              _buildWeekChart(waterProvider),
-              const SizedBox(height: 20),
-              // Günlük detaylar (Genişletilebilir liste)
-              _buildExpandableWeekDetails(weekData),
-            ],
-          ),
+        return _buildChartView(
+          chartData: chartData,
+          labels: labels,
+          title: 'Bu Hafta',
+          currentAmount: weekTotal,
+          dailyGoal: dailyGoal * 7,
+          waterProvider: waterProvider,
         );
       },
-    );
-  }
-
-  Widget _buildExpandableWeekDetails(Map<String, double> weekData) {
-    return ExpansionTile(
-      title: const Text(
-        'Günlük Detaylar',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF4A5568),
-        ),
-      ),
-      leading: Icon(
-        Icons.list,
-        color: AppColors.softPinkButton,
-      ),
-      children: weekData.entries.map((entry) {
-        final date = DateTime.parse(entry.key);
-        final amount = entry.value;
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.softPinkButton.withValues(alpha: 0.15),
-            child: Text(
-              '${date.day}',
-              style: TextStyle(
-                color: AppColors.softPinkButton,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          title: Text(
-            '${date.day}/${date.month}/${date.year}',
-            style: const TextStyle(fontSize: 14),
-          ),
-          trailing: Text(
-            '${(amount / 1000.0).toStringAsFixed(2)}L',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.softPinkButton,
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 
@@ -349,51 +207,42 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     return Consumer2<WaterProvider, UserProvider>(
       builder: (context, waterProvider, userProvider, child) {
         final now = DateTime.now();
-        double monthTotal = 0.0;
-        int daysInMonth = 0;
-        
-        // Bu ayın tüm günlerini hesapla
+        final dailyGoal = waterProvider.dailyGoal;
         final lastDay = DateTime(now.year, now.month + 1, 0);
         
-        for (int i = 0; i <= lastDay.day; i++) {
-          final date = DateTime(now.year, now.month, i);
-          if (date.isBefore(now) || date.day == now.day) {
-            final dateKey = _getDateKey(date);
-            monthTotal += waterProvider.drinkHistory[dateKey] ?? 0.0;
-            daysInMonth++;
-          }
+        // Bu ayın tüm günlerini göster
+        final chartData = <BarDataPoint>[];
+        final labels = <String>[];
+        double monthTotal = 0.0;
+        int dayCount = 0;
+        
+        for (int day = 1; day <= lastDay.day; day++) {
+          final date = DateTime(now.year, now.month, day);
+          if (date.isAfter(now)) break;
+          
+          final dateKey = _getDateKey(date);
+          final amount = waterProvider.drinkHistory[dateKey] ?? 0.0;
+          final isReached = amount >= dailyGoal;
+          monthTotal += amount;
+          dayCount++;
+          
+          labels.add('$day');
+          chartData.add(BarDataPoint(
+            x: day - 1,
+            y: amount,
+            isReached: isReached,
+            dateKey: dateKey,
+            date: date,
+          ));
         }
         
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExpandableStatCard(
-                title: 'Bu Ay',
-                amount: monthTotal,
-                unit: 'ml',
-                icon: Icons.calendar_month,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 12),
-              _buildExpandableStatCard(
-                title: 'Günlük Ortalama',
-                amount: daysInMonth > 0 ? monthTotal / daysInMonth : 0.0,
-                unit: 'ml',
-                icon: Icons.trending_up,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 12),
-              _buildExpandableStatCard(
-                title: 'Toplam Su',
-                amount: userProvider.userData.totalWaterConsumed,
-                unit: 'ml',
-                icon: Icons.water_drop,
-                waterProvider: waterProvider,
-              ),
-            ],
-          ),
+        return _buildChartView(
+          chartData: chartData,
+          labels: labels,
+          title: 'Bu Ay',
+          currentAmount: monthTotal,
+          dailyGoal: dailyGoal * dayCount,
+          waterProvider: waterProvider,
         );
       },
     );
@@ -403,300 +252,338 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     return Consumer2<WaterProvider, UserProvider>(
       builder: (context, waterProvider, userProvider, child) {
         final now = DateTime.now();
-        double yearTotal = 0.0;
-        final monthData = <String, double>{};
+        final dailyGoal = waterProvider.dailyGoal;
         
-        // Bu yılın tüm aylarını hesapla
+        // Bu yılın tüm aylarını göster
+        final chartData = <BarDataPoint>[];
+        final labels = <String>[];
+        final monthNames = ['O', 'Ş', 'M', 'N', 'M', 'H', 'T', 'A', 'E', 'E', 'K', 'A'];
+        double yearTotal = 0.0;
+        
         for (int month = 1; month <= now.month; month++) {
           double monthTotal = 0.0;
           final lastDay = DateTime(now.year, month + 1, 0);
           
           for (int day = 1; day <= lastDay.day; day++) {
             final date = DateTime(now.year, month, day);
-            if (date.isBefore(now) || (date.month == now.month && date.day == now.day)) {
-              final dateKey = _getDateKey(date);
-              monthTotal += waterProvider.drinkHistory[dateKey] ?? 0.0;
-            }
+            if (date.isAfter(now)) break;
+            
+            final dateKey = _getDateKey(date);
+            monthTotal += waterProvider.drinkHistory[dateKey] ?? 0.0;
           }
           
-          monthData['${now.year}-${month.toString().padLeft(2, '0')}'] = monthTotal;
+          final avgDaily = monthTotal / lastDay.day;
+          final isReached = avgDaily >= dailyGoal;
           yearTotal += monthTotal;
+          
+          labels.add(monthNames[month - 1]);
+          chartData.add(BarDataPoint(
+            x: month - 1,
+            y: monthTotal,
+            isReached: isReached,
+            dateKey: '${now.year}-${month.toString().padLeft(2, '0')}',
+            date: DateTime(now.year, month, 1),
+          ));
         }
         
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExpandableStatCard(
-                title: 'Bu Yıl',
-                amount: yearTotal,
-                unit: 'ml',
-                icon: Icons.calendar_today,
-                waterProvider: waterProvider,
-              ),
-              const SizedBox(height: 20),
-              // Aylık detaylar (Genişletilebilir liste)
-              _buildExpandableYearDetails(monthData),
-            ],
-          ),
+        return _buildChartView(
+          chartData: chartData,
+          labels: labels,
+          title: 'Bu Yıl',
+          currentAmount: yearTotal,
+          dailyGoal: dailyGoal * 365,
+          waterProvider: waterProvider,
         );
       },
     );
   }
 
-  Widget _buildExpandableYearDetails(Map<String, double> monthData) {
-    final monthNames = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
-    
-    return ExpansionTile(
-      title: const Text(
-        'Aylık Detaylar',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF4A5568),
-        ),
-      ),
-      leading: Icon(
-        Icons.calendar_view_month,
-        color: AppColors.softPinkButton,
-      ),
-      children: monthData.entries.map((entry) {
-        final parts = entry.key.split('-');
-        final month = int.parse(parts[1]);
-        final amount = entry.value;
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.softPinkButton.withValues(alpha: 0.15),
-            child: Text(
-              '$month',
-              style: TextStyle(
-                color: AppColors.softPinkButton,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          title: Text(
-            monthNames[month - 1],
-            style: const TextStyle(fontSize: 14),
-          ),
-          trailing: Text(
-            '${(amount / 1000.0).toStringAsFixed(2)}L',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.softPinkButton,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildExpandableStatCard({
+  Widget _buildChartView({
+    required List<BarDataPoint> chartData,
+    required List<String> labels,
     required String title,
-    required double amount,
-    required String unit,
-    required IconData icon,
+    required double currentAmount,
+    required double dailyGoal,
     required WaterProvider waterProvider,
   }) {
-    return ExpansionTile(
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF4A5568),
-        ),
-      ),
-      subtitle: Text(
-        unit == '%' 
-          ? '${amount.toStringAsFixed(1)}%'
-          : '${(amount / 1000.0).toStringAsFixed(2)}L',
-        style: TextStyle(
-          fontSize: 16,
-          color: AppColors.softPinkButton,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      leading: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: AppColors.softPinkButton.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: AppColors.softPinkButton,
-          size: 24,
-        ),
-      ),
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Detaylı Bilgi',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                unit == '%'
-                  ? 'Günlük hedefinizin %${amount.toStringAsFixed(1)}\'ini tamamladınız.'
-                  : 'Toplam ${(amount / 1000.0).toStringAsFixed(2)} litre su tükettiniz.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.5,
-                ),
-              ),
-            ],
+    if (chartData.isEmpty) {
+      return Center(
+        child: Text(
+          'Henüz veri yok',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey[600],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard({
-    required String title,
-    required double amount,
-    required String unit,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
+      );
+    }
+    
+    final maxValue = chartData.map((d) => d.y).reduce((a, b) => a > b ? a : b);
+    final maxY = maxValue > 0 ? (maxValue * 1.2).clamp(dailyGoal, double.infinity) : dailyGoal;
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Bugün Özeti
           Container(
-            width: 60,
-            height: 60,
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.softPinkButton.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Icon(
-              icon,
-              color: AppColors.softPinkButton,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(amount / 1000.0).toStringAsFixed(2)}L',
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF4A5568),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${(currentAmount / 1000.0).toStringAsFixed(2)}L',
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4A5568),
+                          ),
+                        ),
+                        Text(
+                          'İçildi',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${(dailyGoal / 1000.0).toStringAsFixed(2)}L',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          'Hedef',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeekChart(WaterProvider waterProvider) {
-    final now = DateTime.now();
-    final weekData = <String, double>{};
-    
-    for (int i = 6; i >= 0; i--) {
-      final date = now.subtract(Duration(days: i));
-      final dateKey = _getDateKey(date);
-      weekData[dateKey] = waterProvider.drinkHistory[dateKey] ?? 0.0;
-    }
-    
-    final maxValue = weekData.values.isEmpty 
-        ? 1.0 
-        : weekData.values.reduce((a, b) => a > b ? a : b);
-    
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Haftalık Grafik',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4A5568),
+          
+          const SizedBox(height: 24),
+          
+          // Grafik
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: weekData.entries.map((entry) {
-              final date = DateTime.parse(entry.key);
-              final height = maxValue > 0 ? (entry.value / maxValue * 150) : 0.0;
-              
-              return Column(
-                children: [
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 300,
+                  child: AnimatedBuilder(
+                    animation: _animation,
+                    builder: (context, child) {
+                      return BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY: maxY,
+                          barTouchData: BarTouchData(
+                            enabled: true,
+                            touchTooltipData: BarTouchTooltipData(
+                              getTooltipColor: (group) => Colors.transparent,
+                              tooltipRoundedRadius: 8,
+                              tooltipPadding: EdgeInsets.zero,
+                              tooltipMargin: 8,
+                              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                final data = chartData[groupIndex];
+                                return BarTooltipItem(
+                                  '${(data.y / 1000.0).toStringAsFixed(2)}L / ${(dailyGoal / 1000.0).toStringAsFixed(2)}L',
+                                  const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                );
+                              },
+                            ),
+                            touchCallback: (FlTouchEvent event, barTouchResponse) {
+                              if (event is FlTapUpEvent && barTouchResponse != null) {
+                                final spot = barTouchResponse.spot;
+                                if (spot != null) {
+                                  final index = spot.touchedBarGroupIndex;
+                                  if (index >= 0 && index < chartData.length) {
+                                    final data = chartData[index];
+                                    setState(() {
+                                      _selectedBarIndex = index;
+                                      _selectedBarValue = data.y;
+                                      _selectedBarLabel = labels[index];
+                                    });
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                          titlesData: FlTitlesData(
+                            show: true,
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  final index = value.toInt();
+                                  if (index >= 0 && index < labels.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        labels[index],
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const Text('');
+                                },
+                                reservedSize: 40,
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 50,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    '${(value / 1000.0).toStringAsFixed(1)}L',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                          ),
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: maxY / 5,
+                            getDrawingHorizontalLine: (value) {
+                              return FlLine(
+                                color: Colors.grey[200]!,
+                                strokeWidth: 1,
+                              );
+                            },
+                          ),
+                          borderData: FlBorderData(show: false),
+                          barGroups: chartData.map((data) {
+                            final animatedHeight = data.y * _animation.value;
+                            
+                            return BarChartGroupData(
+                              x: data.x,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: animatedHeight,
+                                  width: 20,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(8),
+                                  ),
+                                  color: data.isReached
+                                      ? AppColors.waterColor
+                                      : AppColors.waterColor.withValues(alpha: 0.3),
+                                  backDrawRodData: BackgroundBarChartRodData(
+                                    show: true,
+                                    toY: dailyGoal,
+                                    color: Colors.grey[100],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                
+                // Seçilen sütun bilgisi
+                if (_selectedBarIndex >= 0 && _selectedBarValue != null)
                   Container(
-                    width: 30,
-                    height: height.clamp(0.0, 150.0),
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.softPinkButton,
-                      borderRadius: BorderRadius.circular(15),
+                      color: AppColors.softPinkButton.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$_selectedBarLabel: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          '${(_selectedBarValue! / 1000.0).toStringAsFixed(2)}L / ${(dailyGoal / 1000.0).toStringAsFixed(2)}L',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.softPinkButton,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${date.day}/${date.month}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+              ],
+            ),
           ),
         ],
       ),
@@ -708,3 +595,18 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
   }
 }
 
+class BarDataPoint {
+  final int x;
+  final double y;
+  final bool isReached;
+  final String dateKey;
+  final DateTime date;
+
+  BarDataPoint({
+    required this.x,
+    required this.y,
+    required this.isReached,
+    required this.dateKey,
+    required this.date,
+  });
+}

@@ -7,11 +7,13 @@ import '../providers/water_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
+import '../models/achievement_model.dart';
 import '../models/decoration_item.dart';
 import '../widgets/interactive_cup_modal.dart';
 import '../widgets/challenge_card.dart';
+import '../providers/drink_provider.dart';
+import '../models/drink_model.dart';
 import 'drink_gallery_screen.dart';
-import 'history_screen.dart';
 import 'success_screen.dart';
 
 class TankScreen extends StatefulWidget {
@@ -28,10 +30,13 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late Animation<double> _scrollIndicatorAnimation;
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
+  late DraggableScrollableController _challengeSheetController;
   
   @override
   void initState() {
     super.initState();
+    // DraggableScrollableController'ı initState içinde oluştur
+    _challengeSheetController = DraggableScrollableController();
     // Coin animasyonu için controller
     _coinAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -76,10 +81,11 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     _coinAnimationController.dispose();
     _scrollIndicatorController.dispose();
     _waveController.dispose();
+    _challengeSheetController.dispose();
     super.dispose();
   }
   
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,178 +115,192 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           children: [
             // Ana içerik - ScrollView
             SingleChildScrollView(
-          child: Column(
-            children: [
-              // Sol Üst: Metin Bilgileri + Sağ Üst: Coin + Streak
+            child: Column(
+              children: [
+              // Üst Bar: Sol - Günlük Seri Butonu, Sağ - Coin Butonu (spaceBetween ile hizalı)
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Sol Üst: Metin Bilgileri (Sola yaslı)
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${consumedAmount.toStringAsFixed(0)} ml İçildi',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.softPinkButton,
-                              letterSpacing: 0.3,
-                              height: 1.2,
-                            ),
+                    // Sol: Günlük Seri Butonu (Dairesel + Progress Ring)
+                    GestureDetector(
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SuccessScreen(),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Hedef: ${(dailyGoal / 1000.0).toStringAsFixed(1)}L',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-                              letterSpacing: 0.2,
+                        );
+                        
+                        // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
+                        if (result == 'open_challenges_panel' && mounted) {
+                          _challengeSheetController.animateTo(
+                            0.85,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
+                      child: SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Progress Ring (Günlük hedefe göre dolan)
+                            SizedBox(
+                              width: 60,
+                              height: 60,
+                              child: CircularProgressIndicator(
+                                value: progressPercentage / 100,
+                                strokeWidth: 4,
+                                backgroundColor: Colors.grey[300],
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.softPinkButton,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '%${progressPercentage.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.softPinkButton.withValues(alpha: 0.8),
-                              letterSpacing: 0.2,
+                            // İçerideki Dairesel Buton
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.local_fire_department,
+                                    color: AppColors.softPinkButton,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${userProvider.consecutiveDays}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.softPinkButton,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     
-                    // Sağ Üst: Coin + Streak (Dikey, Simetrik)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Coin sayacı (animasyonlu) - Sabit genişlik (110.0) ve yükseklik
-                        ScaleTransition(
-                          scale: _coinScaleAnimation,
-                          child: Container(
-                            width: 110.0,
-                            height: 50,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 0,
+                    // Sağ: Dairesel Coin Butonu
+                    ScaleTransition(
+                      scale: _coinScaleAnimation,
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
                             ),
-                            decoration: BoxDecoration(
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.monetization_on,
                               color: AppColors.goldCoin,
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.goldCoin.withValues(alpha: 0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+                              size: 24,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.monetization_on,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${waterProvider.tankCoins}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Seri Göstergesi Butonu - Aynı genişlik (110.0) ve yükseklik
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SuccessScreen(),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${waterProvider.tankCoins}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.goldCoin,
+                                letterSpacing: 0.5,
                               ),
-                            );
-                          },
-                          child: Container(
-                            width: 110.0,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.local_fire_department,
-                                  color: AppColors.softPinkButton,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    '${userProvider.consecutiveDays}',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.softPinkButton,
-                                      letterSpacing: 0.5,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
               
+              // Merkezi Metin: Akvaryumun üstünde ortalanmış
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Text(
+                    '${consumedAmount.toStringAsFixed(0)} ml İçildi',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.softPinkButton,
+                      letterSpacing: 0.3,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              
               const SizedBox(height: 20),
               
-              // Yuvarlak Fanus Tank Tasarımı - Büyütülmüş Boyut, RepaintBoundary ile Optimize
-              RepaintBoundary(
-                child: Container(
-                  width: MediaQuery.of(context).size.width * 0.65,
-                  height: MediaQuery.of(context).size.width * 0.65, // Ekranın %65'i (büyütüldü)
-                  margin: const EdgeInsets.symmetric(vertical: 20),
-                  child: Stack(
+              // Fanus ve Yan Bilgileri (Row içinde)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Sol Taraf: Yüzde Göstergesi
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      '%${progressPercentage.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Yuvarlak Fanus Tank Tasarımı - Büyütülmüş Boyut, RepaintBoundary ile Optimize
+                  RepaintBoundary(
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.65,
+                      height: MediaQuery.of(context).size.width * 0.65, // Ekranın %65'i (büyütüldü)
+                      child: Stack(
                     alignment: Alignment.center,
                     children: [
                     // Dış Çerçeve - Kalın Border ile Yuvarlak Fanus
-                    Container(
+                Container(
                       width: MediaQuery.of(context).size.width * 0.65,
                       height: MediaQuery.of(context).size.width * 0.65,
-                        decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
+                    border: Border.all(
                             color: AppColors.softPinkButton,
                             width: 6, // Kalın border
                           ),
@@ -292,21 +312,21 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                               const Color(0xFF9B7EDE).withValues(alpha: 0.1), // Mor
                               const Color(0xFF6B9BD1).withValues(alpha: 0.1), // Mavi
                             ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
+                    ),
+                    boxShadow: [
+                      BoxShadow(
                               color: AppColors.softPinkButton.withValues(alpha: 0.3),
                               blurRadius: 30,
-                              offset: const Offset(0, 10),
+                        offset: const Offset(0, 10),
                               spreadRadius: 5,
                             ),
                             BoxShadow(
                               color: const Color(0xFF9B7EDE).withValues(alpha: 0.2),
                               blurRadius: 20,
                               offset: const Offset(-5, -5),
-                            ),
-                          ],
-                        ),
+                      ),
+                    ],
+                  ),
                       ),
                       
                       // Su Seviyesi - ClipOval ile Taşma Önleme, RepaintBoundary ile Optimize
@@ -315,21 +335,21 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                           child: SizedBox(
                             width: MediaQuery.of(context).size.width * 0.65,
                             height: MediaQuery.of(context).size.width * 0.65,
-                            child: Stack(
-                              children: [
+                  child: Stack(
+                    children: [
                                 // Su doluluk animasyonu
                                 if (fillPercentage > 0)
-                                  Positioned(
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
                                     child: AnimatedBuilder(
                                       animation: _waveAnimation,
                                       builder: (context, child) {
                                         final waterHeight = MediaQuery.of(context).size.width * 0.65 * fillPercentage;
                                         return Container(
                                           height: waterHeight,
-                                          decoration: BoxDecoration(
+                          decoration: BoxDecoration(
                                             gradient: LinearGradient(
                                               begin: Alignment.topCenter,
                                               end: Alignment.bottomCenter,
@@ -353,10 +373,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                         );
                                       },
                                     ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                      ),
+                    ],
+                  ),
+                ),
                         ),
                       ),
                       
@@ -370,114 +390,244 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Sağ Taraf: Birim Göstergesi
+                  FutureBuilder<String>(
+                    future: SharedPreferences.getInstance().then((prefs) => prefs.getString('preferred_unit') ?? 'ml'),
+                    builder: (context, snapshot) {
+                      final unit = snapshot.data ?? 'ml';
+                      return SizedBox(
+                        width: 60,
+                        child: Text(
+                          unit.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
+            ),
+          );
+        },
+      ),
+                ],
               ),
               
-              const SizedBox(height: 20),
-              
-              // Üçlü Yuvarlak Buton Sistemi - Kusursuz Simetri
+              // Fanus Altı: Günlük Hedef (Ortalanmış)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Sol Buton - İstatistikler (Takvim/Grafik)
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HistoryScreen(),
-                          ),
-                        );
-                      },
-                      child: CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Colors.white,
-                        child: Icon(
-                          Icons.bar_chart_rounded,
-                          color: AppColors.softPinkButton,
-                          size: 30,
-                        ),
-                      ),
-                    ),
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(
+                  'Günlük Hedef: ${(dailyGoal / 1000.0).toStringAsFixed(1)} L',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey[600],
+                    letterSpacing: 0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
+              const SizedBox(height: 2), // Tanka daha yakın
+              
+              // Dinamik Hızlı Erişim Barı - Yatayda Kaydırılabilir
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Consumer<DrinkProvider>(
+                  builder: (context, drinkProvider, child) {
+                    final quickAccessDrinks = drinkProvider.quickAccessDrinks;
                     
-                    const SizedBox(width: 20),
-                    
-                    // Orta Buton - Su Bardağı (Merkezde) - Aynı dairesel boyut
-                    Stack(
-                      alignment: Alignment.center,
+                    // Ana Üçlü Grup Widget'ı (Merkezde) - Yeni Sıralama: Menü (Sol) | Su (Merkez, Mavi, Büyük) | İçecek Ekle (Sağ, Çikolatalı Süt +)
+                    final mainButtonGroup = Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Ana Buton - CircleAvatar ile Standardize (radius: 30)
+                        // En Sol: Menü Butonu (Izgara/Dalga ikonu)
                         GestureDetector(
-                          onTap: () => _showInteractiveCupModal(
-                            context,
-                            waterProvider,
-                            userProvider,
-                            achievementProvider,
-                          ),
+                          onTap: () {
+                            if (!mounted) return;
+                            _showDrinkSelector(context, waterProvider, userProvider, achievementProvider);
+                          },
                           child: CircleAvatar(
                             radius: 30,
-                            backgroundColor: AppColors.softPinkButton,
-                            child: const Icon(
-                              Icons.local_drink,
-                              color: Colors.white,
+                            backgroundColor: Colors.white,
+                            child: Icon(
+                              Icons.grid_view, // Izgara ikonu
+                              color: AppColors.softPinkButton,
                               size: 30,
                             ),
                           ),
                         ),
-                        // Üstte geçici etiket (sadece su eklendikten sonra görünür)
-                        Positioned(
-                          top: -20,
-                          child: FutureBuilder<Map<String, dynamic>>(
-                            future: _getLastAddedAmountWithUnit(),
-                            builder: (context, snapshot) {
-                              final data = snapshot.data;
-                              if (data != null) {
-                                final amount = data['amount'];
-                                final unit = data['unit'] as String;
-                                final hasAmount = amount != null && (amount as num) > 0;
-                                
-                                if (hasAmount) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.softPinkButton.withValues(alpha: 0.9),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '+${(amount as double).toStringAsFixed(unit == 'oz' ? 1 : 0)} $unit',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                              return const SizedBox.shrink();
-                            },
+                        
+                        const SizedBox(width: 20),
+                        
+                        // Merkez: Su İçme Butonu (Mavi, En Büyük)
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                if (!mounted) return;
+                                _showInteractiveCupModal(
+                                  context,
+                                  waterProvider,
+                                  userProvider,
+                                  achievementProvider,
+                                );
+                              },
+                              child: CircleAvatar(
+                                radius: 36, // En büyük buton (diğerleri 30)
+                                backgroundColor: AppColors.waterColor, // Mavi renk
+                                child: const Icon(
+                                  Icons.local_drink,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
+                              ),
+                            ),
+                            // Üstte geçici etiket (sadece su eklendikten sonra görünür)
+                            Positioned(
+                              top: -20,
+                              child: FutureBuilder<Map<String, dynamic>>(
+                                future: _getLastAddedAmountWithUnit(),
+                                builder: (context, snapshot) {
+                                  final data = snapshot.data;
+                                  if (data != null) {
+                                    final amount = data['amount'];
+                                    final unit = data['unit'] as String;
+                                    final hasAmount = amount != null && (amount as num) > 0;
+                                    
+                                    if (hasAmount) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.waterColor.withValues(alpha: 0.9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '+${(amount as double).toStringAsFixed(unit == 'oz' ? 1 : 0)} $unit',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(width: 20),
+                        
+                        // Sağ: İçecek Ekleme Butonu (Çikolatalı Süt Kutusu + Küçük + İşareti)
+                        GestureDetector(
+                          onTap: () {
+                            if (!mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const DrinkGalleryScreen(),
+                              ),
+                            );
+                          },
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 30,
+                                backgroundColor: AppColors.softPinkButton,
+                                child: Icon(
+                                  Icons.local_drink, // Çikolatalı süt kutusu için uygun ikon
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              // Sağ üst köşede küçük + işareti
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.add,
+                                    color: AppColors.softPinkButton,
+                                    size: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
+                    );
                     
-                    const SizedBox(width: 20),
-                    
-                    // Sağ Buton - Menü - CircleAvatar ile Standardize (radius: 30, aynı boyut)
-                    GestureDetector(
-                      onTap: () => _showDrinkSelector(context, waterProvider, userProvider, achievementProvider),
-                      child: CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Colors.white,
-                        child: Icon(
-                          Icons.grid_view,
-                          color: AppColors.softPinkButton,
-                          size: 30,
-                        ),
-                      ),
-                    ),
-                  ],
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final screenWidth = constraints.maxWidth;
+                        // Ana üçlü grubun genişliği: Menü(60) + 20 + Su(72) + 20 + Ekle(60) = 232
+                        final mainGroupWidth = 60.0 + 20.0 + 72.0 + 20.0 + 60.0;
+                        
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: false,
+                          child: Row(
+                            children: [
+                              // Sol boşluk - Ana üçlü grubu merkeze hizalamak için
+                              SizedBox(
+                                width: (screenWidth - mainGroupWidth) / 2,
+                              ),
+                              
+                              // Ana Üçlü Grup (Merkezde - Ana Üs)
+                              mainButtonGroup,
+                              
+                              // Hızlı Erişim İçecekleri (Ana üçlü grubun sağından başlar)
+                              if (quickAccessDrinks.isNotEmpty) const SizedBox(width: 12),
+                              
+                              ...quickAccessDrinks.map((drink) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      if (!mounted) return;
+                                      // Modal açılmadan varsayılan miktarı ekle
+                                      _addQuickAccessDrink(drink, waterProvider, userProvider, achievementProvider);
+                                    },
+                                    child: CircleAvatar(
+                                      radius: 30,
+                                      backgroundColor: Colors.white,
+                                      child: Icon(
+                                        _getDrinkIcon(drink.id),
+                                        color: _getDrinkColor(drink.id),
+                                        size: 30,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                              
+                              // Sağ boşluk - Ana üçlü grubu merkeze hizalamak için
+                              SizedBox(
+                                width: (screenWidth - mainGroupWidth) / 2,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
               
@@ -494,12 +644,13 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         
         // DraggableScrollableSheet - Mücadele Kartları (Peek Height)
         DraggableScrollableSheet(
+          controller: _challengeSheetController,
           initialChildSize: 0.12, // Başlığın ve kartların üstünün görüneceği seviye (peek height)
           minChildSize: 0.12,
           maxChildSize: 0.85,
           builder: (context, scrollController) {
             return Container(
-              decoration: BoxDecoration(
+            decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
                 boxShadow: [
@@ -513,11 +664,11 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               child: Column(
                 children: [
                   // Tutma çizgisi
-                  Container(
+        Container(
                     margin: const EdgeInsets.only(top: 12, bottom: 8),
                     width: 40,
                     height: 4,
-                    decoration: BoxDecoration(
+          decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -532,10 +683,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                         waterProvider,
                         userProvider,
                         achievementProvider,
-                      ),
-                    ),
-                  ),
-                ],
+            ),
+          ),
+        ),
+      ],
               ),
             );
           },
@@ -684,19 +835,24 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         setState(() {}); // Buton metnini güncelle
       }
       
-      // İlk Bardak mücadelesi kontrolü
+      // İlk Bardak başarısı kontrolü
       final currentConsumedAmount = waterProvider.consumedAmount;
       
       // Eğer önceki değer 0 idi ve şimdi > 0 ise, ilk su içildi
       if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
-        final isAlreadyCompleted = prefs.getBool('challenge_first_cup_completed') ?? false;
+        final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
+        final isAlreadyUnlocked = achievementProvider.isAchievementUnlocked('first_cup');
         
-        if (!isAlreadyCompleted) {
-          // Mücadeleyi tamamlandı olarak işaretle
-          await prefs.setBool('challenge_first_cup_completed', true);
+        if (!isAlreadyUnlocked) {
+          // Başarıyı aç ve coin ödülünü al
+          final coinReward = await achievementProvider.checkFirstCup();
           
-          // 20 Coin ekle
-          await waterProvider.addCoins(20);
+          // Coin ödülünü ekle
+          if (coinReward > 0) {
+            await waterProvider.addCoins(coinReward);
+            // Await sonrası mounted kontrolü
+            if (!mounted) return;
+          }
           
           // Context kontrolü - mounted kontrolünden sonra context kullan
           if (!mounted) return;
@@ -704,7 +860,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           // Context'i post-frame callback ile kullan (güvenli context kullanımı)
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              _showChallengeCompletionDialog(context, 'first_cup');
+              _showAchievementDialog(context, 'first_cup');
             }
           });
         }
@@ -712,11 +868,22 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     }
   }
   
-  // Mücadele tamamlandığında gösterilecek kutlama dialogu
-  void _showChallengeCompletionDialog(BuildContext context, String challengeId) {
-    // İlk Bardak mücadelesi için kart bilgisi
-    final firstCupChallenge = ChallengeData.getChallenges()
-        .firstWhere((c) => c.id == 'first_cup');
+  // Başarı kazanıldığında gösterilecek kutlama dialogu
+  void _showAchievementDialog(BuildContext context, String achievementId) {
+    final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
+    final achievement = achievementProvider.achievements.firstWhere(
+      (a) => a.id == achievementId,
+      orElse: () => Achievement(
+        id: achievementId,
+        name: 'İlk Bardak',
+        description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
+        coinReward: 20,
+      ),
+    );
+    
+    // İlk Bardak için özel renk ve emoji
+    final cardColor = const Color(0xFF00BCD4); // Açık Mavi/Cyan
+    final badgeEmoji = '💧';
     
     showDialog(
       context: context,
@@ -725,13 +892,13 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(20),
         child: Container(
-          decoration: BoxDecoration(
+      decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                firstCupChallenge.cardColor,
-                firstCupChallenge.cardColor.withValues(alpha: 0.7),
+                cardColor,
+                cardColor.withValues(alpha: 0.7),
               ],
             ),
             borderRadius: BorderRadius.circular(30),
@@ -739,36 +906,36 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               color: Colors.white.withValues(alpha: 0.3),
               width: 3,
             ),
-            boxShadow: [
-              BoxShadow(
+        boxShadow: [
+          BoxShadow(
                 color: Colors.cyan.withValues(alpha: 0.6),
                 blurRadius: 30,
                 spreadRadius: 5,
                 offset: const Offset(0, 0),
               ),
               BoxShadow(
-                color: firstCupChallenge.cardColor.withValues(alpha: 0.4),
+                color: cardColor.withValues(alpha: 0.4),
                 blurRadius: 25,
                 offset: const Offset(0, 10),
-              ),
-            ],
           ),
+        ],
+      ),
           child: Padding(
             padding: const EdgeInsets.all(30),
-            child: Column(
+      child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
+        children: [
                 // Rozet emoji (büyük)
                 Text(
-                  firstCupChallenge.badgeEmoji,
+                  badgeEmoji,
                   style: const TextStyle(fontSize: 80),
                 ),
                 const SizedBox(height: 20),
                 
                 // Başlık
-                const Text(
-                  'Mücadele Tamamlandı!',
-                  style: TextStyle(
+          const Text(
+                  'Yeni Bir Başarı Kazandın!',
+            style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -778,12 +945,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 12),
                 
-                // Mücadele adı
+                // Başarı adı
                 Text(
-                  firstCupChallenge.name,
+                  achievement.name,
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                   textAlign: TextAlign.center,
@@ -807,7 +974,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${firstCupChallenge.coinReward} Coin Kazandınız!',
+                        '${achievement.coinReward} Coin Kazandınız!',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -829,7 +996,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: firstCupChallenge.cardColor,
+                    foregroundColor: cardColor,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 40,
                       vertical: 16,
@@ -877,17 +1044,11 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         ),
         
         // Pokemon Kartı Tarzı Mücadeleler
-        ...ChallengeData.getChallenges().map((challenge) {
+        ...ChallengeData.getChallenges().where((challenge) => challenge.id != 'first_cup').map((challenge) {
           // Mücadele durumunu hesapla
           Challenge updatedChallenge = challenge;
           
-          // İlk Bardak mücadelesi kontrolü
-          if (challenge.id == 'first_cup') {
-            // SharedPreferences'den completion durumunu kontrol et (async)
-            // FutureBuilder ile kontrol edilecek, şimdilik default değer
-            // Completion durumu _showInteractiveCupModal içinde kontrol ediliyor
-            // ve SharedPreferences'a kaydediliyor
-          }
+          // İlk Bardak artık başarı olarak işleniyor, mücadeleler listesinde yok
           
           if (challenge.id == 'deep_dive') {
             // Derin Dalış: 3 gün üst üste %100 su hedefi
@@ -940,6 +1101,163 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   }
 
 
+  // Hızlı erişim içecek ekleme fonksiyonu (kaydedilmiş miktar ile)
+  Future<void> _addQuickAccessDrink(
+    Drink drink,
+    WaterProvider waterProvider,
+    UserProvider userProvider,
+    AchievementProvider achievementProvider,
+  ) async {
+    // Hızlı erişim içecek için kaydedilmiş miktarı al (varsayılan: 200ml)
+    final drinkProvider = Provider.of<DrinkProvider>(context, listen: false);
+    final amount = drinkProvider.getQuickAccessAmount(drink.id);
+    
+    final result = await waterProvider.drink(drink, amount);
+    
+    if (!mounted) return;
+    
+    if (result.success) {
+      // Hidrasyon faktörüne göre efektif miktarı ekle
+      final effectiveAmount = amount * drink.hydrationFactor;
+      await userProvider.addToTotalWater(effectiveAmount);
+      
+      if (!mounted) return;
+      
+      // Başarı kontrolü
+      if (result.isFirstDrink) {
+        final coins = await achievementProvider.checkFirstStep();
+        if (coins > 0) {
+          await waterProvider.addCoins(coins);
+          await userProvider.addAchievement('first_step');
+        }
+      }
+      
+      if (!mounted) return;
+      
+      final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
+      if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
+        final coins = await achievementProvider.checkDailyGoal();
+        if (coins > 0) {
+          await waterProvider.addCoins(coins);
+          await userProvider.addAchievement('daily_goal');
+          await userProvider.updateConsecutiveDays(true);
+        }
+      } else if (waterProvider.hasReachedDailyGoal) {
+        await userProvider.updateConsecutiveDays(true);
+      }
+      
+      if (!mounted) return;
+      
+      // Başarı mesajı göster
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${drink.name} eklendi! (${amount.toStringAsFixed(0)}ml)',
+          ),
+          backgroundColor: AppColors.softPinkButton,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // İçecek ikonu getir
+  IconData _getDrinkIcon(String drinkId) {
+    switch (drinkId) {
+      case 'water':
+        return Icons.water_drop;
+      case 'mineral_water':
+        return Icons.water;
+      case 'coffee':
+        return Icons.local_cafe;
+      case 'tea':
+        return Icons.emoji_food_beverage;
+      case 'herbal_tea':
+      case 'green_tea':
+        return Icons.eco;
+      case 'cold_tea':
+        return Icons.emoji_food_beverage;
+      case 'lemonade':
+        return Icons.local_drink;
+      case 'iced_coffee':
+        return Icons.local_cafe;
+      case 'ayran':
+      case 'kefir':
+        return Icons.liquor;
+      case 'milk':
+        return Icons.local_drink;
+      case 'juice':
+      case 'fresh_juice':
+        return Icons.local_drink;
+      case 'smoothie':
+        return Icons.blender;
+      case 'sports':
+        return Icons.fitness_center;
+      case 'protein_shake':
+        return Icons.sports_gymnastics;
+      case 'coconut_water':
+        return Icons.water_drop;
+      case 'soda':
+        return Icons.sports_bar;
+      case 'energy_drink':
+        return Icons.bolt;
+      case 'detox_water':
+        return Icons.spa;
+      default:
+        return Icons.local_drink;
+    }
+  }
+
+  // İçecek rengi getir
+  Color _getDrinkColor(String drinkId) {
+    switch (drinkId) {
+      case 'water':
+        return Colors.blue;
+      case 'mineral_water':
+        return const Color(0xFF4A9ED8);
+      case 'coffee':
+        return Colors.brown;
+      case 'tea':
+        return Colors.green;
+      case 'herbal_tea':
+        return const Color(0xFF6B8E23);
+      case 'green_tea':
+        return const Color(0xFF228B22);
+      case 'cold_tea':
+        return const Color(0xFF8B7355);
+      case 'lemonade':
+        return const Color(0xFFFFD700);
+      case 'iced_coffee':
+        return const Color(0xFF8B4513);
+      case 'ayran':
+        return const Color(0xFFF5F5DC);
+      case 'kefir':
+        return const Color(0xFFFFE4B5);
+      case 'milk':
+        return Colors.white70;
+      case 'juice':
+        return Colors.orange;
+      case 'smoothie':
+        return const Color(0xFFFF6347);
+      case 'fresh_juice':
+        return const Color(0xFFFF8C00);
+      case 'sports':
+        return Colors.cyan;
+      case 'protein_shake':
+        return const Color(0xFF9370DB);
+      case 'coconut_water':
+        return const Color(0xFFDEB887);
+      case 'soda':
+        return Colors.red;
+      case 'energy_drink':
+        return const Color(0xFFFF1493);
+      case 'detox_water':
+        return const Color(0xFF98D8C8);
+      default:
+        return AppColors.softPinkButton;
+    }
+  }
+
   // Animasyonlu Scroll Göstergesi
   Widget _buildScrollIndicator() {
     return Padding(
@@ -958,15 +1276,15 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                Text(
+        Text(
                   'Mücadeleler için kaydır',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[500],
                     fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+          ),
+        ),
+      ],
             ),
           );
         },

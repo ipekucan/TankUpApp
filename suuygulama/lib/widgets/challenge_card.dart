@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Mücadele modeli
 class Challenge {
@@ -354,8 +355,15 @@ class _ChallengeCardState extends State<ChallengeCard>
                             // Mücadeleye Başla butonu
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  // Mücadeleyi başlat
+                                onPressed: () async {
+                                  // Mücadeleyi başlat - SharedPreferences'a kaydet
+                                  final prefs = await SharedPreferences.getInstance();
+                                  await prefs.setBool('challenge_${widget.challenge.id}_started', true);
+                                  await prefs.setString('challenge_${widget.challenge.id}_start_date', DateTime.now().toIso8601String());
+                                  
+                                  if (!context.mounted) return;
+                                  
+                                  // Başarı mesajı göster
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('${widget.challenge.name} mücadelesi başlatıldı! 🎯'),
@@ -363,6 +371,8 @@ class _ChallengeCardState extends State<ChallengeCard>
                                       duration: const Duration(seconds: 2),
                                     ),
                                   );
+                                  
+                                  if (!context.mounted) return;
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -586,60 +596,52 @@ class _ChallengeCardState extends State<ChallengeCard>
 class ChallengeData {
   static List<Challenge> getChallenges() {
     return [
-      Challenge(
-        id: 'first_cup',
-        name: 'İlk Bardak',
-        description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
-        coinReward: 20,
-        cardColor: const Color(0xFF00BCD4), // Açık Mavi/Cyan
-        icon: Icons.water_drop,
-        whyStart: 'Her yolculuk ilk adımla başlar. İlk suyunu içerek sağlıklı bir alışkanlığın temelini atıyorsun!',
-        healthBenefit: 'Düzenli su tüketimi, vücut fonksiyonlarını optimize eder, enerji seviyenizi artırır ve genel sağlığınızı iyileştirir.',
-        badgeEmoji: '💧', // İlk Damla rozeti
-      ),
-      Challenge(
-        id: 'blue_crystal',
-        name: 'Mavi Kristal',
-        description: '1 hafta şekerli içecek yok',
-        coinReward: 100,
-        cardColor: const Color(0xFF4A9ED8), // Mavi
-        icon: Icons.diamond,
-        whyStart: 'Şekerli içecekler vücudunuzun su dengesini bozar ve gereksiz kalori ekler. Bu mücadele ile hem hidrasyonunuzu iyileştirir hem de kilo kontrolüne yardımcı olursunuz.',
-        healthBenefit: 'Şekersiz bir hafta, kan şekeri seviyenizi dengeleyecek, enerji seviyenizi artıracak ve cildinizin daha sağlıklı görünmesini sağlayacak.',
-        badgeEmoji: '💎', // Balık Kristali rozeti
-      ),
+      // Kolay (20 Coin)
       Challenge(
         id: 'caffeine_hunter',
         name: 'Kafein Avcısı',
         description: 'Bugün 2 kahve yerine 2 büyük bardak su',
-        coinReward: 30,
+        coinReward: 20, // Kolay
         cardColor: const Color(0xFF8B4513), // Kahverengi
         icon: Icons.local_cafe,
         whyStart: 'Kafein dehidrasyona neden olabilir. Kahve yerine su içerek vücudunuzun gerçekten ihtiyaç duyduğu sıvıyı sağlarsınız.',
         healthBenefit: 'Daha iyi hidrasyon, daha stabil enerji seviyeleri ve daha kaliteli uyku. Kafein bağımlılığından kurtulmak için ilk adım!',
         badgeEmoji: '🚫☕', // Kahve yasağı rozeti
       ),
-      Challenge(
-        id: 'deep_dive',
-        name: 'Derin Dalış',
-        description: '3 gün üst üste %100 su hedefi',
-        coinReward: 150,
-        cardColor: const Color(0xFF6B9BD1), // Açık Mavi
-        icon: Icons.water_drop,
-        whyStart: 'Düzenli su tüketimi alışkanlık haline getirmek için en etkili yöntem. 3 gün üst üste hedefe ulaşmak, kalıcı bir rutin oluşturmanıza yardımcı olur.',
-        healthBenefit: 'Optimal hidrasyon, gelişmiş bilişsel fonksiyon, daha iyi sindirim ve genel sağlık. Vücudunuz size teşekkür edecek!',
-        badgeEmoji: '🌊', // Dalga rozeti
-      ),
+      // Orta (50 Coin)
       Challenge(
         id: 'coral_guardian',
         name: 'Mercan Koruyucu',
         description: 'Akşam 8\'den sonra sadece su tüket',
-        coinReward: 40,
+        coinReward: 50, // Orta
         cardColor: const Color(0xFFFF6B9D), // Pembe/Mercan
         icon: Icons.nightlight_round,
         whyStart: 'Gece geç saatlerde şekerli veya kafeinli içecekler uyku kalitenizi bozar. Sadece su içerek daha iyi bir gece uykusu sağlarsınız.',
         healthBenefit: 'Daha kaliteli uyku, daha iyi metabolizma ve sabah daha dinç uyanma. Gece rutininizi optimize edin!',
         badgeEmoji: '🪸', // Mercan rozeti
+      ),
+      Challenge(
+        id: 'blue_crystal',
+        name: 'Mavi Kristal',
+        description: '1 hafta şekerli içecek yok',
+        coinReward: 50, // Orta
+        cardColor: const Color(0xFF4A9ED8), // Mavi
+        icon: Icons.diamond,
+        whyStart: 'Şekerli içecekler vücudunuzun su dengesini bozar ve gereksiz kalori ekler. Bu mücadele ile hem hidrasyonunuzu iyileştirir hem de kilo kontrolüne yardımcı olursunuz.',
+        healthBenefit: 'Şekersiz bir hafta, kan şekeri seviyenizi dengeleyecek, enerji seviyenizi artıracak ve cildinizin daha sağlıklı görünmesini sağlayacak.',
+        badgeEmoji: '💎', // Balık Kristali rozeti
+      ),
+      // Zor (100 Coin)
+      Challenge(
+        id: 'deep_dive',
+        name: 'Derin Dalış',
+        description: '3 gün üst üste %100 su hedefi',
+        coinReward: 100, // Zor
+        cardColor: const Color(0xFF6B9BD1), // Açık Mavi
+        icon: Icons.water_drop,
+        whyStart: 'Düzenli su tüketimi alışkanlık haline getirmek için en etkili yöntem. 3 gün üst üste hedefe ulaşmak, kalıcı bir rutin oluşturmanıza yardımcı olur.',
+        healthBenefit: 'Optimal hidrasyon, gelişmiş bilişsel fonksiyon, daha iyi sindirim ve genel sağlık. Vücudunuz size teşekkür edecek!',
+        badgeEmoji: '🌊', // Dalga rozeti
       ),
     ];
   }

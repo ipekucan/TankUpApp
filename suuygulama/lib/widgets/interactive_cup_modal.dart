@@ -344,6 +344,63 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
 
       if (!mounted) return;
       
+      // Şanslı Yudum ve diğer bonus bildirimleri
+      if (result.isLuckyDrink) {
+        // Şanslı Yudum bildirimi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.stars, color: Colors.amber, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Şanslı Yudum! +10 Coin kazandın! 🍀',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.amber.shade700,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      
+      if (result.isEarlyBird) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erken Kuş Bonusu! +5 Coin 🌅'),
+            backgroundColor: Colors.orange.shade400,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      if (result.isNightOwl) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gece Kuşu Bonusu! +5 Coin 🌙'),
+            backgroundColor: Colors.indigo.shade400,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      if (result.isDailyGoalBonus) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Günlük Hedefe Ulaşıldı! +15 Coin 🎯'),
+            backgroundColor: Colors.green.shade600,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
       // Son eklenen miktarı ve birimi kaydet
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('last_added_amount', _currentAmount);

@@ -6,7 +6,6 @@ import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
 import 'plan_loading_screen.dart';
-import 'main_navigation_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -18,18 +17,20 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   // Form verileri - Başlangıçta boş
   String? _selectedGender;
-  int _selectedHeight = 0; // cm (100-250 arası) - Başlangıçta 0
   int _selectedWeight = 0; // kg veya lbs (birime göre) - Başlangıçta 0
   String? _selectedActivityLevel;
   String? _selectedClimate; // İklim seçimi
   int _weightUnit = 0; // 0 = Kg, 1 = Lbs (CupertinoSlidingSegmentedControl için)
   double? _customGoal; // Özel hedef
   
+  // PageView Controller
+  late PageController _pageController;
+  int _currentPage = 0; // 0-4 arası (5 adım)
   
   // Canlı hesaplanan su hedefi
   double get _calculatedWaterGoal {
-    // En az bir veri (Boy veya Kilo) girilene kadar 0 döndür
-    if (_selectedWeight == 0 && _selectedHeight == 0) return 0.0;
+    // Kilo girilene kadar 0 döndür
+    if (_selectedWeight == 0) return 0.0;
     
     // Kilo dönüşümü (Lbs ise Kg'ye çevir) - Varsayılan değerlerle
     final weightInKg = _weightUnit == 1 
@@ -49,7 +50,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     // İklim faktörü
     double climateBonus = 0.0;
-    if (_selectedClimate == 'hot') {
+    if (_selectedClimate == 'very_hot') {
+      climateBonus = 400.0; // Çok sıcak iklim için +400ml
+    } else if (_selectedClimate == 'hot') {
       climateBonus = 300.0; // Sıcak iklim için +300ml
     } else if (_selectedClimate == 'warm') {
       climateBonus = 150.0; // Ilıman iklim için +150ml
@@ -64,80 +67,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
   
   // Picker controller'ları
-  late FixedExtentScrollController _heightController;
   late FixedExtentScrollController _weightController;
-  
-  // Cache'lenmiş picker children'ları (performans için)
-  late final List<Widget> _heightPickerChildren;
-  late final List<Widget> _weightPickerChildrenKg;
-  late final List<Widget> _weightPickerChildrenLbs;
   
   @override
   void initState() {
     super.initState();
-    _heightController = FixedExtentScrollController(initialItem: 0); // Başlangıçta 0 (100 cm)
+    _pageController = PageController();
     _weightController = FixedExtentScrollController(initialItem: 0); // Başlangıçta 0 (30 kg)
     
-    // Picker children'larını önceden oluştur (performans için) - Kompakt ve zarif tasarım
-    _heightPickerChildren = List.generate(151, (index) {
-      final height = 100 + index;
-      return Center(
-        child: Text(
-          '$height cm',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey,
-          ),
-        ),
-      );
-    });
-    
-    _weightPickerChildrenKg = List.generate(171, (index) {
-      final weight = 30 + index;
-      return Center(
-        child: Text(
-          '$weight',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey,
-          ),
-        ),
-      );
-    });
-    
-    _weightPickerChildrenLbs = List.generate(376, (index) {
-      final weight = 66 + index;
-      return Center(
-        child: Text(
-          '$weight',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey,
-          ),
-        ),
-      );
-    });
-    
-    // Controller'ları dinle ve sadece gerektiğinde setState çağır
-    _heightController.addListener(_onHeightChanged);
+    // Controller'ı dinle ve sadece gerektiğinde setState çağır
     _weightController.addListener(_onWeightChanged);
-  }
-  
-  void _onHeightChanged() {
-    if (_heightController.hasClients) {
-      final index = _heightController.selectedItem;
-      if (index >= 0 && index < 151) {
-        final newHeight = 100 + index;
-        if (newHeight != _selectedHeight) {
-          setState(() {
-            _selectedHeight = newHeight;
-          });
-        }
-      }
-    }
   }
   
   void _onWeightChanged() {
@@ -159,11 +98,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   
   @override
   void dispose() {
-    _heightController.removeListener(_onHeightChanged);
     _weightController.removeListener(_onWeightChanged);
-    _heightController.dispose();
     _weightController.dispose();
+    _pageController.dispose();
     super.dispose();
+  }
+  
+  // Otomatik Geçiş Fonksiyonu - Seçimi kaydet, sonraki sayfaya geç, progress bar'ı güncelle
+  void _nextStep() {
+    // Son sayfa değilse bir sonraki sayfaya geç (0-4 = 5 adım)
+    if (_currentPage < 4) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      // Progress bar otomatik güncellenir (onPageChanged callback'i sayesinde)
+    } else {
+      // Son sayfadaysa onboarding'i tamamla
+      _completeOnboarding();
+    }
+  }
+  
+  // Atla butonu mantığı - Veri doğrulaması yapmadan direkt sonraki sayfaya geç
+  void _skipCurrentStep() {
+    // Veri doğrulaması yapmadan direkt sonraki sayfaya geç (0-4 = 5 adım)
+    if (_currentPage < 4) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Son sayfadaysa onboarding'i tamamla
+      _completeOnboarding();
+    }
   }
 
   Future<void> _completeOnboarding() async {
@@ -180,7 +147,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Profil verilerini kaydet
     await userProvider.updateProfile(
       gender: _selectedGender,
-      height: _selectedHeight.toDouble(),
       weight: weightInKg,
       activityLevel: _selectedActivityLevel,
     );
@@ -195,8 +161,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     if (!mounted) return;
     
+    // Progress bar'ı tam doldur (son sayfaya geç)
+    setState(() {
+      _currentPage = 4; // Son sayfa (0-4 = 5 adım)
+    });
+    
+    // Kısa bir gecikme ile plan loading ekranına yönlendir
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (!mounted) return;
+    
     // Plan Loading ekranına yönlendir
-    Navigator.of(context).push(
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => PlanLoadingScreen(
           customGoal: _customGoal,
@@ -205,51 +181,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
   
-  Future<void> _skipOnboarding() async {
-    if (!mounted) return;
-    
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-    
-    // Varsayılan değerlerle profil oluştur
-    await userProvider.updateProfile(
-      gender: null,
-      height: 170.0,
-      weight: 70.0,
-      activityLevel: 'medium',
-    );
-    
-    // Varsayılan 2000ml hedefi ayarla
-    await waterProvider.updateDailyGoal(2000.0);
-    
-    // Coin'i sıfırla
-    await waterProvider.resetCoins();
-    
-    // Onboarding tamamlandı olarak işaretle
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_completed', true);
-    
-    if (!mounted) return;
-    
-    // Ana sayfaya yönlendir
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => const MainNavigationScreen(),
-      ),
-      (route) => false,
-    );
-  }
 
-  bool _canProceed() {
-    final weightValid = _weightUnit == 0
-        ? _selectedWeight >= 30 && _selectedWeight <= 200
-        : _selectedWeight >= 66 && _selectedWeight <= 441;
-    return _selectedGender != null &&
-        _selectedHeight >= 100 &&
-        _selectedHeight <= 250 &&
-        weightValid &&
-        _selectedActivityLevel != null;
-  }
 
 
   @override
@@ -257,255 +189,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       backgroundColor: AppColors.verySoftBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Atla Butonu - Sol Üst Köşe
-              Align(
-                alignment: Alignment.topLeft,
-                child: TextButton(
-                  onPressed: () => _skipOnboarding(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'Atla',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: const Color(0xFF4A5568).withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Başlık
-              const Text(
-                'Sağlık Profili',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF4A5568),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Kişisel hidrasyon planınızı oluşturmak için bilgilerinizi girin',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 40),
-              
-              // Dinamik Üst Banner - Bilimsel Hidrasyon İhtiyacı
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Günlük Hidrasyon İhtiyacı: ${_calculatedWaterGoal.toStringAsFixed(0)} ml',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.softPinkButton,
-                    letterSpacing: 0.2,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Modern Kart Sistemi - Tıklanabilir Butonlar
-              _buildSelectableButton(
-                title: 'Cinsiyet',
-                value: _selectedGender == null 
-                    ? null 
-                    : _selectedGender == 'male' 
-                        ? 'Erkek' 
-                        : _selectedGender == 'female' 
-                            ? 'Kadın' 
-                            : 'Belirtmek İstemiyorum',
-                onTap: () => _showGenderModal(),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              _buildSelectableButton(
-                title: 'Boy',
-                value: _selectedHeight == 0 ? null : '$_selectedHeight cm',
-                onTap: () => _showHeightModal(),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              _buildSelectableButton(
-                title: 'Kilo',
-                value: _selectedWeight == 0 ? null : '$_selectedWeight ${_weightUnit == 0 ? 'kg' : 'lbs'}',
-                onTap: () => _showWeightModal(),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              _buildSelectableButton(
-                title: 'Aktivite Seviyesi',
-                value: _selectedActivityLevel == null
-                    ? null
-                    : _selectedActivityLevel == 'low'
-                        ? 'Düşük'
-                        : _selectedActivityLevel == 'medium'
-                            ? 'Orta'
-                            : 'Yüksek',
-                onTap: () => _showActivityModal(),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              _buildSelectableButton(
-                title: 'İklim',
-                value: _selectedClimate == null
-                    ? null
-                    : _selectedClimate == 'cold'
-                        ? 'Soğuk'
-                        : _selectedClimate == 'warm'
-                            ? 'Ilıman'
-                            : 'Sıcak',
-                onTap: () => _showClimateModal(),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Özel Hedef Butonu (Minimalist)
-              TextButton(
-                onPressed: () => _showCustomGoalDialog(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  'Özel Hedef Belirle',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: const Color(0xFF4A5568).withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // İleri Butonu
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _canProceed() ? _completeOnboarding : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.softPinkButton,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 60,
-                      vertical: 22,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(35),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'İleri',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Modern Kart Sistemi - Tıklanabilir Buton
-  Widget _buildSelectableButton({
-    required String title,
-    required String? value,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: value != null 
-                ? AppColors.softPinkButton.withValues(alpha: 0.3)
-                : Colors.grey[300]!,
-            width: value != null ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                if (value != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.softPinkButton,
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Seçiniz',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+            // Üst Kontrol Paneli - Sabit (Progress Bar + Atla Butonu)
+            _buildTopControlPanel(),
+            
+            // PageView - 5 Adımlı Akış
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                physics: const NeverScrollableScrollPhysics(), // Yatay kaydırmayı devre dışı bırak
+                children: [
+                  // 1. Adım: Cinsiyet Seçimi
+                  _buildGenderStep(),
+                  // 2. Adım: Kilo Seçimi
+                  _buildWeightStep(),
+                  // 3. Adım: Aktivite Seviyesi
+                  _buildActivityStep(),
+                  // 4. Adım: İklim Seçimi
+                  _buildClimateStep(),
+                  // 5. Adım: Günlük Hedef
+                  _buildGoalStep(),
                 ],
-              ],
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: AppColors.softPinkButton,
-              size: 24,
+              ),
             ),
           ],
         ),
@@ -513,134 +224,1000 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
   
-  // Modal Bottom Sheet Fonksiyonları - Modüler Widget'lara yönlendirme
-  
-  void _showGenderModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => GenderModalSheet(
-        selectedGender: _selectedGender,
-        onGenderSelected: (gender) {
-          setState(() => _selectedGender = gender);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-  
-  void _showHeightModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => HeightModalSheet(
-        heightController: _heightController,
-        heightPickerChildren: _heightPickerChildren,
-      ),
-    );
-  }
-  
-  void _showWeightModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => WeightModalSheet(
-        weightController: _weightController,
-        weightUnit: _weightUnit,
-        weightPickerChildrenKg: _weightPickerChildrenKg,
-        weightPickerChildrenLbs: _weightPickerChildrenLbs,
-        onWeightUnitChanged: (unit, newWeight) {
-          setState(() {
-            _weightUnit = unit;
-            _selectedWeight = newWeight;
-          });
-        },
-      ),
-    );
-  }
-  
-  void _showActivityModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => ActivityModalSheet(
-        selectedActivity: _selectedActivityLevel,
-        onActivitySelected: (activity) {
-          setState(() => _selectedActivityLevel = activity);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-  
-  void _showClimateModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => ClimateModalSheet(
-        selectedClimate: _selectedClimate,
-        onClimateSelected: (climate) {
-          setState(() => _selectedClimate = climate);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-  
-  void _showCustomGoalDialog() {
-    final TextEditingController goalController = TextEditingController(
-      text: _customGoal != null ? (_customGoal! / 1000.0).toStringAsFixed(1) : '',
-    );
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text('Özel Hedef Belirle'),
-        content: TextField(
-          controller: goalController,
-          decoration: InputDecoration(
-            labelText: 'Günlük Hedef (L)',
-            hintText: 'Örn: 3.5',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
+  // Üst Kontrol Paneli - Progress Bar + Atla Butonu
+  Widget _buildTopControlPanel() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          // Progress Bar
+          Expanded(
+            child: Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: ((_currentPage + 1) * 0.20).clamp(0.0, 1.0), // Her adımda %20 artış
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.softPinkButton,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
             ),
           ),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
+          
+          const SizedBox(width: 16),
+          
+          // Atla Butonu
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
-          ),
-          TextButton(
-            onPressed: () {
-              final goal = double.tryParse(goalController.text);
-              if (goal != null && goal > 0) {
-                setState(() {
-                  _customGoal = goal * 1000.0; // L'den ml'ye çevir
-                });
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Kaydet'),
+            onPressed: _skipCurrentStep,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Atla',
+              style: TextStyle(
+                fontSize: 14,
+                color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+  
+  // 1. Adım: Cinsiyet Seçimi
+  Widget _buildGenderStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Cinsiyet Seçiniz',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Kişisel hidrasyon planınızı oluşturmak için cinsiyetinizi seçin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 60),
+          
+          // Yan yana iki dairesel buton
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Erkek Butonu
+              _buildGenderButton(
+                isSelected: _selectedGender == 'male',
+                icon: Icons.person,
+                label: 'Erkek',
+                onTap: () {
+                  setState(() {
+                    _selectedGender = 'male';
+                  });
+                  // Otomatik sonraki sayfaya geç
+                  Future.delayed(const Duration(milliseconds: 300), () {
+                    if (mounted) {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  });
+                },
+              ),
+              
+              const SizedBox(width: 32),
+              
+              // Kadın Butonu
+              _buildGenderButton(
+                isSelected: _selectedGender == 'female',
+                icon: Icons.person_outline,
+                label: 'Kadın',
+                onTap: () {
+                  setState(() {
+                    _selectedGender = 'female';
+                  });
+                  // Otomatik sonraki sayfaya geç
+                  Future.delayed(const Duration(milliseconds: 300), () {
+                    if (mounted) {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Cinsiyet Butonu Widget'ı
+  Widget _buildGenderButton({
+    required bool isSelected,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 140,
+        height: 140,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isSelected 
+              ? AppColors.softPinkButton 
+              : Colors.white,
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.softPinkButton 
+                : Colors.grey[300]!,
+            width: isSelected ? 3 : 2,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.softPinkButton.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 60,
+              color: isSelected 
+                  ? Colors.white 
+                  : AppColors.softPinkButton,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isSelected 
+                    ? Colors.white 
+                    : const Color(0xFF4A5568),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 2. Adım: Kilo Seçimi
+  Widget _buildWeightStep() {
+    // WheelPicker için değerler (30-200 arası)
+    final weightValues = List.generate(171, (index) => 30 + index);
+    final initialWeightIndex = _selectedWeight > 0 && _selectedWeight >= 30 && _selectedWeight <= 200
+        ? _selectedWeight - 30
+        : 40; // Varsayılan 70kg
+    
+    // Controller'ı state'te tutmak yerine, her build'de güncelle
+    if (!_weightController.hasClients || _weightController.selectedItem != initialWeightIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_weightController.hasClients && _weightController.selectedItem != initialWeightIndex) {
+          _weightController.animateToItem(
+            initialWeightIndex,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Kilonuzu Seçiniz',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Hidrasyon hedefinizi hesaplamak için kilonuzu girin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 60),
+          
+          // Sol: WheelPicker, Sağ: Birim Toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Sol: WheelPicker
+              SizedBox(
+                width: 120,
+                height: 200,
+                child: CupertinoPicker(
+                  scrollController: _weightController,
+                  itemExtent: 50,
+                  onSelectedItemChanged: (index) {
+                    setState(() {
+                      _selectedWeight = weightValues[index];
+                    });
+                  },
+                  children: weightValues.map((weight) {
+                    return Center(
+                      child: Text(
+                        weight.toString(),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF4A5568),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              
+              const SizedBox(width: 32),
+              
+              // Sağ: Birim Toggle (kg/lb)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // kg Seçeneği
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _weightUnit = 0;
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _weightUnit == 0 ? AppColors.softPinkButton : Colors.transparent,
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                            child: Text(
+                              'kg',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: _weightUnit == 0 ? Colors.white : Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // lbs Seçeneği
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _weightUnit = 1;
+                              // lbs'ye çevir
+                              if (_selectedWeight > 0) {
+                                _selectedWeight = (_selectedWeight * 2.20462).round();
+                              }
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _weightUnit == 1 ? AppColors.softPinkButton : Colors.transparent,
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                            child: Text(
+                              'lbs',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: _weightUnit == 1 ? Colors.white : Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 40),
+          
+          // Seçilen değer gösterimi
+          Text(
+            _selectedWeight > 0 
+                ? '$_selectedWeight ${_weightUnit == 0 ? 'kg' : 'lbs'}'
+                : 'Seçiniz',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: _selectedWeight > 0 
+                  ? AppColors.softPinkButton 
+                  : Colors.grey[400],
+            ),
+          ),
+          
+          const SizedBox(height: 40),
+          
+          // İleri Butonu
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selectedWeight > 0 ? _nextStep : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'İleri',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+  
+  // 3. Adım: Aktivite Seviyesi
+  Widget _buildActivityStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Aktivite Seviyeniz',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Günlük aktivite seviyenizi seçin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 60),
+          
+          // 3 Yatay Dikdörtgen Buton
+          Column(
+            children: [
+              // Düşük Aktivite
+              _buildActivityButton(
+                title: 'Düşük',
+                icon: Icons.directions_walk,
+                isSelected: _selectedActivityLevel == 'low',
+                onTap: () async {
+                  setState(() {
+                    _selectedActivityLevel = 'low';
+                  });
+                  
+                  // Provider'a yaz
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  await userProvider.updateProfile(activityLevel: 'low');
+                  
+                  // Otomatik sonraki sayfaya geç
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Orta Aktivite
+              _buildActivityButton(
+                title: 'Orta',
+                icon: Icons.directions_run,
+                isSelected: _selectedActivityLevel == 'medium',
+                onTap: () async {
+                  setState(() {
+                    _selectedActivityLevel = 'medium';
+                  });
+                  
+                  // Provider'a yaz
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  await userProvider.updateProfile(activityLevel: 'medium');
+                  
+                  // Otomatik sonraki sayfaya geç
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Yüksek Aktivite
+              _buildActivityButton(
+                title: 'Yüksek',
+                icon: Icons.sports_gymnastics,
+                isSelected: _selectedActivityLevel == 'high',
+                onTap: () async {
+                  setState(() {
+                    _selectedActivityLevel = 'high';
+                  });
+                  
+                  // Provider'a yaz
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  await userProvider.updateProfile(activityLevel: 'high');
+                  
+                  // Otomatik sonraki sayfaya geç
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 40),
+          
+          // İleri Butonu (Yedek - Aktivite seçildiğinde otomatik geçiş yapılıyor)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selectedActivityLevel != null ? _nextStep : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'İleri',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+  
+  // Aktivite Butonu Widget'ı
+  Widget _buildActivityButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? AppColors.softPinkButton.withValues(alpha: 0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.softPinkButton 
+                : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.softPinkButton.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 5,
+                    spreadRadius: 1,
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Sol: Metin
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: isSelected 
+                    ? AppColors.softPinkButton 
+                    : const Color(0xFF4A5568),
+              ),
+            ),
+            
+            // Sağ: İkon
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected 
+                  ? AppColors.softPinkButton 
+                  : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 4. Adım: İklim Seçimi
+  Widget _buildClimateStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'İklim Seçiniz',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Yaşadığınız bölgenin iklim tipini seçin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 60),
+          
+          // 4 Yatay Dikdörtgen Buton
+          Column(
+            children: [
+              // Çok Sıcak
+              _buildClimateButton(
+                title: 'Çok Sıcak',
+                icon: Icons.wb_sunny,
+                isSelected: _selectedClimate == 'very_hot',
+                onTap: () {
+                  setState(() {
+                    _selectedClimate = 'very_hot';
+                  });
+                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Sıcak
+              _buildClimateButton(
+                title: 'Sıcak',
+                icon: Icons.wb_twilight,
+                isSelected: _selectedClimate == 'hot',
+                onTap: () {
+                  setState(() {
+                    _selectedClimate = 'hot';
+                  });
+                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Ilıman
+              _buildClimateButton(
+                title: 'Ilıman',
+                icon: Icons.wb_cloudy,
+                isSelected: _selectedClimate == 'warm',
+                onTap: () {
+                  setState(() {
+                    _selectedClimate = 'warm';
+                  });
+                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Soğuk
+              _buildClimateButton(
+                title: 'Soğuk',
+                icon: Icons.ac_unit,
+                isSelected: _selectedClimate == 'cold',
+                onTap: () {
+                  setState(() {
+                    _selectedClimate = 'cold';
+                  });
+                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
+                  if (mounted) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 40),
+          
+          // İleri Butonu (Yedek - İklim seçildiğinde otomatik geçiş yapılıyor)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _nextStep,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'İleri',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+  
+  // İklim Butonu Widget'ı
+  Widget _buildClimateButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? AppColors.softPinkButton.withValues(alpha: 0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.softPinkButton 
+                : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.softPinkButton.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 5,
+                    spreadRadius: 1,
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Sol: Metin
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: isSelected 
+                    ? AppColors.softPinkButton 
+                    : const Color(0xFF4A5568),
+              ),
+            ),
+            
+            // Sağ: İkon
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected 
+                  ? AppColors.softPinkButton 
+                  : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 5. Adım: Günlük Hedef
+  Widget _buildGoalStep() {
+    final goalController = TextEditingController(
+      text: _customGoal != null ? _customGoal!.toStringAsFixed(0) : '',
+    );
+    
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Günlük Hedef',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Günlük su hedefinizi ml cinsinden girin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 60),
+          
+          // Büyük TextField
+          TextField(
+            controller: goalController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF4A5568),
+            ),
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              hintText: 'Örn: 2000',
+              hintStyle: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w300,
+                color: Colors.grey[400],
+              ),
+              suffixText: 'ml',
+              suffixStyle: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: AppColors.softPinkButton,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: Colors.grey[300]!,
+                  width: 2,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: Colors.grey[300]!,
+                  width: 2,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: AppColors.softPinkButton,
+                  width: 3,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
+            ),
+            onChanged: (value) {
+              final goal = double.tryParse(value);
+              if (goal != null && goal > 0) {
+                setState(() {
+                  _customGoal = goal;
+                });
+              } else {
+                setState(() {
+                  _customGoal = null;
+                });
+              }
+            },
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Hesaplanan hedef gösterimi (opsiyonel)
+          if (_calculatedWaterGoal > 0 && _customGoal == null)
+            Text(
+              'Önerilen hedef: ${_calculatedWaterGoal.toStringAsFixed(0)} ml',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          
+          const SizedBox(height: 40),
+          
+          // Planı Oluştur Butonu
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                _completeOnboarding();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Planı Oluştur',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // Modern Kart Sistemi - Tıklanabilir Buton
+  // Modal Bottom Sheet Fonksiyonları - Modüler Widget'lara yönlendirme
+  
 }
 
 // Modüler Modal Sheet Widget'ları - Performans İyileştirmesi
@@ -765,85 +1342,6 @@ class GenderModalSheet extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class HeightModalSheet extends StatelessWidget {
-  final FixedExtentScrollController heightController;
-  final List<Widget> heightPickerChildren;
-
-  const HeightModalSheet({
-    super.key,
-    required this.heightController,
-    required this.heightPickerChildren,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 300,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Tutma Çizgisi
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Boy Seçiniz',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF4A5568),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CupertinoPicker(
-                scrollController: heightController,
-                itemExtent: 50,
-                onSelectedItemChanged: (index) {
-                  // Listener otomatik olarak setState çağıracak
-                },
-                children: heightPickerChildren,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Tamam'),
-            ),
-          ),
-        ],
       ),
     );
   }
