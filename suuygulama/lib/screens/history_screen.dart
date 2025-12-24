@@ -530,13 +530,33 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                               barRods: [
                                 BarChartRodData(
                                   toY: animatedHeight,
-                                  width: 20,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(8),
+                                  width: 24,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    topRight: Radius.circular(12),
+                                    bottomLeft: Radius.zero,
+                                    bottomRight: Radius.zero,
                                   ),
                                   color: data.isReached
-                                      ? AppColors.waterColor
-                                      : AppColors.waterColor.withValues(alpha: 0.3),
+                                      ? const Color(0xFF00BCD4) // Canlı mavi - hedefe ulaşılan
+                                      : const Color(0xFF00BCD4).withValues(alpha: 0.3), // Soluk mavi - eksik
+                                  gradient: data.isReached
+                                      ? LinearGradient(
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                          colors: [
+                                            const Color(0xFF00BCD4).withValues(alpha: 0.8),
+                                            const Color(0xFF00BCD4),
+                                          ],
+                                        )
+                                      : LinearGradient(
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                          colors: [
+                                            const Color(0xFF00BCD4).withValues(alpha: 0.2),
+                                            const Color(0xFF00BCD4).withValues(alpha: 0.3),
+                                          ],
+                                        ),
                                   backDrawRodData: BackgroundBarChartRodData(
                                     show: true,
                                     toY: dailyGoal,

@@ -157,16 +157,24 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
                       ),
                     ),
                     
-                    // Su Dolumu - Animasyonlu
+                    // Su Dolumu - Animasyonlu (ClipOval ile tankın dairesel sınırlarına uyumlu)
                     ClipOval(
+                      clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar için
                       child: AnimatedBuilder(
                         animation: _fillAnimation,
                         builder: (context, child) {
-                          return CustomPaint(
-                            size: const Size(250, 250),
-                            painter: CircularTankWavePainter(
-                              fillPercentage: _fillProgress,
-                              waveOffset: _waveController.value * 2 * math.pi,
+                          // Tankın iç çapı: 250 - (6 * 2) = 238
+                          final innerDiameter = 238.0;
+                          return SizedBox(
+                            width: innerDiameter,
+                            height: innerDiameter,
+                            child: CustomPaint(
+                              size: Size(innerDiameter, innerDiameter),
+                              painter: CircularTankWavePainter(
+                                fillPercentage: _fillProgress,
+                                waveOffset: _waveController.value * 2 * math.pi,
+                                tankDiameter: innerDiameter,
+                              ),
                             ),
                           );
                         },
@@ -176,17 +184,20 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
                 ),
               ),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 32), // Dengeli mesafe
               
-              const Text(
-                'Sizin için kişisel planınız oluşturuluyor...',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF4A5568),
-                  letterSpacing: 1.2,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: const Text(
+                  'Sizin için kişisel planınız oluşturuluyor...',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w300,
+                    color: Color(0xFF4A5568),
+                    letterSpacing: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -200,17 +211,25 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
 class CircularTankWavePainter extends CustomPainter {
   final double fillPercentage;
   final double waveOffset;
+  final double tankDiameter;
 
   CircularTankWavePainter({
     required this.fillPercentage,
     required this.waveOffset,
+    required this.tankDiameter,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (fillPercentage <= 0) return;
     
+    // Tankın merkezi ve yarıçapı (tam iç çap)
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final radius = tankDiameter / 2;
+    
     // Su seviyesi hesaplama (alt kısımdan yukarı doğru)
+    // fillPercentage 0.0-1.0 arası, 1.0 = tam dolu
     final waterHeight = size.height * fillPercentage;
     final waterTop = size.height - waterHeight;
     
@@ -219,33 +238,44 @@ class CircularTankWavePainter extends CustomPainter {
       ..color = AppColors.waterColor.withValues(alpha: 0.8)
       ..style = PaintingStyle.fill;
     
-    // Yuvarlak tank için su dolumu
-    final centerX = size.width / 2;
-    final radius = size.width / 2 - 6; // Border için boşluk
-    
-    // Su dolu alanı çiz (yuvarlak formda)
+    // Su dolu alanı çiz (dairesel formda, tankın taban merkezinden başlayarak)
     final path = Path();
     
-    // Alt kısımdan başla
-    path.moveTo(0, size.height);
-    
-    // Su seviyesine kadar düz çizgi
+    // Su seviyesine kadar dairesel formda çiz
     if (waterTop < size.height) {
-      path.lineTo(0, waterTop);
-      
-      // Dalga çizgisi (yuvarlak form için)
-      for (double x = 0; x <= size.width; x += 1.5) {
-        final normalizedX = (x - centerX) / radius;
-        if (normalizedX.abs() <= 1.0) {
-          final y = waterTop + 
-              5 * math.sin((x / size.width * 2 * math.pi) + waveOffset);
+      // Alt yarıyı çiz (su seviyesinin altındaki kısım - tam dairesel)
+      // π'den 2π'ye kadar (alt yarı)
+      bool isFirstPoint = true;
+      for (double angle = math.pi; angle <= 2 * math.pi; angle += 0.01) {
+        final x = centerX + radius * math.cos(angle);
+        final y = centerY + radius * math.sin(angle);
+        if (isFirstPoint) {
+          path.moveTo(x, y); // Başlangıç noktası (tankın sol alt noktası)
+          isFirstPoint = false;
+        } else {
           path.lineTo(x, y);
         }
       }
       
-      path.lineTo(size.width, size.height);
-      path.close();
+      // Üst yarıyı çiz (su seviyesine göre ayarlanmış, dalga efekti ile)
+      // 0'dan π'ye kadar (üst yarı)
+      for (double angle = 0; angle <= math.pi; angle += 0.01) {
+        final x = centerX + radius * math.cos(angle);
+        final y = centerY + radius * math.sin(angle);
+        
+        // Eğer bu nokta su seviyesinin altındaysa, su seviyesine göre ayarla
+        if (y >= waterTop) {
+          // Dalga efekti ekle (sadece üst kısımda)
+          final waveHeight = 5.0 * math.sin((angle * 2 * math.pi) + waveOffset);
+          final adjustedY = math.max(waterTop + waveHeight, y);
+          path.lineTo(x, adjustedY);
+        } else {
+          // Su seviyesinin üstündeki kısım - tankın kenarını takip et
+          path.lineTo(x, y);
+        }
+      }
       
+      path.close();
       canvas.drawPath(path, waterPaint);
     }
   }

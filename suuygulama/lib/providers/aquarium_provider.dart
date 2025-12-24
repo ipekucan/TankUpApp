@@ -64,10 +64,7 @@ class AquariumProvider extends ChangeNotifier {
       await _saveAquariumData();
       notifyListeners();
     } catch (e) {
-      // Dekorasyon bulunamadı
-      if (kDebugMode) {
-        print('Dekorasyon bulunamadı: $decorationId');
-      }
+      // Dekorasyon bulunamadı - sessizce devam et
     }
   }
 
@@ -100,9 +97,7 @@ class AquariumProvider extends ChangeNotifier {
       // Aktif dekorasyonları kaydet
       await prefs.setString('activeDecorations', jsonEncode(_activeDecorations));
     } catch (e) {
-      if (kDebugMode) {
-        print('Aquarium verileri kaydedilirken hata: $e');
-      }
+      // Hata durumunda sessizce devam et
     }
   }
 
@@ -129,9 +124,6 @@ class AquariumProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print('Aquarium verileri yüklenirken hata: $e');
-      }
       // Hata durumunda varsayılan değerler
       _ownedDecorations = [];
       _activeDecorations = {};

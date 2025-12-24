@@ -13,6 +13,7 @@ import '../widgets/interactive_cup_modal.dart';
 import '../widgets/challenge_card.dart';
 import '../providers/drink_provider.dart';
 import '../models/drink_model.dart';
+import '../utils/unit_converter.dart';
 import 'drink_gallery_screen.dart';
 import 'success_screen.dart';
 
@@ -117,7 +118,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             SingleChildScrollView(
             child: Column(
               children: [
-              // Üst Bar: Sol - Günlük Seri Butonu, Sağ - Coin Butonu (spaceBetween ile hizalı)
+              // Üst Bar: Sol - Günlük Seri Butonu, Sağ - Coin Butonu (spaceBetween ile hizalı - jilet gibi)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 child: Row(
@@ -134,8 +135,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                           ),
                         );
                         
+                        if (!mounted) return;
+                        
                         // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
-                        if (result == 'open_challenges_panel' && mounted) {
+                        if (result == 'open_challenges_panel') {
                           _challengeSheetController.animateTo(
                             0.85,
                             duration: const Duration(milliseconds: 300),
@@ -188,12 +191,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${userProvider.consecutiveDays}',
-                                    style: TextStyle(
+          style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.softPinkButton,
-                                    ),
-                                  ),
+          ),
+        ),
                                 ],
                               ),
                             ),
@@ -219,7 +222,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                             ),
                           ],
                         ),
-                        child: Column(
+            child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
@@ -245,12 +248,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 ),
               ),
               
-              // Merkezi Metin: Akvaryumun üstünde ortalanmış
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+              // Merkezi Metin: Akvaryumun tam üzerinde merkezlenmiş
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Center(
                   child: Text(
-                    '${consumedAmount.toStringAsFixed(0)} ml İçildi',
+                    '${UnitConverter.formatVolume(consumedAmount, userProvider.isMetric)} İçildi',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w400,
@@ -258,6 +261,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                       letterSpacing: 0.3,
                       height: 1.2,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -293,7 +297,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                       height: MediaQuery.of(context).size.width * 0.65, // Ekranın %65'i (büyütüldü)
                       child: Stack(
                     alignment: Alignment.center,
-                    children: [
+              children: [
                     // Dış Çerçeve - Kalın Border ile Yuvarlak Fanus
                 Container(
                       width: MediaQuery.of(context).size.width * 0.65,
@@ -322,7 +326,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                             ),
                             BoxShadow(
                               color: const Color(0xFF9B7EDE).withValues(alpha: 0.2),
-                              blurRadius: 20,
+                        blurRadius: 20,
                               offset: const Offset(-5, -5),
                       ),
                     ],
@@ -358,8 +362,8 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                                 const Color(0xFF6B9BD1).withValues(alpha: 0.8), // Mavi ton
                                                 AppColors.softPinkButton.withValues(alpha: 0.6), // Pembe ton
                                               ],
-                                            ),
-                                          ),
+                          ),
+                        ),
                                           child: CustomPaint(
                                             size: Size(
                                               MediaQuery.of(context).size.width * 0.65,
@@ -421,7 +425,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               Padding(
                 padding: const EdgeInsets.only(top: 16),
                 child: Text(
-                  'Günlük Hedef: ${(dailyGoal / 1000.0).toStringAsFixed(1)} L',
+                  'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
@@ -467,7 +471,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                         // Merkez: Su İçme Butonu (Mavi, En Büyük)
                         Stack(
                           alignment: Alignment.center,
-                          children: [
+      children: [
                             GestureDetector(
                               onTap: () {
                                 if (!mounted) return;
@@ -503,10 +507,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                     if (hasAmount) {
                                       return Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
+            decoration: BoxDecoration(
                                           color: AppColors.waterColor.withValues(alpha: 0.9),
                                           borderRadius: BorderRadius.circular(12),
-                                        ),
+            ),
                                         child: Text(
                                           '+${(amount as double).toStringAsFixed(unit == 'oz' ? 1 : 0)} $unit',
                                           style: const TextStyle(
@@ -521,9 +525,9 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                   return const SizedBox.shrink();
                                 },
                               ),
-                            ),
-                          ],
-                        ),
+              ),
+            ],
+          ),
                         
                         const SizedBox(width: 20),
                         
@@ -538,9 +542,9 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                               ),
                             );
                           },
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
                               CircleAvatar(
                                 radius: 30,
                                 backgroundColor: AppColors.softPinkButton,
@@ -549,28 +553,28 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                   color: Colors.white,
                                   size: 24,
                                 ),
-                              ),
+              ),
                               // Sağ üst köşede küçük + işareti
-                              Positioned(
+              Positioned(
                                 top: 2,
                                 right: 2,
-                                child: Container(
+                child: Container(
                                   width: 16,
                                   height: 16,
-                                  decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                                     color: Colors.white,
                                     shape: BoxShape.circle,
-                                  ),
+                      ),
                                   child: const Icon(
                                     Icons.add,
                                     color: AppColors.softPinkButton,
                                     size: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
                       ],
                     );
                     
@@ -658,7 +662,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                     color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
-                  ),
+          ),
                 ],
               ),
               child: Column(
@@ -671,7 +675,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2),
-                    ),
+          ),
                   ),
                   
                   // Scrollable içerik
@@ -688,7 +692,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         ),
       ],
               ),
-            );
+    );
           },
         ),
       ],
@@ -786,7 +790,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       ),
     );
   }
-  
+
   // Son eklenen miktarı ve birimi al
   Future<Map<String, dynamic>> _getLastAddedAmountWithUnit() async {
     try {
@@ -867,7 +871,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       }
     }
   }
-  
+
   // Başarı kazanıldığında gösterilecek kutlama dialogu
   void _showAchievementDialog(BuildContext context, String achievementId) {
     final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
@@ -1029,8 +1033,8 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     AchievementProvider achievementProvider,
   ) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         const Padding(
           padding: EdgeInsets.only(top: 12, bottom: 24),
           child: Text(
@@ -1083,7 +1087,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               badgeEmoji: challenge.badgeEmoji,
               isCompleted: isCompleted,
               progress: (waterProvider.consumedAmount / waterProvider.dailyGoal).clamp(0.0, 1.0),
-              progressText: '${(waterProvider.consumedAmount / 1000.0).toStringAsFixed(1)}/${(waterProvider.dailyGoal / 1000.0).toStringAsFixed(1)}L',
+              progressText: '${UnitConverter.formatVolume(waterProvider.consumedAmount, userProvider.isMetric)}/${UnitConverter.formatVolume(waterProvider.dailyGoal, userProvider.isMetric)}',
             );
           }
           
@@ -1126,9 +1130,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       // Başarı kontrolü
       if (result.isFirstDrink) {
         final coins = await achievementProvider.checkFirstStep();
+        if (!mounted) return;
         if (coins > 0) {
           await waterProvider.addCoins(coins);
+          if (!mounted) return;
           await userProvider.addAchievement('first_step');
+          if (!mounted) return;
         }
       }
       
@@ -1137,13 +1144,18 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
       if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
         final coins = await achievementProvider.checkDailyGoal();
+        if (!mounted) return;
         if (coins > 0) {
           await waterProvider.addCoins(coins);
+          if (!mounted) return;
           await userProvider.addAchievement('daily_goal');
+          if (!mounted) return;
           await userProvider.updateConsecutiveDays(true);
+          if (!mounted) return;
         }
       } else if (waterProvider.hasReachedDailyGoal) {
         await userProvider.updateConsecutiveDays(true);
+        if (!mounted) return;
       }
       
       if (!mounted) return;
@@ -1269,12 +1281,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             offset: Offset(0, _scrollIndicatorAnimation.value),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+      children: [
                 Icon(
                   Icons.keyboard_arrow_down,
                   color: Colors.grey[400],
                   size: 24,
-                ),
+          ),
                 const SizedBox(width: 8),
         Text(
                   'Mücadeleler için kaydır',
@@ -1286,7 +1298,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         ),
       ],
             ),
-          );
+    );
         },
       ),
     );

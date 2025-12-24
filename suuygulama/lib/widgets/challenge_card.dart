@@ -553,33 +553,6 @@ class _ChallengeCardState extends State<ChallengeCard>
                           letterSpacing: 0.3,
                         ),
                       ),
-                      if (widget.challenge.progressText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: LinearProgressIndicator(
-                                value: widget.challenge.progress,
-                                backgroundColor: Colors.grey[200],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  widget.challenge.cardColor,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                                minHeight: 6,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              widget.challenge.progressText,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
                     ],
                   ),
                 ),

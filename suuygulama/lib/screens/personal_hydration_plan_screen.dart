@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -446,9 +445,7 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
         wakeUpTime: wakeUpTime,
         sleepTime: sleepTime,
       ).catchError((e) {
-        if (kDebugMode) {
-          print('Bildirim zamanlama hatası: $e');
-        }
+        // Hata durumunda sessizce devam et
       });
       
       if (!context.mounted) return;
@@ -459,9 +456,7 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
         (route) => false,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('Plan onaylama hatası: $e');
-      }
+      // Hata durumunda sessizce devam et
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

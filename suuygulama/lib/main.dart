@@ -15,14 +15,17 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Release modda tüm print mesajlarını sustur
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
+  
   // HAFIZA RESET (Geçici - bir kez çalıştırılacak, sonra silinebilir)
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   } catch (e) {
-    if (kDebugMode) {
-      print('Hafıza temizleme hatası: $e');
-    }
+    // Hata durumunda sessizce devam et
   }
   
   // Bildirim servisini arka planda başlat - uygulama başlatmayı engellemesin
@@ -35,10 +38,7 @@ void main() async {
       // Profil tamamlandığında güncellenecek
       await notificationService.scheduleDailyNotifications();
     } catch (e) {
-      // Bildirim hatası uygulama başlatmayı engellemesin
-      if (kDebugMode) {
-        print('Bildirim servisi başlatma hatası: $e');
-      }
+      // Bildirim hatası uygulama başlatmayı engellemesin - sessizce devam et
     }
   });
   

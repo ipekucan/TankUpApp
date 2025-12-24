@@ -307,6 +307,39 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                                     // Modalı kapat ve ana ekrana geri dön
                                     if (context.mounted) {
                                       Navigator.of(context).pop();
+                                      // Şık SnackBar bildirimi göster
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: Text(
+                                                  'İçecek hızlı erişim için ana sayfaya eklendi!',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          backgroundColor: AppColors.softPinkButton,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
                                     }
                                   }
                                 },

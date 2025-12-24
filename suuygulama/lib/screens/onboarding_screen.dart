@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
+import '../utils/unit_converter.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
 import 'plan_loading_screen.dart';
@@ -21,7 +22,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _selectedActivityLevel;
   String? _selectedClimate; // İklim seçimi
   int _weightUnit = 0; // 0 = Kg, 1 = Lbs (CupertinoSlidingSegmentedControl için)
-  double? _customGoal; // Özel hedef
+  double? _customGoal; // Özel hedef (ml cinsinden)
+  final TextEditingController _goalController = TextEditingController();
+  final FocusNode _goalFocusNode = FocusNode();
   
   // PageView Controller
   late PageController _pageController;
@@ -77,6 +80,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     // Controller'ı dinle ve sadece gerektiğinde setState çağır
     _weightController.addListener(_onWeightChanged);
+    
+    // Goal focus node listener - focus kaybedildiğinde formatlanmış metni göster
+    _goalFocusNode.addListener(() {
+      if (!_goalFocusNode.hasFocus && _customGoal != null) {
+        setState(() {}); // Formatlanmış metni göstermek için
+      }
+    });
   }
   
   void _onWeightChanged() {
@@ -101,6 +111,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _weightController.removeListener(_onWeightChanged);
     _weightController.dispose();
     _pageController.dispose();
+    _goalController.dispose();
+    _goalFocusNode.dispose();
     super.dispose();
   }
   
@@ -315,15 +327,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedGender = 'male';
                   });
-                  // Otomatik sonraki sayfaya geç
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    if (mounted) {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  });
                 },
               ),
               
@@ -338,18 +341,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedGender = 'female';
                   });
-                  // Otomatik sonraki sayfaya geç
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    if (mounted) {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  });
                 },
               ),
             ],
+          ),
+          
+          const SizedBox(height: 60),
+          
+          // İleri Butonu
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selectedGender != null ? _nextStep : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[500],
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'İleri',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -664,23 +690,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 title: 'Düşük',
                 icon: Icons.directions_walk,
                 isSelected: _selectedActivityLevel == 'low',
-                onTap: () async {
+                onTap: () {
                   setState(() {
                     _selectedActivityLevel = 'low';
                   });
-                  
-                  // Provider'a yaz
-                  final userProvider = Provider.of<UserProvider>(context, listen: false);
-                  await userProvider.updateProfile(activityLevel: 'low');
-                  
-                  // Otomatik sonraki sayfaya geç
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
               
@@ -691,23 +704,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 title: 'Orta',
                 icon: Icons.directions_run,
                 isSelected: _selectedActivityLevel == 'medium',
-                onTap: () async {
+                onTap: () {
                   setState(() {
                     _selectedActivityLevel = 'medium';
                   });
-                  
-                  // Provider'a yaz
-                  final userProvider = Provider.of<UserProvider>(context, listen: false);
-                  await userProvider.updateProfile(activityLevel: 'medium');
-                  
-                  // Otomatik sonraki sayfaya geç
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
               
@@ -718,23 +718,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 title: 'Yüksek',
                 icon: Icons.sports_gymnastics,
                 isSelected: _selectedActivityLevel == 'high',
-                onTap: () async {
+                onTap: () {
                   setState(() {
                     _selectedActivityLevel = 'high';
                   });
-                  
-                  // Provider'a yaz
-                  final userProvider = Provider.of<UserProvider>(context, listen: false);
-                  await userProvider.updateProfile(activityLevel: 'high');
-                  
-                  // Otomatik sonraki sayfaya geç
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
             ],
@@ -742,14 +729,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           
           const SizedBox(height: 40),
           
-          // İleri Butonu (Yedek - Aktivite seçildiğinde otomatik geçiş yapılıyor)
+          // İleri Butonu
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _selectedActivityLevel != null ? _nextStep : null,
+              onPressed: _selectedActivityLevel != null
+                  ? () async {
+                      // Provider'a kaydet
+                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                      await userProvider.updateProfile(activityLevel: _selectedActivityLevel);
+                      // Sonraki sayfaya geç
+                      if (mounted) {
+                        _nextStep();
+                      }
+                    }
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.softPinkButton,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[500],
                 padding: const EdgeInsets.symmetric(
                   horizontal: 60,
                   vertical: 22,
@@ -884,14 +883,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedClimate = 'very_hot';
                   });
-                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
               
@@ -906,14 +897,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedClimate = 'hot';
                   });
-                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
               
@@ -928,14 +911,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedClimate = 'warm';
                   });
-                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
               
@@ -950,14 +925,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _selectedClimate = 'cold';
                   });
-                  // Otomatik sonraki sayfaya geç (İklim bilgisi state'te tutuluyor, Provider'a yazılmıyor)
-                  if (mounted) {
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        _nextStep();
-                      }
-                    });
-                  }
                 },
               ),
             ],
@@ -965,14 +932,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           
           const SizedBox(height: 40),
           
-          // İleri Butonu (Yedek - İklim seçildiğinde otomatik geçiş yapılıyor)
+          // İleri Butonu
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _nextStep,
+              onPressed: _selectedClimate != null ? _nextStep : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.softPinkButton,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[500],
                 padding: const EdgeInsets.symmetric(
                   horizontal: 60,
                   vertical: 22,
@@ -1068,150 +1037,192 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
   
+
   // 5. Adım: Günlük Hedef
   Widget _buildGoalStep() {
-    final goalController = TextEditingController(
-      text: _customGoal != null ? _customGoal!.toStringAsFixed(0) : '',
-    );
-    
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Günlük Hedef',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w300,
-              color: Color(0xFF4A5568),
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Günlük su hedefinizi ml cinsinden girin',
-            style: TextStyle(
-              fontSize: 16,
-              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 60),
-          
-          // Büyük TextField
-          TextField(
-            controller: goalController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF4A5568),
-            ),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: 'Örn: 2000',
-              hintStyle: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w300,
-                color: Colors.grey[400],
-              ),
-              suffixText: 'ml',
-              suffixStyle: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppColors.softPinkButton,
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(
-                  color: AppColors.softPinkButton,
-                  width: 3,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 24,
-              ),
-            ),
-            onChanged: (value) {
-              final goal = double.tryParse(value);
-              if (goal != null && goal > 0) {
-                setState(() {
-                  _customGoal = goal;
-                });
-              } else {
-                setState(() {
-                  _customGoal = null;
-                });
-              }
-            },
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Hesaplanan hedef gösterimi (opsiyonel)
-          if (_calculatedWaterGoal > 0 && _customGoal == null)
-            Text(
-              'Önerilen hedef: ${_calculatedWaterGoal.toStringAsFixed(0)} ml',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          
-          const SizedBox(height: 40),
-          
-          // Planı Oluştur Butonu
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                _completeOnboarding();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 22,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Planı Oluştur',
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        // Bardak sayısını hesapla (_customGoal ml cinsinden)
+        int calculateCups() {
+          if (_customGoal == null) return 0;
+          return (_customGoal! / 200).round();
+        }
+        
+        // Mevcut hedefi birime göre göster (_customGoal her zaman ml cinsinden)
+        String getDisplayText() {
+          if (_customGoal == null) return '';
+          final displayValue = userProvider.isMetric
+              ? _customGoal!.toStringAsFixed(0)
+              : UnitConverter.mlToFlOz(_customGoal!).toStringAsFixed(1);
+          final unit = userProvider.isMetric ? 'ml' : 'oz';
+          final cups = calculateCups();
+          return ' $displayValue $unit / $cups bardak';
+        }
+        
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Başlık ve açıklama (en üstte)
+              const Text(
+                'Günlük Hedef',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w300,
+                  color: Color(0xFF4A5568),
+                  letterSpacing: 1.2,
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                'Günlük su hedefinizi girin',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+                ),
+              ),
+              
+              const Spacer(),
+              
+              // Ortada geniş, oval TextField (pembe buton gibi) - Dinamik format gösterimi
+              GestureDetector(
+                onTap: () {
+                  _goalFocusNode.requestFocus();
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 2,
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Formatlanmış metin gösterimi (TextField focus'ta değilse veya boşsa)
+                      if (!_goalFocusNode.hasFocus || _goalController.text.isEmpty)
+                        Text(
+                          getDisplayText().isEmpty ? 'Hedefinizi girin' : getDisplayText(),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: _customGoal != null ? const Color(0xFF4A5568) : Colors.grey[400],
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      // TextField (sadece sayı girişi için, görünmez veya saydam)
+                      Opacity(
+                        opacity: _goalFocusNode.hasFocus ? 1.0 : 0.0,
+                        child: TextField(
+                          controller: _goalController,
+                          focusNode: _goalFocusNode,
+                          textAlign: TextAlign.center,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF4A5568),
+                            letterSpacing: 0.5,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                            hintText: '',
+                          ),
+                          onChanged: (value) {
+                            if (value.isEmpty) {
+                              setState(() {
+                                _customGoal = null;
+                              });
+                              return;
+                            }
+                            
+                            // Sadece sayıları al (birim ve bardak metnini temizle)
+                            final cleanValue = value.replaceAll(RegExp(r'[^0-9.]'), '');
+                            final numValue = double.tryParse(cleanValue);
+                            
+                            if (numValue != null && numValue >= 0) {
+                              // Display değerinden ml'ye çevir (global birim ayarına göre)
+                              double newGoal;
+                              if (userProvider.isMetric) {
+                                newGoal = numValue;
+                              } else {
+                                newGoal = UnitConverter.flOzToMl(numValue);
+                              }
+                              
+                              setState(() {
+                                _customGoal = newGoal;
+                              });
+                              
+                              // TextField'ı temiz tut (sadece sayı)
+                              if (_goalController.text != cleanValue) {
+                                _goalController.value = TextEditingValue(
+                                  text: cleanValue,
+                                  selection: TextSelection.collapsed(offset: cleanValue.length),
+                                );
+                              }
+                            }
+                          },
+                          onSubmitted: (value) {
+                            _goalFocusNode.unfocus();
+                            setState(() {}); // Formatlanmış metni göstermek için
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const Spacer(),
+              
+              const SizedBox(height: 40),
+              
+              // Planı Oluştur Butonu
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _completeOnboarding();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.softPinkButton,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 60,
+                      vertical: 22,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(35),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Planı Oluştur',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+            ],
           ),
-          
-          const SizedBox(height: 20),
-        ],
-      ),
+        );
+      },
     );
   }
 

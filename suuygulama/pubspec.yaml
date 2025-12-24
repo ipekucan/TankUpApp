@@ -56,6 +56,9 @@ dependencies:
   
   # Chart Library
   fl_chart: ^0.68.0
+  
+  # Wave Animation
+  wave: ^0.2.2
 
 dev_dependencies:
   flutter_test:

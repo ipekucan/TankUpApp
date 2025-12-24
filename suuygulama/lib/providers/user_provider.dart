@@ -7,13 +7,16 @@ class UserProvider extends ChangeNotifier {
   static const String _userDataKey = 'user_data';
   static const String _lastResetDateKey = 'last_reset_date';
   static const String _consecutiveDaysKey = 'consecutive_days';
+  static const String _isMetricKey = 'is_metric'; // Birim sistemi (true = Metric, false = Imperial)
   
   UserModel _userData = UserModel.initial();
   DateTime? _lastResetDate;
   int _consecutiveDays = 0;
+  bool _isMetric = true; // Varsayılan olarak Metric (kg, L, ml)
 
   UserModel get userData => _userData;
   int get consecutiveDays => _consecutiveDays;
+  bool get isMetric => _isMetric;
 
   UserProvider() {
     _loadUserData();
@@ -39,6 +42,9 @@ class UserProvider extends ChangeNotifier {
       
       // Ardışık gün sayısını yükle
       _consecutiveDays = prefs.getInt(_consecutiveDaysKey) ?? 0;
+      
+      // Birim sistemini yükle (varsayılan: Metric)
+      _isMetric = prefs.getBool(_isMetricKey) ?? true;
       
       // Gün kontrolü yap
       _checkAndResetDay();
@@ -92,12 +98,19 @@ class UserProvider extends ChangeNotifier {
       
       // Ardışık gün sayısını kaydet
       await prefs.setInt(_consecutiveDaysKey, _consecutiveDays);
+      
+      // Birim sistemini kaydet
+      await prefs.setBool(_isMetricKey, _isMetric);
     } catch (e) {
       // Hata durumunda sessizce devam et
-      if (kDebugMode) {
-        print('UserProvider kayıt hatası: $e');
-      }
     }
+  }
+
+  // Birim sistemini güncelle (true = Metric, false = Imperial)
+  Future<void> setIsMetric(bool isMetric) async {
+    _isMetric = isMetric;
+    await _saveUserData();
+    notifyListeners();
   }
 
   // Kullanıcı adını güncelle

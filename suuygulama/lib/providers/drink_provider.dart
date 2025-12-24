@@ -70,9 +70,6 @@ class DrinkProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('İçecek verileri yüklenirken hata: $e');
-      }
       _customDrinks = [];
     }
   }
@@ -95,9 +92,6 @@ class DrinkProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print('Favori içecekler yüklenirken hata: $e');
-      }
       _favoriteDrinkIds = [];
       _favoriteDrinkAmounts = {};
     }
@@ -111,9 +105,7 @@ class DrinkProvider extends ChangeNotifier {
       await prefs.setString(_favoriteDrinksKey, favoriteIdsJson);
       await prefs.setString('${_favoriteDrinksKey}_amounts', favoriteAmountsJson);
     } catch (e) {
-      if (kDebugMode) {
-        print('Favori içecekler kaydedilirken hata: $e');
-      }
+      // Hata durumunda sessizce devam et
     }
   }
 
@@ -178,9 +170,6 @@ class DrinkProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print('Hızlı erişim içecekler yüklenirken hata: $e');
-      }
       _quickAccessDrinkIds = [];
       _quickAccessDrinkAmounts = {};
     }
@@ -194,9 +183,7 @@ class DrinkProvider extends ChangeNotifier {
       await prefs.setString(_quickAccessDrinksKey, quickAccessIdsJson);
       await prefs.setString('${_quickAccessDrinksKey}_amounts', quickAccessAmountsJson);
     } catch (e) {
-      if (kDebugMode) {
-        print('Hızlı erişim içecekler kaydedilirken hata: $e');
-      }
+      // Hata durumunda sessizce devam et
     }
   }
 
@@ -246,9 +233,7 @@ class DrinkProvider extends ChangeNotifier {
       );
       await prefs.setString(_customDrinksKey, customDrinksJson);
     } catch (e) {
-      if (kDebugMode) {
-        print('İçecek verileri kaydedilirken hata: $e');
-      }
+      // Hata durumunda sessizce devam et
     }
   }
 

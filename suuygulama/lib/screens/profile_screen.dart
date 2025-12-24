@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
+import '../utils/unit_converter.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
-import '../widgets/weight_ruler_picker.dart';
 import 'reset_time_screen.dart';
-import 'favorite_drinks_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -54,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.monitor_weight,
                       label: 'Kilo',
                       value: (userProvider.userData.weight != null && userProvider.userData.weight! > 0)
-                          ? '${userProvider.userData.weight!.toStringAsFixed(1)} kg'
+                          ? UnitConverter.formatWeight(userProvider.userData.weight!, userProvider.isMetric)
                           : 'Girilmemiş',
                       isPlaceholder: (userProvider.userData.weight == null || userProvider.userData.weight! <= 0),
                       onTap: () => _showWeightDialog(context, userProvider),
@@ -66,32 +65,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       isPlaceholder: userProvider.userData.activityLevel == null,
                       onTap: () => _showActivityDialog(context, userProvider),
                     ),
-                    FutureBuilder<bool>(
-                      future: _isGoalCustomSet(waterProvider),
-                      builder: (context, snapshot) {
-                        final isCustomGoal = snapshot.data ?? false;
-                        final goalValue = isCustomGoal
-                            ? '${(waterProvider.dailyGoal / 1000).toStringAsFixed(1)}L'
-                            : 'Belirtilmemiş';
-                        return _buildProfileButton(
-                          icon: Icons.flag,
-                          label: 'Hedef',
-                          value: goalValue,
-                          isPlaceholder: !isCustomGoal,
-                          onTap: () => _showCustomGoalDialog(context, waterProvider),
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.favorite,
-                      label: 'Favori İçecekler',
-                      value: '',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FavoriteDrinksScreen(),
-                          ),
+                    Consumer<UserProvider>(
+                      builder: (context, userProvider, child) {
+                        return FutureBuilder<bool>(
+                          future: _isGoalCustomSet(waterProvider),
+                          builder: (context, snapshot) {
+                            final isCustomGoal = snapshot.data ?? false;
+                            String goalValue = 'Belirtilmemiş';
+                            if (isCustomGoal) {
+                              goalValue = UnitConverter.formatVolume(waterProvider.dailyGoal, userProvider.isMetric);
+                            }
+                            return _buildProfileButton(
+                              icon: Icons.flag,
+                              label: 'Hedef',
+                              value: goalValue,
+                              isPlaceholder: !isCustomGoal,
+                              onTap: () => _showCustomGoalDialog(context, waterProvider),
+                            );
+                          },
                         );
                       },
                     ),
@@ -398,6 +389,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
 
+  // Pembe tonlarında, yuvarlatılmış köşeli ve modern SnackBar göster
+  void _showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: AppColors.softPinkButton,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   void _showGenderDialog(BuildContext context, UserProvider userProvider) {
     showDialog(
@@ -413,6 +426,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(gender: 'female');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
               },
             ),
             ListTile(
@@ -421,6 +435,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(gender: 'male');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
               },
             ),
             ListTile(
@@ -429,6 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(gender: 'other');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
               },
             ),
           ],
@@ -438,14 +454,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showWeightDialog(BuildContext context, UserProvider userProvider) {
-    // Birim seçimi için state
-    bool isKg = true; // Varsayılan olarak kg
+    // Birim seçimi için state - mevcut isMetric değerini kullan
+    bool isKg = userProvider.isMetric;
     
     // Mevcut kiloyu kg olarak al
-    final currentWeightKg = userProvider.userData.weight ?? 70.0; // Varsayılan 70kg
+    final currentWeightKg = userProvider.userData.weight ?? 0.0;
     
-    // Seçilen değer (kg cinsinden)
-    double selectedWeightKg = currentWeightKg;
+    // TextField için controller
+    final TextEditingController textController = TextEditingController();
+    
+    // Mevcut değeri birime göre göster
+    if (currentWeightKg > 0) {
+      if (isKg) {
+        textController.text = currentWeightKg.toStringAsFixed(1);
+      } else {
+        textController.text = (currentWeightKg * 2.20462).toStringAsFixed(1);
+      }
+    }
     
     showDialog(
       context: context,
@@ -454,6 +479,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // Birim değiştiğinde değeri güncelle
           void updateUnit(bool newIsKg) {
             setState(() {
+              if (textController.text.isNotEmpty) {
+                final currentValue = double.tryParse(textController.text) ?? 0.0;
+                // Mevcut değeri kg cinsine çevir
+                final valueInKg = isKg ? currentValue : currentValue / 2.20462;
+                // Yeni birime göre göster
+                final newValue = newIsKg ? valueInKg : valueInKg * 2.20462;
+                textController.text = newValue.toStringAsFixed(1);
+              }
               isKg = newIsKg;
             });
           }
@@ -474,11 +507,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: MediaQuery.of(context).size.width * 0.9,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 24), // Başlık ile birim seçici arası boşluk
+                  const SizedBox(height: 24),
                   
-                  // Modern Pill Toggle
+                  // Modern Pill Toggle (Birim Seçici)
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -532,17 +565,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
                   
-                  // Etkileşimli Ruler Picker
-                  WeightRulerPicker(
-                    key: ValueKey(isKg), // Birim değiştiğinde widget'ı yeniden oluştur
-                    initialValue: selectedWeightKg,
-                    isKg: isKg,
-                    onValueChanged: (valueInKg) {
-                      selectedWeightKg = valueInKg;
-                    },
+                  // Büyük TextField (Manuel Giriş)
+                  Center(
+                    child: SizedBox(
+                      width: 200,
+                      child: TextField(
+                        controller: textController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4A5568),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0.0',
+                          hintStyle: TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.w300,
+                            color: Colors.grey[300],
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppColors.softPinkButton,
+                              width: 2,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppColors.softPinkButton,
+                              width: 2,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppColors.softPinkButton,
+                              width: 3,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 24,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
+                  
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -553,9 +630,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  if (selectedWeightKg > 0) {
-                    await userProvider.updateProfile(weight: selectedWeightKg);
-                    if (!context.mounted) return;
+                  final textValue = textController.text.trim();
+                  if (textValue.isNotEmpty) {
+                    final enteredValue = double.tryParse(textValue) ?? 0.0;
+                    if (enteredValue > 0) {
+                      // Girilen değeri kg'ye çevir
+                      final weightInKg = isKg ? enteredValue : enteredValue / 2.20462;
+                      await userProvider.updateProfile(weight: weightInKg);
+                      // Birim sistemini güncelle (kg = metric, lbs = imperial)
+                      await userProvider.setIsMetric(isKg);
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      _showSuccessSnackBar(context, 'Kilonuz başarıyla kaydedildi!');
+                    }
+                  } else {
                     Navigator.pop(context);
                   }
                 },
@@ -563,7 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   backgroundColor: AppColors.softPinkButton,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25), // Ana ekrandaki 'İç' butonuyla aynı kavis
+                    borderRadius: BorderRadius.circular(25),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                 ),
@@ -579,7 +667,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       ),
-    );
+    ).then((_) {
+      // Dialog kapandığında controller'ı temizle
+      textController.dispose();
+    });
   }
 
   void _showActivityDialog(BuildContext context, UserProvider userProvider) {
@@ -596,6 +687,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(activityLevel: 'low');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
               },
             ),
             ListTile(
@@ -604,6 +696,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(activityLevel: 'medium');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
               },
             ),
             ListTile(
@@ -612,6 +705,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await userProvider.updateProfile(activityLevel: 'high');
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
               },
             ),
           ],
@@ -668,18 +762,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 
                 if (!context.mounted) return;
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Günlük hedef ${goal.toStringAsFixed(1)}L olarak ayarlandı'),
-                    backgroundColor: AppColors.softPinkButton,
-                  ),
-                );
+                _showSuccessSnackBar(context, 'Günlük su hedefiniz yenilendi!');
               } else {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Lütfen 0 ile 10 litre arası bir değer girin'),
+                  SnackBar(
+                    content: const Text('Lütfen 0 ile 10 litre arası bir değer girin'),
                     backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    margin: const EdgeInsets.all(16),
                   ),
                 );
               }

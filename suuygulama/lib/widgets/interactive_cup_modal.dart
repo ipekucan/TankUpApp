@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:wave/wave.dart';
+import 'package:wave/config.dart';
 import '../utils/app_colors.dart';
+import '../utils/unit_converter.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
@@ -19,16 +21,15 @@ class InteractiveCupModal extends StatefulWidget {
 class _InteractiveCupModalState extends State<InteractiveCupModal>
     with TickerProviderStateMixin {
   double _currentAmount = 0.0; // ml cinsinden
-  String _preferredUnit = 'ml';
   bool _isLoading = true;
-  List<double> _favoriteAmounts = []; // Favori miktarlar (ml cinsinden)
   double? _selectedTemplateMax; // Seçili şablonun maksimum kapasitesi
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
+  late AnimationController _bubbleController;
+  late Animation<double> _bubbleAnimation;
   final ScrollController _templateScrollController = ScrollController();
   final TextEditingController _amountController = TextEditingController();
   final FocusNode _amountFocusNode = FocusNode();
-  bool _isUpdatingFromDrag = false; // Drag'dan gelen güncellemeleri işaretle
   
   // Şablon miktarlar (ml cinsinden) - 250 ile başlar
   final List<double> _templateAmounts = [250, 330, 500, 1000];
@@ -50,12 +51,26 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     );
     _waveController.repeat();
     
+    // Kabarcık animasyonu
+    _bubbleController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+    _bubbleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _bubbleController,
+        curve: Curves.linear,
+      ),
+    );
+    _bubbleController.repeat();
+    
     _loadPreferredUnit();
   }
 
   @override
   void dispose() {
     _waveController.dispose();
+    _bubbleController.dispose();
     _templateScrollController.dispose();
     _amountController.dispose();
     _amountFocusNode.dispose();
@@ -63,103 +78,38 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   }
 
   Future<void> _loadPreferredUnit() async {
-    final prefs = await SharedPreferences.getInstance();
-    final unit = prefs.getString('preferred_unit') ?? 'ml';
-    final favoritesJson = prefs.getString('favorite_amounts');
-    List<double> favorites = [];
-    if (favoritesJson != null) {
-      try {
-        final List<dynamic> decoded = jsonDecode(favoritesJson);
-        favorites = decoded.map((e) => (e as num).toDouble()).toList();
-      } catch (e) {
-        favorites = [];
-      }
-    }
+    // Artık _preferredUnit kullanmıyoruz, UserProvider.isMetric kullanıyoruz
     setState(() {
-      _preferredUnit = unit;
-      _favoriteAmounts = favorites;
       _currentAmount = 250.0; // 250 ile başla
-      _amountController.text = _convertToDisplay(_currentAmount).toStringAsFixed(unit == 'oz' ? 1 : 0);
       _isLoading = false;
     });
     
-    // İlk yüklemede şablon slider'ı merkeze getir
+    // UserProvider'dan birim bilgisini al ve TextField'ı güncelle
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToSelectedTemplate();
+      if (mounted) {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final displayValue = userProvider.isMetric 
+            ? _currentAmount 
+            : UnitConverter.mlToFlOz(_currentAmount);
+        _amountController.text = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
+        _scrollToSelectedTemplate();
+      }
     });
-    
-    // TextField değişikliklerini dinle
-    _amountController.addListener(_onAmountTextChanged);
   }
   
-  void _onAmountTextChanged() {
-    // Eğer drag'dan gelen bir güncelleme ise, listener'ı atla
-    if (_isUpdatingFromDrag) return;
-    
-    final text = _amountController.text;
-    if (text.isEmpty) {
-      setState(() {
-        _currentAmount = 0.0;
-      });
-      return;
-    }
-    
-    final value = double.tryParse(text);
-    if (value != null && value >= 0) {
-      // Display değerinden ml'ye çevir
-      double newAmount;
-      if (_preferredUnit == 'oz') {
-        newAmount = value * 29.5735;
-      } else {
-        newAmount = value;
-      }
-      
-      // Maksimum sınırı kontrol et
-      final maxMl = _selectedTemplateMax ?? 1000.0;
-      newAmount = newAmount.clamp(0.0, maxMl);
-      
-      if ((_currentAmount - newAmount).abs() > 0.1) {
-        setState(() {
-          _currentAmount = newAmount;
-        });
-      }
-    }
-  }
-
-  Future<void> _saveFavoriteAmounts() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('favorite_amounts', jsonEncode(_favoriteAmounts));
-  }
-
-  bool get _isFavorite {
-    if (_currentAmount <= 0) return false;
-    return _favoriteAmounts.contains(_currentAmount);
-  }
-
-  void _toggleFavorite() {
-    setState(() {
-      if (_isFavorite) {
-        _favoriteAmounts.remove(_currentAmount);
-      } else {
-        if (_currentAmount > 0) {
-          _favoriteAmounts.add(_currentAmount);
-          _favoriteAmounts.sort();
-        }
-      }
-      _saveFavoriteAmounts();
-    });
-  }
-
   void _selectTemplateAmount(double amount) {
     setState(() {
       _selectedTemplateMax = amount; // Maksimum kapasiteyi şablon miktarına ayarla
       _currentAmount = amount.clamp(0.0, amount);
-      // TextField'ı güncelle (listener'ı atlamak için flag kullan)
-      final displayValue = _convertToDisplay(_currentAmount);
-      _isUpdatingFromDrag = true;
-      _amountController.text = displayValue.toStringAsFixed(_preferredUnit == 'oz' ? 1 : 0);
-      _isUpdatingFromDrag = false;
     });
+    
+    // UserProvider'dan birim bilgisini al ve TextField'ı güncelle
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final displayValue = userProvider.isMetric 
+        ? _currentAmount 
+        : UnitConverter.mlToFlOz(_currentAmount);
+    _amountController.text = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
+    
     // Seçili öğeyi merkeze getir
     _scrollToSelectedTemplate();
   }
@@ -193,28 +143,15 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     );
   }
 
-  // Birim dönüşümü
-  double _convertToDisplay(double ml) {
-    if (_preferredUnit == 'oz') {
-      return ml / 29.5735; // ml'den oz'ye çevir
-    }
-    return ml;
-  }
-
-  // Maksimum sınır - Seçili şablon miktarına göre
-  double get _maxAmount {
-    // Eğer şablon seçildiyse, o miktarı kullan
-    if (_selectedTemplateMax != null) {
-      return _preferredUnit == 'oz' 
-          ? _selectedTemplateMax! / 29.5735 
-          : _selectedTemplateMax!;
-    }
-    // Varsayılan maksimum
-    return _preferredUnit == 'oz' ? 34.0 : 1000.0;
+  // Maksimum sınır - Seçili şablon miktarına göre (ml cinsinden)
+  double get _maxAmountMl {
+    return _selectedTemplateMax ?? 1000.0;
   }
 
   // Drag işlemi - Artırılmış hassasiyet
   void _onVerticalDragUpdate(DragUpdateDetails details) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    
     setState(() {
       // Yukarı kaydırma = artır, aşağı kaydırma = azalt
       // Hassasiyeti artırmak için delta'yı 2.5 ile çarp
@@ -222,7 +159,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       
       // 10'ar 10'ar artış için hassasiyet ayarı
       double stepSize;
-      if (_preferredUnit == 'oz') {
+      if (!userProvider.isMetric) {
         stepSize = 0.3; // oz için yaklaşık 10ml karşılığı
       } else {
         stepSize = 10.0; // ml için 10'ar 10'ar
@@ -232,13 +169,18 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       final steps = (delta / 15.0).round(); // Her 15px drag = 1 step (daha hassas)
       final deltaAmount = steps * stepSize;
       
-      // Display değerini güncelle
-      final currentDisplay = _convertToDisplay(_currentAmount);
-      final newDisplay = (currentDisplay + deltaAmount).clamp(0.0, _maxAmount);
+      // Display değerini güncelle (ml'den display'e çevir)
+      final currentDisplay = userProvider.isMetric 
+          ? _currentAmount 
+          : UnitConverter.mlToFlOz(_currentAmount);
+      final maxDisplay = userProvider.isMetric 
+          ? _maxAmountMl 
+          : UnitConverter.mlToFlOz(_maxAmountMl);
+      final newDisplay = (currentDisplay + deltaAmount).clamp(0.0, maxDisplay);
       
       // ml'ye geri çevir ve 10'un katına yuvarla
-      if (_preferredUnit == 'oz') {
-        _currentAmount = (newDisplay * 29.5735).roundToDouble();
+      if (!userProvider.isMetric) {
+        _currentAmount = UnitConverter.flOzToMl(newDisplay).roundToDouble();
       } else {
         _currentAmount = newDisplay.roundToDouble();
       }
@@ -247,16 +189,15 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       _currentAmount = (_currentAmount / 10).round() * 10.0;
       
       // Maksimum ml sınırını kontrol et - Seçili şablon miktarına göre
-      final maxMl = _selectedTemplateMax ?? 1000.0;
-      _currentAmount = _currentAmount.clamp(0.0, maxMl);
+      _currentAmount = _currentAmount.clamp(0.0, _maxAmountMl);
       
-      // TextField'ı güncelle (listener'ı atlamak için flag kullan)
-      final displayValue = _convertToDisplay(_currentAmount);
-      final newText = displayValue.toStringAsFixed(_preferredUnit == 'oz' ? 1 : 0);
+      // TextField'ı güncelle
+      final displayValue = userProvider.isMetric 
+          ? _currentAmount 
+          : UnitConverter.mlToFlOz(_currentAmount);
+      final newText = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
       if (_amountController.text != newText) {
-        _isUpdatingFromDrag = true;
         _amountController.text = newText;
-        _isUpdatingFromDrag = false;
       }
     });
     
@@ -266,11 +207,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     });
   }
 
-  // Su seviyesi yüzdesi - Seçili şablon miktarına göre
+  // Su seviyesi yüzdesi - Seçili şablon miktarına göre, maksimum %92 (tepeden %8 aşağıda - head space)
   double get _fillPercentage {
     final maxMl = _selectedTemplateMax ?? 1000.0;
     if (maxMl <= 0) return 0.0;
-    return _currentAmount / maxMl;
+    final percentage = _currentAmount / maxMl;
+    return (percentage * 0.92).clamp(0.0, 0.92); // Maksimum %92 (head space için %8 boşluk)
   }
 
   // Su ekleme işlemi
@@ -401,10 +343,9 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         );
       }
       
-      // Son eklenen miktarı ve birimi kaydet
+      // Son eklenen miktarı kaydet
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('last_added_amount', _currentAmount);
-      await prefs.setString('preferred_unit', _preferredUnit);
       
       if (!mounted) return;
       Navigator.pop(context, _currentAmount); // Son eklenen miktarı döndür
@@ -458,9 +399,9 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
 
           const SizedBox(height: 16),
 
-          // Miktar Paneli - Yanıp Sönen İmleç ve Birim
+          // Özel Miktar TextField - Template butonlarıyla aynı tasarım
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: _buildAmountPanel(),
           ),
 
@@ -526,38 +467,65 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: AnimatedBuilder(
-                  animation: _waveAnimation,
-                  builder: (context, child) {
-                    final waterHeight = 300 * _fillPercentage;
-                    return ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(27),
-                        bottomRight: Radius.circular(27),
-                      ),
-                      child: CustomPaint(
-                        size: Size(200, waterHeight),
-                        painter: CupWavePainter(
-                          waveOffset: _waveAnimation.value,
-                          fillPercentage: _fillPercentage,
-                        ),
-                        child: Container(
-                          height: waterHeight,
-                          decoration: BoxDecoration(
-                            color: AppColors.waterColor.withValues(alpha: 0.85),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                AppColors.waterColor.withValues(alpha: 0.9),
-                                AppColors.waterColor.withValues(alpha: 0.7),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30), // Bardak çerçevesi ile birebir aynı
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_waveAnimation, _bubbleAnimation]),
+                    builder: (context, child) {
+                      final waterHeight = 300 * _fillPercentage;
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cupWidth = constraints.maxWidth;
+                          return SizedBox(
+                            width: cupWidth, // Bardağın iç genişliğine tam otur
+                            height: waterHeight,
+                            child: Stack(
+                              children: [
+                                // Su dolgusu - Wave paketi ile dalgalı üst kısım
+                                ClipRRect(
+                                  borderRadius: BorderRadius.only(
+                                    bottomLeft: Radius.circular(30),
+                                    bottomRight: Radius.circular(30),
+                                  ),
+                                  child: WaveWidget(
+                                    config: CustomConfig(
+                                      gradients: [
+                                        [
+                                          AppColors.waterColor.withValues(alpha: 0.9),
+                                          AppColors.waterColor.withValues(alpha: 0.7),
+                                        ],
+                                        [
+                                          AppColors.waterColor.withValues(alpha: 0.85),
+                                          AppColors.waterColor.withValues(alpha: 0.75),
+                                        ],
+                                      ],
+                                      durations: [3500, 4000],
+                                      heightPercentages: [0.20, 0.23],
+                                      blur: MaskFilter.blur(BlurStyle.solid, 5),
+                                      gradientBegin: Alignment.bottomLeft,
+                                      gradientEnd: Alignment.topRight,
+                                    ),
+                                    waveAmplitude: 5.0,
+                                    waveFrequency: 1.5,
+                                    size: Size(cupWidth, waterHeight),
+                                    backgroundColor: AppColors.waterColor.withValues(alpha: 0.85),
+                                  ),
+                                ),
+                                // Kabarcıklar
+                                CustomPaint(
+                                  size: Size(cupWidth, waterHeight),
+                                  painter: BubblePainter(
+                                    bubbleOffset: _bubbleAnimation.value,
+                                    fillPercentage: _fillPercentage,
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
           ],
@@ -568,135 +536,166 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
 
   // Şablon Slider Widget'ı
   Widget _buildTemplateSlider() {
-    return SizedBox(
-      height: 60,
-      child: ListView.builder(
-        controller: _templateScrollController,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _templateAmounts.length,
-        itemBuilder: (context, index) {
-          final amount = _templateAmounts[index];
-          final displayAmount = _convertToDisplay(amount);
-          // Seçili öğe kontrolü - daha hassas tolerans
-          final isSelected = (_currentAmount - amount).abs() < 10.0; // 10ml tolerans
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        return SizedBox(
+          height: 60,
+          child: ListView.builder(
+            controller: _templateScrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _templateAmounts.length,
+            itemBuilder: (context, index) {
+              final amount = _templateAmounts[index];
+              // Birime göre gösterim: isMetric true ise ml, false ise fl oz
+              final displayText = userProvider.isMetric
+                  ? '${amount.toStringAsFixed(0)} ml'
+                  : '${UnitConverter.roundToNearestStandardOz(UnitConverter.mlToFlOz(amount)).toStringAsFixed(0)} oz';
+              // Seçili öğe kontrolü - daha hassas tolerans
+              final isSelected = (_currentAmount - amount).abs() < 10.0; // 10ml tolerans
 
-          return GestureDetector(
-            onTap: () => _selectTemplateAmount(amount),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.black
-                    : Colors.grey[200],
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  '${displayAmount.toStringAsFixed(_preferredUnit == 'oz' ? 1 : 0)} $_preferredUnit',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+              return GestureDetector(
+                onTap: () => _selectTemplateAmount(amount),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
                     color: isSelected
-                        ? Colors.white
-                        : Colors.grey[700],
+                        ? Colors.black
+                        : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      displayText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.grey[700],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-  // Miktar Paneli Widget'ı - TextField ile
+  // Miktar Paneli Widget'ı - TextField ile (Template butonlarıyla aynı tasarım)
   Widget _buildAmountPanel() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          // Miktar TextField - Ortalanmış
-          Expanded(
-            child: TextField(
-              controller: _amountController,
-              focusNode: _amountFocusNode,
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(
-                fontSize: 20,
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final unitLabel = userProvider.isMetric ? 'ml' : 'oz';
+        // TextField'ın focus durumunu kontrol et
+        final hasFocus = _amountFocusNode.hasFocus;
+        final hasValue = _amountController.text.isNotEmpty && _amountController.text != '0';
+        
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: hasFocus || hasValue
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: TextField(
+            controller: _amountController,
+            focusNode: _amountFocusNode,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+              letterSpacing: 0.5,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Özel',
+              hintStyle: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF4A5568),
-                letterSpacing: 0.5,
               ),
-              decoration: InputDecoration(
-                hintText: '0',
-                hintStyle: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 20,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
-              ),
-              onChanged: (value) {
-                // TextField değişikliği _onAmountTextChanged'da işleniyor
-              },
-            ),
-          ),
-          // Birim Göstergesi
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Text(
-              _preferredUnit,
-              style: TextStyle(
-                fontSize: 20,
+              suffixText: unitLabel,
+              suffixStyle: TextStyle(
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF4A5568),
-                letterSpacing: 0.5,
+                color: Colors.grey[700],
               ),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
             ),
+            onChanged: (value) {
+              // TextField değişikliğini işle - global birim ayarına göre
+              if (value.isEmpty) {
+                setState(() {
+                  _currentAmount = 0.0;
+                });
+                return;
+              }
+              
+              final numValue = double.tryParse(value);
+              if (numValue != null && numValue >= 0) {
+                // Display değerinden ml'ye çevir (global birim ayarına göre)
+                double newAmount;
+                if (!userProvider.isMetric) {
+                  // oz ise ml'ye çevir
+                  newAmount = UnitConverter.flOzToMl(numValue);
+                } else {
+                  newAmount = numValue;
+                }
+                
+                // Maksimum sınırı kontrol et
+                final maxMl = _selectedTemplateMax ?? 1000.0;
+                newAmount = newAmount.clamp(0.0, maxMl);
+                
+                if ((_currentAmount - newAmount).abs() > 0.1) {
+                  setState(() {
+                    _currentAmount = newAmount;
+                  });
+                }
+              }
+            },
+            onSubmitted: (value) {
+              // Klavye kapandığında veya onaylandığında focus'u kaldır
+              _amountFocusNode.unfocus();
+            },
           ),
-          const SizedBox(width: 8),
-          // Favori Yıldızı
-          GestureDetector(
-            onTap: _toggleFavorite,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                _isFavorite ? Icons.star : Icons.star_border,
-                key: ValueKey(_isFavorite),
-                color: _isFavorite
-                    ? Colors.amber
-                    : Colors.grey[400],
-                size: 28,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-// Bardak dalga animasyonu için CustomPainter - Gerçekçi form
+// Bardak dalga animasyonu için CustomPainter - Gerçekçi dalgalı su
 class CupWavePainter extends CustomPainter {
   final double waveOffset;
   final double fillPercentage;
@@ -710,30 +709,129 @@ class CupWavePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (fillPercentage <= 0) return;
 
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
+    // Su dolgusunu çiz - dalgalı üst yüzey ile
+    final waterPaint = Paint()
+      ..color = AppColors.waterColor.withValues(alpha: 0.85)
+      ..style = PaintingStyle.fill;
 
-    // Yumuşak dalga çizgisi (üst kısım) - Gerçekçi dalga efekti
+    // Gradient için başka bir paint
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        AppColors.waterColor.withValues(alpha: 0.9),
+        AppColors.waterColor.withValues(alpha: 0.7),
+      ],
+    );
+
+    // Dalgalı üst yüzey path'i - Wave paketi parametreleri (waveAmplitude: 5.0, waveFrequency: 1.5)
     final path = Path();
-    final waveHeight = 6.0;
-    final waveFrequency = 2.0; // Dalga sıklığı
+    final waveHeight = 5.0; // waveAmplitude: 5.0
+    final waveFrequency = 1.5; // waveFrequency: 1.5
 
-    path.moveTo(0, size.height - 5);
+    // Sol alt köşe
+    path.moveTo(0, size.height);
 
-    for (double x = 0; x <= size.width; x += 1.0) {
-      final y = size.height - 5 +
-          waveHeight * math.sin((x / size.width * waveFrequency * 2 * math.pi) + waveOffset);
+    // Alt kenar (düz)
+    path.lineTo(0, size.height);
+    path.lineTo(size.width, size.height);
+
+    // Üst kenar (dalgalı)
+    for (double x = size.width; x >= 0; x -= 1.0) {
+      final y = waveHeight * math.sin((x / size.width * waveFrequency * 2 * math.pi) + waveOffset);
       path.lineTo(x, y);
     }
 
-    canvas.drawPath(path, paint);
+    path.close();
+
+    // Gradient ile doldur
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final shader = gradient.createShader(rect);
+    waterPaint.shader = shader;
+    
+    canvas.drawPath(path, waterPaint);
+
+    // Üst yüzeyde parlaklık efekti (beyaz çizgi)
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final highlightPath = Path();
+    for (double x = 0; x <= size.width; x += 1.0) {
+      final y = waveHeight * math.sin((x / size.width * waveFrequency * 2 * math.pi) + waveOffset);
+      if (x == 0) {
+        highlightPath.moveTo(x, y);
+      } else {
+        highlightPath.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(highlightPath, highlightPaint);
   }
 
   @override
   bool shouldRepaint(CupWavePainter oldDelegate) {
     return oldDelegate.waveOffset != waveOffset ||
+        oldDelegate.fillPercentage != fillPercentage;
+  }
+}
+
+// Şeffaf kabarcık animasyonu için CustomPainter
+class BubblePainter extends CustomPainter {
+  final double bubbleOffset;
+  final double fillPercentage;
+
+  BubblePainter({
+    required this.bubbleOffset,
+    required this.fillPercentage,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fillPercentage <= 0) return;
+
+    final random = math.Random(42); // Sabit seed ile tutarlı kabarcıklar
+    final bubblePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.2)
+      ..style = PaintingStyle.fill;
+
+    // Kabarcık sayısı su seviyesine göre değişir
+    final bubbleCount = (fillPercentage * 15).round();
+
+    for (int i = 0; i < bubbleCount; i++) {
+      // X pozisyonu rastgele ama tutarlı
+      final xSeed = random.nextDouble() * 1000 + i * 100;
+      final x = (xSeed % size.width).toDouble();
+
+      // Y pozisyonu animasyonla yukarı hareket eder
+      final startY = size.height * (0.7 + random.nextDouble() * 0.3); // Alt %30'dan başlar
+      final bubbleProgress = (bubbleOffset + (i * 0.15)) % 1.0; // Her kabarcık farklı hızda
+      final y = startY - (bubbleProgress * size.height * 0.8); // %80 yukarı çıkar
+
+      // Eğer kabarcık ekranın dışındaysa atla
+      if (y < 0 || y > size.height) continue;
+
+      // Kabarcık boyutu
+      final bubbleSize = 3.0 + random.nextDouble() * 5.0;
+
+      // Ana kabarcık
+      canvas.drawCircle(Offset(x, y), bubbleSize, bubblePaint);
+
+      // Küçük parlaklık (gözbebeği efekti)
+      final highlightPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.4)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(
+        Offset(x - bubbleSize * 0.3, y - bubbleSize * 0.3),
+        bubbleSize * 0.3,
+        highlightPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(BubblePainter oldDelegate) {
+    return oldDelegate.bubbleOffset != bubbleOffset ||
         oldDelegate.fillPercentage != fillPercentage;
   }
 }
