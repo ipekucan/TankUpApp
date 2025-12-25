@@ -39,8 +39,9 @@ class UnitConverter {
         return '${ml.toStringAsFixed(0)} ml';
       }
     } else {
-      final flOz = mlToFlOz(ml);
-      return '${flOz.toStringAsFixed(1)} fl oz';
+      // Oz hesaplama: targetMl * 0.033814 (1 ml = 0.033814 fl oz)
+      final flOz = ml * 0.033814;
+      return '${flOz.toStringAsFixed(1)} oz';
     }
   }
 

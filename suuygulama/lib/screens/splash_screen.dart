@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
-import 'unit_selection_screen.dart';
 import 'onboarding_screen.dart';
 import 'main_navigation_screen.dart';
 
@@ -78,17 +77,6 @@ class _SplashScreenState extends State<SplashScreen>
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       
-      final preferredUnit = prefs.getString('preferred_unit');
-      
-      // Eğer birim seçilmemişse unit selection ekranına yönlendir
-      if (preferredUnit == null) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const UnitSelectionScreen()),
-        );
-        return;
-      }
-      
       final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
       
       // Eğer onboarding tamamlanmamışsa veya weight verisi yoksa onboarding göster
@@ -109,10 +97,10 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } catch (e) {
-      // Hata durumunda unit selection göster
+      // Hata durumunda onboarding göster
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const UnitSelectionScreen()),
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     }
   }

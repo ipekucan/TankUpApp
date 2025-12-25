@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
-import '../utils/unit_converter.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
 import 'plan_loading_screen.dart';
@@ -16,19 +15,25 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  // Sabitler - Hardcoded değerler yerine
+  static const double _defaultGoalMl = 2500.0; // Varsayılan ml hedefi
+  static const double _defaultGoalOz = 85.0; // Varsayılan oz hedefi
+  
   // Form verileri - Başlangıçta boş
   String? _selectedGender;
   int _selectedWeight = 0; // kg veya lbs (birime göre) - Başlangıçta 0
   String? _selectedActivityLevel;
   String? _selectedClimate; // İklim seçimi
   int _weightUnit = 0; // 0 = Kg, 1 = Lbs (CupertinoSlidingSegmentedControl için)
-  double? _customGoal; // Özel hedef (ml cinsinden)
-  final TextEditingController _goalController = TextEditingController();
-  final FocusNode _goalFocusNode = FocusNode();
+  double _customGoal = 2500.0; // Özel hedef - Varsayılan: 2500 ml (direkt birimde tutulur)
+  // _volumeUnit kaldırıldı - artık _weightUnit'e göre belirleniyor (kg = ml, lbs = oz)
   
   // PageView Controller
   late PageController _pageController;
   int _currentPage = 0; // 0-4 arası (5 adım)
+  
+  // Miktar TextField Controller
+  late TextEditingController _amountController;
   
   // Canlı hesaplanan su hedefi
   double get _calculatedWaterGoal {
@@ -72,21 +77,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Picker controller'ları
   late FixedExtentScrollController _weightController;
   
+  
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _weightController = FixedExtentScrollController(initialItem: 0); // Başlangıçta 0 (30 kg)
+    _amountController = TextEditingController();
+    
+    // Varsayılan değerleri ayarla (ml ve 2500)
+    _customGoal = _defaultGoalMl;
+    _amountController.text = _customGoal.toStringAsFixed(0);
+    
+    // UserProvider'ı varsayılan olarak metric yap
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        userProvider.setIsMetric(true);
+      }
+    });
     
     // Controller'ı dinle ve sadece gerektiğinde setState çağır
     _weightController.addListener(_onWeightChanged);
-    
-    // Goal focus node listener - focus kaybedildiğinde formatlanmış metni göster
-    _goalFocusNode.addListener(() {
-      if (!_goalFocusNode.hasFocus && _customGoal != null) {
-        setState(() {}); // Formatlanmış metni göstermek için
-      }
-    });
   }
   
   void _onWeightChanged() {
@@ -111,8 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _weightController.removeListener(_onWeightChanged);
     _weightController.dispose();
     _pageController.dispose();
-    _goalController.dispose();
-    _goalFocusNode.dispose();
+    _amountController.dispose();
     super.dispose();
   }
   
@@ -163,9 +174,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       activityLevel: _selectedActivityLevel,
     );
     
-    // Su hedefini kaydet
-    final finalGoal = _customGoal ?? _calculatedWaterGoal;
-    await waterProvider.updateDailyGoal(finalGoal);
+    // Birim sistemini kaydet (UserProvider'dan anlık birim bilgisini al)
+    final isMetric = userProvider.isMetric;
+    
+    // Su hedefini kaydet (_customGoal seçili birimde tutuluyor, ml'ye çevirerek kaydet)
+    double finalGoalMl;
+    if (_customGoal > 0) {
+      if (isMetric) {
+        // Metric (ml) - direkt kullan
+        finalGoalMl = _customGoal;
+      } else {
+        // Imperial (oz) - ml'ye çevir
+        finalGoalMl = _customGoal / 0.033814;
+      }
+    } else {
+      finalGoalMl = _calculatedWaterGoal;
+    }
+    await waterProvider.updateDailyGoal(finalGoalMl);
     
     // Onboarding tamamlandı olarak işaretle
     final prefs = await SharedPreferences.getInstance();
@@ -187,7 +212,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => PlanLoadingScreen(
-          customGoal: _customGoal,
+          customGoal: _customGoal > 0 ? _customGoal : null,
         ),
       ),
     );
@@ -544,8 +569,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       children: [
                         // kg Seçeneği
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
+                            final userProvider = Provider.of<UserProvider>(context, listen: false);
+                            await userProvider.setIsMetric(true);
                             setState(() {
+                              // Birim değiştiğinde hedef değerini güncelle
+                              if (_weightUnit == 1) {
+                                // Lbs'den kg'ye geçiş - ml moduna geç
+                                // Varsayılan ml değerine dön (direkt ml cinsinden)
+                                _customGoal = _defaultGoalMl;
+                              }
                               _weightUnit = 0;
                             });
                           },
@@ -569,8 +602,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         const SizedBox(height: 8),
                         // lbs Seçeneği
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
+                            final userProvider = Provider.of<UserProvider>(context, listen: false);
+                            await userProvider.setIsMetric(false);
                             setState(() {
+                              // Birim değiştiğinde hedef değerini güncelle
+                              if (_weightUnit == 0) {
+                                // kg'den lbs'ye geçiş - oz moduna geç
+                                // Varsayılan oz değerine ayarla (direkt oz cinsinden)
+                                _customGoal = _defaultGoalOz;
+                              }
                               _weightUnit = 1;
                               // lbs'ye çevir
                               if (_selectedWeight > 0) {
@@ -1040,189 +1081,417 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // 5. Adım: Günlük Hedef
   Widget _buildGoalStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40),
+          
+          // Başlık - Ortalanmış
+          const Text(
+            'Günlük Hedef',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF4A5568),
+              letterSpacing: 1.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          
+          // Alt açıklama metni
+          Text(
+            'Günlük su hedefinizi belirleyin',
+            style: TextStyle(
+              fontSize: 16,
+              color: const Color(0xFF4A5568).withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 80),
+          
+          // Miktar Ayarlama Barı - Geniş, oval, ortada
+          _buildAmountAdjustmentBar(),
+          
+          // Birim Seçim Toggle - Miktar barının hemen altına
+          const SizedBox(height: 24),
+          _buildUnitToggle(),
+          
+          // Akıllı Hedef Önerisi
+          if (_selectedWeight > 0 && _calculatedWaterGoal > 0) ...[
+            const SizedBox(height: 24),
+            _buildSmartGoalSuggestion(),
+          ],
+          
+          const Spacer(),
+          
+          // Planı Oluştur Butonu
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _completeOnboarding,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.softPinkButton,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(35),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Planı Oluştur',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+  
+  // MİKTAR AYARLAMA BARI (Temizlenmiş ve Basitleştirilmiş)
+  Widget _buildAmountAdjustmentBar() {
+    // Provider'dan anlık birim bilgisini çek
+    final userProvider = Provider.of<UserProvider>(context);
+    final isMetric = userProvider.isMetric;
+    
+    // Controller'ı güncel değerle senkronize et
+    String text;
+    if (isMetric) {
+      text = _customGoal.toStringAsFixed(0);
+    } else {
+      text = _customGoal.toStringAsFixed(1);
+    }
+    if (_amountController.text != text) {
+      _amountController.text = text;
+    }
+    
+    String getDisplayUnit() {
+      return isMetric ? 'ml' : 'oz';
+    }
+    
+    void incrementAmount() {
+      setState(() {
+        if (isMetric) {
+          _customGoal += 50.0;
+        } else {
+          _customGoal += 2.0; // 2 oz artır
+        }
+      });
+    }
+    
+    void decrementAmount() {
+      setState(() {
+        if (isMetric) {
+          _customGoal -= 50.0;
+        } else {
+          _customGoal -= 2.0; // 2 oz azalt
+        }
+        if (_customGoal < 0) _customGoal = 0.0;
+      });
+    }
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: AppColors.softPinkButton.withValues(alpha: 0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.softPinkButton.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // AZALT BUTONU
+          GestureDetector(
+            onTap: decrementAmount,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.softPinkButton.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.remove,
+                color: AppColors.softPinkButton,
+                size: 28,
+              ),
+            ),
+          ),
+          
+          // TEXTFIELD VE BİRİM
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 120,
+                child: TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: !isMetric),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF4A5568),
+                    letterSpacing: 0.5,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                  onChanged: (value) {
+                    final numValue = double.tryParse(value);
+                    if (numValue != null && numValue >= 0) {
+                      // setState GEREKLİ DEĞİL, controller zaten güncel.
+                      // Sadece _customGoal'ü güncelle.
+                      _customGoal = numValue;
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                getDisplayUnit(),
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF4A5568),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          
+          // ARTIR BUTONU
+          GestureDetector(
+            onTap: incrementAmount,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.softPinkButton,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Birim Seçim Toggle (ml | oz)
+  Widget _buildUnitToggle() {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        // Bardak sayısını hesapla (_customGoal ml cinsinden)
-        int calculateCups() {
-          if (_customGoal == null) return 0;
-          return (_customGoal! / 200).round();
-        }
+        final isMetric = userProvider.isMetric;
         
-        // Mevcut hedefi birime göre göster (_customGoal her zaman ml cinsinden)
-        String getDisplayText() {
-          if (_customGoal == null) return '';
-          final displayValue = userProvider.isMetric
-              ? _customGoal!.toStringAsFixed(0)
-              : UnitConverter.mlToFlOz(_customGoal!).toStringAsFixed(1);
-          final unit = userProvider.isMetric ? 'ml' : 'oz';
-          final cups = calculateCups();
-          return ' $displayValue $unit / $cups bardak';
-        }
-        
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: AppColors.softPinkButton.withValues(alpha: 0.3),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.softPinkButton.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Başlık ve açıklama (en üstte)
-              const Text(
-                'Günlük Hedef',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF4A5568),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Günlük su hedefinizi girin',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-                ),
-              ),
-              
-              const Spacer(),
-              
-              // Ortada geniş, oval TextField (pembe buton gibi) - Dinamik format gösterimi
+              // ml Butonu
               GestureDetector(
-                onTap: () {
-                  _goalFocusNode.requestFocus();
+                onTap: () async {
+                  if (isMetric) return; // Zaten ml seçili
+                  
+                  // Oz'dan ml'ye dönüştür
+                  final currentOz = _customGoal;
+                  final newMl = currentOz / 0.033814; // oz'dan ml'ye çevir
+                  
+                  setState(() {
+                    _customGoal = newMl.roundToDouble();
+                  });
+                  
+                  // UserProvider'ı güncelle
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  await userProvider.setIsMetric(true);
+                  
+                  // Controller'ı güncelle
+                  _amountController.text = _customGoal.toStringAsFixed(0);
                 },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: Colors.grey[300]!,
-                      width: 2,
-                    ),
+                    color: isMetric ? AppColors.softPinkButton : Colors.transparent,
+                    borderRadius: BorderRadius.circular(26),
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Formatlanmış metin gösterimi (TextField focus'ta değilse veya boşsa)
-                      if (!_goalFocusNode.hasFocus || _goalController.text.isEmpty)
-                        Text(
-                          getDisplayText().isEmpty ? 'Hedefinizi girin' : getDisplayText(),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: _customGoal != null ? const Color(0xFF4A5568) : Colors.grey[400],
-                            letterSpacing: 0.5,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      // TextField (sadece sayı girişi için, görünmez veya saydam)
-                      Opacity(
-                        opacity: _goalFocusNode.hasFocus ? 1.0 : 0.0,
-                        child: TextField(
-                          controller: _goalController,
-                          focusNode: _goalFocusNode,
-                          textAlign: TextAlign.center,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF4A5568),
-                            letterSpacing: 0.5,
-                          ),
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
-                            hintText: '',
-                          ),
-                          onChanged: (value) {
-                            if (value.isEmpty) {
-                              setState(() {
-                                _customGoal = null;
-                              });
-                              return;
-                            }
-                            
-                            // Sadece sayıları al (birim ve bardak metnini temizle)
-                            final cleanValue = value.replaceAll(RegExp(r'[^0-9.]'), '');
-                            final numValue = double.tryParse(cleanValue);
-                            
-                            if (numValue != null && numValue >= 0) {
-                              // Display değerinden ml'ye çevir (global birim ayarına göre)
-                              double newGoal;
-                              if (userProvider.isMetric) {
-                                newGoal = numValue;
-                              } else {
-                                newGoal = UnitConverter.flOzToMl(numValue);
-                              }
-                              
-                              setState(() {
-                                _customGoal = newGoal;
-                              });
-                              
-                              // TextField'ı temiz tut (sadece sayı)
-                              if (_goalController.text != cleanValue) {
-                                _goalController.value = TextEditingValue(
-                                  text: cleanValue,
-                                  selection: TextSelection.collapsed(offset: cleanValue.length),
-                                );
-                              }
-                            }
-                          },
-                          onSubmitted: (value) {
-                            _goalFocusNode.unfocus();
-                            setState(() {}); // Formatlanmış metni göstermek için
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const Spacer(),
-              
-              const SizedBox(height: 40),
-              
-              // Planı Oluştur Butonu
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _completeOnboarding();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.softPinkButton,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 60,
-                      vertical: 22,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(35),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Planı Oluştur',
+                  child: Text(
+                    'ml',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
+                      color: isMetric ? Colors.white : Colors.grey[600],
                     ),
                   ),
                 ),
               ),
               
-              const SizedBox(height: 20),
+              // oz Butonu
+              GestureDetector(
+                onTap: () async {
+                  if (!isMetric) return; // Zaten oz seçili
+                  
+                  // Ml'den oz'a dönüştür
+                  final currentMl = _customGoal;
+                  final newOz = currentMl * 0.033814; // ml'den oz'a çevir
+                  
+                  setState(() {
+                    _customGoal = double.parse(newOz.toStringAsFixed(1));
+                  });
+                  
+                  // UserProvider'ı güncelle
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  await userProvider.setIsMetric(false);
+                  
+                  // Controller'ı güncelle
+                  _amountController.text = _customGoal.toStringAsFixed(1);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: !isMetric ? AppColors.softPinkButton : Colors.transparent,
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                  child: Text(
+                    'oz',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: !isMetric ? Colors.white : Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+  
+  // Akıllı Hedef Önerisi Widget'ı
+  Widget _buildSmartGoalSuggestion() {
+    // Provider'dan birim bilgisini al
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final isMetric = userProvider.isMetric;
+    
+    // Kilo girilene kadar 0 döndür
+    if (_selectedWeight == 0) {
+      return const SizedBox.shrink();
+    }
+    
+    // Kilo dönüşümü (Lbs ise Kg'ye çevir)
+    final weightInKg = _weightUnit == 1 
+        ? _selectedWeight * 0.453592 
+        : _selectedWeight.toDouble();
+    
+    // Temel formül: kilo * 35 (ml cinsinden)
+    final idealMl = (weightInKg * 35).round();
+    
+    // Birime göre dönüştür
+    double calculatedValue;
+    String unit;
+    String displayValue;
+    
+    if (isMetric) {
+      // ml: ideal değerini olduğu gibi kullan
+      calculatedValue = idealMl.toDouble();
+      unit = 'ml';
+      displayValue = calculatedValue.toStringAsFixed(0);
+    } else {
+      // oz: (ideal * 0.033814).round() işlemini yap
+      calculatedValue = (idealMl * 0.033814);
+      unit = 'oz';
+      displayValue = calculatedValue.toStringAsFixed(1);
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.softPinkButton.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.softPinkButton.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lightbulb_outline,
+            color: AppColors.softPinkButton,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              'Kilonuza ve bilgilerinize göre günlük su ihtiyacınız: $displayValue $unit',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF4A5568),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

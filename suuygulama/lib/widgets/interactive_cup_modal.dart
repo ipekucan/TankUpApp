@@ -30,6 +30,15 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   final ScrollController _templateScrollController = ScrollController();
   final TextEditingController _amountController = TextEditingController();
   final FocusNode _amountFocusNode = FocusNode();
+  late AnimationController _tooltipAnimationController;
+  late Animation<double> _tooltipAnimation;
+  bool _showTooltip = false;
+  
+  // Öğretici el animasyonu için
+  late AnimationController _handAnimationController;
+  late Animation<double> _handAnimation;
+  bool _showHandAnimation = false;
+  bool _hasInteracted = false; // Kullanıcı ekrana dokundu mu?
   
   // Şablon miktarlar (ml cinsinden) - 250 ile başlar
   final List<double> _templateAmounts = [250, 330, 500, 1000];
@@ -64,13 +73,110 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     );
     _bubbleController.repeat();
     
+    // Tooltip animasyonu (floating/bobbing efekt)
+    _tooltipAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _tooltipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _tooltipAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Öğretici el animasyonu (yukarı-aşağı hareket)
+    _handAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _handAnimation = Tween<double>(begin: -20.0, end: 20.0).animate(
+      CurvedAnimation(
+        parent: _handAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
     _loadPreferredUnit();
+    _checkAndShowTooltip();
+    _checkAndShowHandAnimation();
+  }
+  
+  // Tooltip gösterimi kontrolü (sadece ilk girişte)
+  Future<void> _checkAndShowTooltip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenCupTutorial = prefs.getBool('has_seen_cup_tutorial') ?? false;
+    
+    // Eğer daha önce görüldüyse hiç gösterme
+    if (hasSeenCupTutorial) {
+      return;
+    }
+    
+    // İlk seferinde göster ve hemen kaydet
+    if (mounted) {
+      setState(() {
+        _showTooltip = true;
+      });
+      _tooltipAnimationController.repeat(reverse: true);
+      
+      // Hemen SharedPreferences'a kaydet (bir sonraki açılışta gösterme)
+      await prefs.setBool('has_seen_cup_tutorial', true);
+      
+      // Kullanıcı bir yere tıkladığında veya içecek seçtiğinde kapat
+      _amountFocusNode.addListener(() {
+        if (_amountFocusNode.hasFocus) {
+          _hideTooltip();
+        }
+      });
+    }
+  }
+  
+  // Tooltip'i gizle (artık kaydetme gerekmeyen - initState'te zaten kaydedildi)
+  void _hideTooltip() {
+    if (!_showTooltip) return;
+    
+    if (mounted) {
+      setState(() {
+        _showTooltip = false;
+      });
+      _tooltipAnimationController.stop();
+    }
+  }
+  
+  // Öğretici el animasyonu kontrolü (sadece ilk girişte)
+  Future<void> _checkAndShowHandAnimation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenHandAnimation = prefs.getBool('has_seen_hand_animation') ?? false;
+    
+    if (!hasSeenHandAnimation && mounted) {
+      setState(() {
+        _showHandAnimation = true;
+      });
+      _handAnimationController.repeat(reverse: true);
+    }
+  }
+  
+  void _hideHandAnimation() {
+    if (!_showHandAnimation || _hasInteracted) return;
+    
+    final prefs = SharedPreferences.getInstance();
+    prefs.then((p) => p.setBool('has_seen_hand_animation', true));
+    
+    if (mounted) {
+      setState(() {
+        _showHandAnimation = false;
+        _hasInteracted = true;
+      });
+      _handAnimationController.stop();
+    }
   }
 
   @override
   void dispose() {
     _waveController.dispose();
     _bubbleController.dispose();
+    _tooltipAnimationController.dispose();
+    _handAnimationController.dispose();
     _templateScrollController.dispose();
     _amountController.dispose();
     _amountFocusNode.dispose();
@@ -90,7 +196,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         final displayValue = userProvider.isMetric 
             ? _currentAmount 
-            : UnitConverter.mlToFlOz(_currentAmount);
+            : (_currentAmount * 0.033814); // Oz hesaplama: targetMl * 0.033814
         _amountController.text = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
         _scrollToSelectedTemplate();
       }
@@ -107,7 +213,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final displayValue = userProvider.isMetric 
         ? _currentAmount 
-        : UnitConverter.mlToFlOz(_currentAmount);
+        : (_currentAmount * 0.033814); // Oz hesaplama: targetMl * 0.033814
     _amountController.text = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
     
     // Seçili öğeyi merkeze getir
@@ -150,6 +256,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
 
   // Drag işlemi - Artırılmış hassasiyet
   void _onVerticalDragUpdate(DragUpdateDetails details) {
+    // Kullanıcı etkileşime geçti, el animasyonunu ve tooltip'i gizle
+    _hideTooltip();
+    if (!_hasInteracted) {
+      _hideHandAnimation();
+    }
+    
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
     setState(() {
@@ -172,15 +284,15 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       // Display değerini güncelle (ml'den display'e çevir)
       final currentDisplay = userProvider.isMetric 
           ? _currentAmount 
-          : UnitConverter.mlToFlOz(_currentAmount);
+          : (_currentAmount * 0.033814); // Oz hesaplama: targetMl * 0.033814
       final maxDisplay = userProvider.isMetric 
           ? _maxAmountMl 
-          : UnitConverter.mlToFlOz(_maxAmountMl);
+          : (_maxAmountMl * 0.033814); // Oz hesaplama: targetMl * 0.033814
       final newDisplay = (currentDisplay + deltaAmount).clamp(0.0, maxDisplay);
       
       // ml'ye geri çevir ve 10'un katına yuvarla
       if (!userProvider.isMetric) {
-        _currentAmount = UnitConverter.flOzToMl(newDisplay).roundToDouble();
+        _currentAmount = (newDisplay / 0.033814).roundToDouble(); // Oz'dan ml'ye: oz / 0.033814 = ml
       } else {
         _currentAmount = newDisplay.roundToDouble();
       }
@@ -188,13 +300,13 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       // 10'un katına yuvarla (240, 250, 260 gibi)
       _currentAmount = (_currentAmount / 10).round() * 10.0;
       
-      // Maksimum ml sınırını kontrol et - Seçili şablon miktarına göre
+      // Maksimum ml sınırını kontrol et - Seçili şablon miktarına göre (0 ile max arasında clamp)
       _currentAmount = _currentAmount.clamp(0.0, _maxAmountMl);
       
       // TextField'ı güncelle
       final displayValue = userProvider.isMetric 
           ? _currentAmount 
-          : UnitConverter.mlToFlOz(_currentAmount);
+          : (_currentAmount * 0.033814); // Oz hesaplama: targetMl * 0.033814
       final newText = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
       if (_amountController.text != newText) {
         _amountController.text = newText;
@@ -207,12 +319,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     });
   }
 
-  // Su seviyesi yüzdesi - Seçili şablon miktarına göre, maksimum %92 (tepeden %8 aşağıda - head space)
+  // Su seviyesi yüzdesi - _currentAmount'a göre dinamik hesaplama
   double get _fillPercentage {
-    final maxMl = _selectedTemplateMax ?? 1000.0;
-    if (maxMl <= 0) return 0.0;
-    final percentage = _currentAmount / maxMl;
-    return (percentage * 0.92).clamp(0.0, 0.92); // Maksimum %92 (head space için %8 boşluk)
+    if (_maxAmountMl <= 0) return 0.0;
+    // Su seviyesi seçilen miktara göre hesaplanır (maksimum %92 ile sınırlı - dudak payı)
+    final percentage = (_currentAmount / _maxAmountMl).clamp(0.0, 0.92);
+    return percentage;
   }
 
   // Su ekleme işlemi
@@ -224,7 +336,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
 
     final water = DrinkData.getDrinks().firstWhere((d) => d.id == 'water');
-    final result = await waterProvider.drink(water, _currentAmount);
+    final result = await waterProvider.drink(water, _currentAmount, context: context);
 
     if (!mounted) return;
 
@@ -232,6 +344,36 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       await userProvider.addToTotalWater(_currentAmount * water.hydrationFactor);
 
       if (!mounted) return;
+      
+      // Su ekleme başarı bildirimi
+      final formattedAmount = UnitConverter.formatVolume(_currentAmount, userProvider.isMetric);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('💦', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$formattedAmount su başarıyla eklendi!',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.softPinkButton,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+        ),
+      );
 
       if (result.isFirstDrink) {
         final coins = await achievementProvider.checkFirstStep();
@@ -365,75 +507,217 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       );
     }
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Tutma Çizgisi
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return Stack(
+      children: [
+        Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-
-          // Görsel Bardak - Sürükle-Doldur
-          Expanded(
-            child: Center(
-              child: GestureDetector(
-                onVerticalDragUpdate: _onVerticalDragUpdate,
-                child: _buildCupWidget(),
-              ),
-            ),
-          ),
-
-          // Şablon Slider - Yatay Kaydırılabilir
-          _buildTemplateSlider(),
-
-          const SizedBox(height: 16),
-
-          // Özel Miktar TextField - Template butonlarıyla aynı tasarım
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: _buildAmountPanel(),
-          ),
-
-          const SizedBox(height: 16),
-
-          // +Su Butonu
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: ElevatedButton(
-              onPressed: _currentAmount > 0 ? _addDrink : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                '+Su',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+          child: Column(
+            children: [
+              // Tutma Çizgisi
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
+              
+              // Başlık Satırı - Sadeleştirilmiş (Sadece "Su" başlığı, gereksiz ikonlar yok)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Su',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4A5568),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+
+              // Görsel Bardak - Sürükle-Doldur
+              Expanded(
+                child: Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          // Kullanıcı dokundu, el animasyonunu ve tooltip'i gizle
+                          _hideTooltip();
+                          if (!_hasInteracted) {
+                            _hideHandAnimation();
+                          }
+                        },
+                        onVerticalDragUpdate: _onVerticalDragUpdate,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            _buildCupWidget(),
+                            // Öğretici el animasyonu
+                            if (_showHandAnimation && !_hasInteracted)
+                              Positioned(
+                                top: 100, // Bardak üstünde konumlandır
+                                child: AnimatedBuilder(
+                                  animation: _handAnimation,
+                                  builder: (context, child) {
+                                    return Transform.translate(
+                                      offset: Offset(0, _handAnimation.value),
+                                      child: Icon(
+                                        Icons.pan_tool_alt,
+                                        size: 48,
+                                        color: AppColors.softPinkButton.withValues(alpha: 0.8),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Şablon Slider - Yatay Kaydırılabilir
+              _buildTemplateSlider(),
+
+              const SizedBox(height: 16),
+
+              // Özel Miktar TextField - Template butonlarıyla aynı tasarım
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: _buildAmountPanel(),
+              ),
+
+              const SizedBox(height: 16),
+
+              // +Su Butonu
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: ElevatedButton(
+                  onPressed: _currentAmount > 0 ? () {
+                    _hideTooltip();
+                    _addDrink();
+                  } : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.softPinkButton,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    '+Su',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Tooltip Balonu - Sağ üst köşede (Modal'ın sağ üst köşesi)
+        if (_showTooltip)
+          Positioned(
+            top: 20, // Modal'ın üstünden 20px aşağıda
+            right: 20, // Modal'ın sağından 20px içeride
+            child: GestureDetector(
+              onTap: _hideTooltip,
+              child: AnimatedBuilder(
+                animation: _tooltipAnimation,
+                builder: (context, child) {
+                  // Floating animasyon (yukarı-aşağı hareket)
+                  final offset = math.sin(_tooltipAnimation.value * 2 * math.pi) * 8.0;
+                  return Transform.translate(
+                    offset: Offset(0, -offset),
+                    child: _buildTooltipBubble(),
+                  );
+                },
+              ),
             ),
           ),
-        ],
-      ),
+      ],
+    );
+  }
+
+  // Tooltip Balonu Widget'ı (Oklu)
+  Widget _buildTooltipBubble() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Ana Balon - Taşma önleme ile
+        Container(
+          constraints: const BoxConstraints(
+            minWidth: 100,
+            maxWidth: 150,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A2E), // Koyu lacivert arka plan
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Kısayola Ekle!',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Ok (Balonun altından çıkan üçgen ok)
+        Positioned(
+          bottom: -8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: CustomPaint(
+              size: const Size(16, 8),
+              painter: _TooltipArrowPainter(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -479,47 +763,51 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                           return SizedBox(
                             width: cupWidth, // Bardağın iç genişliğine tam otur
                             height: waterHeight,
-                            child: Stack(
-                              children: [
-                                // Su dolgusu - Wave paketi ile dalgalı üst kısım
-                                ClipRRect(
-                                  borderRadius: BorderRadius.only(
-                                    bottomLeft: Radius.circular(30),
-                                    bottomRight: Radius.circular(30),
-                                  ),
-                                  child: WaveWidget(
-                                    config: CustomConfig(
-                                      gradients: [
-                                        [
-                                          AppColors.waterColor.withValues(alpha: 0.9),
-                                          AppColors.waterColor.withValues(alpha: 0.7),
-                                        ],
-                                        [
-                                          AppColors.waterColor.withValues(alpha: 0.85),
-                                          AppColors.waterColor.withValues(alpha: 0.75),
-                                        ],
-                                      ],
-                                      durations: [3500, 4000],
-                                      heightPercentages: [0.20, 0.23],
-                                      blur: MaskFilter.blur(BlurStyle.solid, 5),
-                                      gradientBegin: Alignment.bottomLeft,
-                                      gradientEnd: Alignment.topRight,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(30), // Bardağın köşe yuvarlaklığıyla birebir aynı (30)
+                              clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar
+                              child: Stack(
+                                children: [
+                                  // Su dolgusu - Wave paketi ile dalgalı üst kısım
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.only(
+                                      bottomLeft: Radius.circular(30), // Alt köşeler yuvarlak
+                                      bottomRight: Radius.circular(30),
                                     ),
-                                    waveAmplitude: 5.0,
-                                    waveFrequency: 1.5,
+                                    child: WaveWidget(
+                                      config: CustomConfig(
+                                        gradients: [
+                                          [
+                                            AppColors.waterColor.withValues(alpha: 0.9),
+                                            AppColors.waterColor.withValues(alpha: 0.7),
+                                          ],
+                                          [
+                                            AppColors.waterColor.withValues(alpha: 0.85),
+                                            AppColors.waterColor.withValues(alpha: 0.75),
+                                          ],
+                                        ],
+                                        durations: [3500, 4000],
+                                        heightPercentages: [0.20, 0.23],
+                                        blur: MaskFilter.blur(BlurStyle.solid, 5),
+                                        gradientBegin: Alignment.bottomLeft,
+                                        gradientEnd: Alignment.topRight,
+                                      ),
+                                      waveAmplitude: 5.0,
+                                      waveFrequency: 1.5,
+                                      size: Size(cupWidth, waterHeight),
+                                      backgroundColor: AppColors.waterColor.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                  // Kabarcıklar
+                                  CustomPaint(
                                     size: Size(cupWidth, waterHeight),
-                                    backgroundColor: AppColors.waterColor.withValues(alpha: 0.85),
+                                    painter: BubblePainter(
+                                      bubbleOffset: _bubbleAnimation.value,
+                                      fillPercentage: _fillPercentage,
+                                    ),
                                   ),
-                                ),
-                                // Kabarcıklar
-                                CustomPaint(
-                                  size: Size(cupWidth, waterHeight),
-                                  painter: BubblePainter(
-                                    bubbleOffset: _bubbleAnimation.value,
-                                    fillPercentage: _fillPercentage,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -540,57 +828,68 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       builder: (context, userProvider, child) {
         return SizedBox(
           height: 60,
-          child: ListView.builder(
-            controller: _templateScrollController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _templateAmounts.length,
-            itemBuilder: (context, index) {
-              final amount = _templateAmounts[index];
-              // Birime göre gösterim: isMetric true ise ml, false ise fl oz
-              final displayText = userProvider.isMetric
-                  ? '${amount.toStringAsFixed(0)} ml'
-                  : '${UnitConverter.roundToNearestStandardOz(UnitConverter.mlToFlOz(amount)).toStringAsFixed(0)} oz';
-              // Seçili öğe kontrolü - daha hassas tolerans
-              final isSelected = (_currentAmount - amount).abs() < 10.0; // 10ml tolerans
+          child: Row(
+            children: [
+              // Template butonları
+              Expanded(
+                child: ListView.builder(
+                  controller: _templateScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _templateAmounts.length,
+                  itemBuilder: (context, index) {
+                    final amount = _templateAmounts[index];
+                    // Birime göre gösterim: isMetric true ise ml, false ise oz
+                    // Oz hesaplama: targetMl * 0.033814 (kullanıcının istediği formül)
+                    final displayText = userProvider.isMetric
+                        ? '${amount.toStringAsFixed(0)} ml'
+                        : '${(amount * 0.033814).toStringAsFixed(1)} oz';
+                    // Seçili öğe kontrolü - daha hassas tolerans
+                    final isSelected = (_currentAmount - amount).abs() < 10.0; // 10ml tolerans
 
-              return GestureDetector(
-                onTap: () => _selectTemplateAmount(amount),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Colors.black
-                        : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                    return GestureDetector(
+                      onTap: () {
+                        _hideTooltip(); // Template seçildiğinde tooltip'i kapat
+                        _selectTemplateAmount(amount);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.black
+                              : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            displayText,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.grey[700],
                             ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? Colors.white
-                            : Colors.grey[700],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         );
       },
@@ -633,8 +932,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
               color: Colors.grey[700],
               letterSpacing: 0.5,
             ),
-            decoration: InputDecoration(
-              hintText: 'Özel',
+              decoration: InputDecoration(
+              hintText: userProvider.isMetric ? 'Miktar (ml)' : 'Miktar (oz)',
               hintStyle: TextStyle(
                 color: Colors.grey[400],
                 fontSize: 14,
@@ -653,7 +952,9 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
               contentPadding: EdgeInsets.zero,
               isDense: true,
             ),
+            onTap: () => _hideTooltip(), // TextField'a tıklandığında tooltip'i kapat
             onChanged: (value) {
+              _hideTooltip(); // Değer değiştiğinde tooltip'i kapat
               // TextField değişikliğini işle - global birim ayarına göre
               if (value.isEmpty) {
                 setState(() {
@@ -667,8 +968,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                 // Display değerinden ml'ye çevir (global birim ayarına göre)
                 double newAmount;
                 if (!userProvider.isMetric) {
-                  // oz ise ml'ye çevir
-                  newAmount = UnitConverter.flOzToMl(numValue);
+                  // oz ise ml'ye çevir: oz / 0.033814 = ml (ters işlem)
+                  newAmount = numValue / 0.033814;
                 } else {
                   newAmount = numValue;
                 }
@@ -693,6 +994,29 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       },
     );
   }
+}
+
+// Tooltip Ok Çizici
+class _TooltipArrowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Butona zıt renk - Pembe (daha belirgin)
+    final paint = Paint()
+      ..color = AppColors.softPinkButton
+      ..style = PaintingStyle.fill;
+    
+    final path = Path();
+    // Üçgen ok çiz (aşağı bakan ok)
+    path.moveTo(size.width / 2, size.height); // Alt nokta (okun ucu)
+    path.lineTo(0, 0); // Sol üst
+    path.lineTo(size.width, 0); // Sağ üst
+    path.close();
+    
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TooltipArrowPainter oldDelegate) => false;
 }
 
 // Bardak dalga animasyonu için CustomPainter - Gerçekçi dalgalı su

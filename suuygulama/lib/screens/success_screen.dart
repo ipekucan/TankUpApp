@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
-import '../providers/user_provider.dart';
-import '../providers/water_provider.dart';
 import '../providers/achievement_provider.dart';
+import '../providers/challenge_provider.dart';
 import '../models/achievement_model.dart';
 import '../widgets/challenge_card.dart';
 
@@ -17,6 +15,7 @@ class SuccessScreen extends StatefulWidget {
 
 class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateMixin {
   late TabController _tabController;
+  final PageController _challengePageController = PageController();
 
   @override
   void initState() {
@@ -27,6 +26,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   @override
   void dispose() {
     _tabController.dispose();
+    _challengePageController.dispose();
     super.dispose();
   }
 
@@ -158,392 +158,404 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
     );
   }
 
-  // Mücadeleler Sekmesi
+  // Mücadeleler Sekmesi - Yeniden Tasarlandı
   Widget _buildChallengesTab() {
-    return Consumer2<UserProvider, WaterProvider>(
-      builder: (context, userProvider, waterProvider, child) {
-        return FutureBuilder<Challenge?>(
-          future: _getActiveChallenge(userProvider, waterProvider),
-          builder: (context, snapshot) {
-            final activeChallenge = snapshot.data;
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (activeChallenge != null) ...[
-                    // Aktif Mücadele Kartı
-                    ChallengeCard(challenge: activeChallenge),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Dinamik İlerleme Durumu
-                    FutureBuilder<Map<String, dynamic>>(
-                      future: _getChallengeProgressData(activeChallenge.id, userProvider, waterProvider),
-                      builder: (context, progressSnapshot) {
-                        final progressData = progressSnapshot.data ?? {
-                          'motivationText': 'Mücadele devam ediyor! 💪',
-                        };
-                        
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.trending_up,
-                                color: AppColors.softPinkButton,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  progressData['motivationText'] as String? ?? 'Mücadele devam ediyor! 💪',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF4A5568),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ] else ...[
-                    // Boş Durum - Henüz Mücadele Başlatılmamış
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 60),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.emoji_events_outlined,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Henüz bir mücadeleye başlamadın.',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 40),
-                              child: Text(
-                                'Yeni bir mücadeleye başlayarak kendini zorla ve başarılar kazan!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                  height: 1.5,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                // Ana ekrana dön ve mücadele panelini aç
-                                Navigator.pop(context, 'open_challenges_panel');
-                              },
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('Mücadeleleri Gör'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.softPinkButton,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                elevation: 4,
-                              ),
-                            ),
+    return Consumer<ChallengeProvider>(
+      builder: (context, challengeProvider, child) {
+        final activeChallenges = challengeProvider.activeIncompleteChallenges;
+        
+        return Column(
+          children: [
+            // Üst Bölüm: Aktif Mücadeleler Vitrini (PageView)
+            if (activeChallenges.isNotEmpty) ...[
+              SizedBox(
+                height: 280,
+                child: PageView.builder(
+                  controller: _challengePageController,
+                  itemCount: activeChallenges.length,
+                  itemBuilder: (context, index) {
+                    final challenge = activeChallenges[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: _buildActiveChallengeCard(challenge, challengeProvider),
+                    );
+                  },
+                ),
+              ),
+              // Dots Indicator (Dinamik)
+              _ChallengeDotsIndicator(
+                pageController: _challengePageController,
+                itemCount: activeChallenges.length,
+              ),
+              const SizedBox(height: 24),
+            ],
+            
+            // Alt Bölüm: Yeni Mücadele Keşfet Butonu
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: GestureDetector(
+                    onTap: () => _showChallengesModal(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.softPinkButton,
+                            AppColors.softPinkButton.withValues(alpha: 0.8),
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_circle_outline,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Yeni Bir Mücadele Keşfet',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
   }
-
-  // Aktif mücadeleyi kontrol et (sadece başlatılmış mücadeleler)
-  Future<Challenge?> _getActiveChallenge(
-    UserProvider userProvider,
-    WaterProvider waterProvider,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final challenges = ChallengeData.getChallenges();
-      
-      // Başlatılmış mücadeleleri kontrol et
-      for (var challenge in challenges) {
-        final isStarted = prefs.getBool('challenge_${challenge.id}_started') ?? false;
-        
-        if (isStarted) {
-          // Başlangıç tarihini al
-          final startDateString = prefs.getString('challenge_${challenge.id}_start_date');
-          DateTime? startDate;
-          if (startDateString != null) {
-            try {
-              startDate = DateTime.parse(startDateString);
-            } catch (e) {
-              startDate = DateTime.now();
-            }
-          } else {
-            startDate = DateTime.now();
-          }
-          
-          // Mücadele tipine göre ilerleme hesapla
-          final progressData = await _calculateChallengeProgress(
-            challenge.id,
-            startDate,
-            userProvider,
-            waterProvider,
-          );
-          
-          // Tamamlanmış mücadeleleri gösterme
-          if (progressData['isCompleted'] == true) {
-            continue;
-          }
-          
-          return Challenge(
-            id: challenge.id,
-            name: challenge.name,
-            description: challenge.description,
-            coinReward: challenge.coinReward,
-            cardColor: challenge.cardColor,
-            icon: challenge.icon,
-            whyStart: challenge.whyStart,
-            healthBenefit: challenge.healthBenefit,
-            badgeEmoji: challenge.badgeEmoji,
-            isCompleted: false,
-            progress: progressData['progress'] as double,
-            progressText: progressData['progressText'] as String,
-          );
-        }
-      }
-      
-      // Hiç başlatılmış mücadele yok
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // Mücadele ilerleme verilerini al (motivasyon metni için)
-  Future<Map<String, dynamic>> _getChallengeProgressData(
-    String challengeId,
-    UserProvider userProvider,
-    WaterProvider waterProvider,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final startDateString = prefs.getString('challenge_${challengeId}_start_date');
-      DateTime? startDate;
-      
-      if (startDateString != null) {
-        try {
-          startDate = DateTime.parse(startDateString);
-        } catch (e) {
-          startDate = DateTime.now();
-        }
-      } else {
-        startDate = DateTime.now();
-      }
-      
-      final progressData = await _calculateChallengeProgress(
-        challengeId,
-        startDate,
-        userProvider,
-        waterProvider,
-      );
-      
-      final motivationText = _getChallengeMotivationText(challengeId, progressData);
-      
-      return {
-        ...progressData,
-        'motivationText': motivationText,
-      };
-    } catch (e) {
-      return {
-        'motivationText': 'Mücadele devam ediyor! 💪',
-      };
-    }
-  }
-
-  // Mücadele ilerlemesini hesapla
-  Future<Map<String, dynamic>> _calculateChallengeProgress(
-    String challengeId,
-    DateTime startDate,
-    UserProvider userProvider,
-    WaterProvider waterProvider,
-  ) async {
-    final now = DateTime.now();
-    final daysSinceStart = now.difference(startDate).inDays;
-    final prefs = await SharedPreferences.getInstance();
+  
+  // Aktif Mücadele Kartı (Gradient, İlerleme Barı, Coin, X Gün Kaldı)
+  Widget _buildActiveChallengeCard(Challenge challenge, ChallengeProvider challengeProvider) {
+    final progressPercentage = (challenge.progress * 100).toInt();
+    final isCompleted = challenge.progress >= 1.0;
     
-    switch (challengeId) {
-      case 'blue_crystal':
-        // 1 hafta (7 gün) şekerli içecek yok
-        final totalDays = 7;
-        final currentDay = (daysSinceStart + 1).clamp(0, totalDays);
-        final isCompleted = currentDay >= totalDays;
-        
-        // Mücadele tamamlandıysa SharedPreferences'a kaydet
-        if (isCompleted) {
-          await prefs.setBool('challenge_${challengeId}_completed', true);
-        }
-        
-        return {
-          'progress': (currentDay / totalDays).clamp(0.0, 1.0),
-          'progressText': '$currentDay/$totalDays gün',
-          'isCompleted': isCompleted,
-          'currentDay': currentDay,
-          'totalDays': totalDays,
-        };
-        
-      case 'caffeine_hunter':
-        // Bugün 2 kahve yerine 2 büyük bardak su (1 günlük)
-        final totalDays = 1;
-        final isCompleted = daysSinceStart >= 1;
-        
-        // Mücadele tamamlandıysa SharedPreferences'a kaydet
-        if (isCompleted) {
-          await prefs.setBool('challenge_${challengeId}_completed', true);
-        }
-        
-        return {
-          'progress': isCompleted ? 1.0 : 0.0,
-          'progressText': isCompleted ? 'Tamamlandı!' : '0/1 gün',
-          'isCompleted': isCompleted,
-          'currentDay': isCompleted ? 1 : 0,
-          'totalDays': totalDays,
-        };
-        
-      case 'deep_dive':
-        // 3 gün üst üste %100 su hedefi
-        final totalDays = 3;
-        final consecutiveDays = userProvider.consecutiveDays;
-        final hasReachedGoal = waterProvider.hasReachedDailyGoal;
-        final currentProgress = consecutiveDays.clamp(0, totalDays);
-        final isCompleted = consecutiveDays >= totalDays && hasReachedGoal;
-        
-        // Mücadele tamamlandıysa SharedPreferences'a kaydet
-        if (isCompleted) {
-          await prefs.setBool('challenge_${challengeId}_completed', true);
-        }
-        
-        return {
-          'progress': (currentProgress / totalDays).clamp(0.0, 1.0),
-          'progressText': '$currentProgress/$totalDays gün',
-          'isCompleted': isCompleted,
-          'currentDay': currentProgress,
-          'totalDays': totalDays,
-        };
-        
-      case 'coral_guardian':
-        // Akşam 8'den sonra sadece su (sürekli, gün bazlı değil)
-        // Basitleştirilmiş: Bugün hedefe ulaşıldı mı?
-        final isCompleted = waterProvider.hasReachedDailyGoal;
-        
-        // Mücadele tamamlandıysa SharedPreferences'a kaydet
-        if (isCompleted) {
-          await prefs.setBool('challenge_${challengeId}_completed', true);
-        }
-        
-        return {
-          'progress': isCompleted ? 1.0 : 0.5,
-          'progressText': isCompleted ? 'Tamamlandı!' : 'Devam ediyor...',
-          'isCompleted': isCompleted,
-          'currentDay': isCompleted ? 1 : 0,
-          'totalDays': 1,
-        };
-        
-      default:
-        return {
-          'progress': 0.0,
-          'progressText': 'Devam ediyor...',
-          'isCompleted': false,
-          'currentDay': 0,
-          'totalDays': 1,
-        };
+    // Kalan gün hesaplama (örnek - mücadele tipine göre değişebilir)
+    final remainingDays = _calculateRemainingDays(challenge);
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            challenge.cardColor,
+            challenge.cardColor.withValues(alpha: 0.7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: challenge.cardColor.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Sağ Üst Köşe: Coin Ödülü Etiketi
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.monetization_on,
+                    color: Colors.amber[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${challenge.coinReward}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.amber[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Tamamlandı Rozeti (eğer %100 ise)
+          if (isCompleted)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Tamamlandı! 🎉',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          
+          // İçerik
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                // İkon ve Mücadele Adı
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        challenge.icon,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            challenge.name,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            challenge.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                
+                // İlerleme Barı
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'İlerleme',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                        Text(
+                          '%$progressPercentage',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: challenge.progress.clamp(0.0, 1.0),
+                        minHeight: 16,
+                        backgroundColor: Colors.white.withValues(alpha: 0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      challenge.progressText.isNotEmpty
+                          ? challenge.progressText
+                          : '${challenge.currentProgress.toStringAsFixed(1)} / ${challenge.targetValue.toStringAsFixed(1)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Kalan Gün
+                if (remainingDays != null && remainingDays > 0 && !isCompleted) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$remainingDays Gün Kaldı',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Kalan gün hesaplama (örnek implementasyon)
+  int? _calculateRemainingDays(Challenge challenge) {
+    // Bu mücadele tipine göre hesaplanabilir
+    // Şimdilik basit bir örnek döndürüyorum
+    if (challenge.id == 'blue_crystal') {
+      return 7; // 7 günlük mücadele
     }
+    return null;
+  }
+  
+  // Mücadeleler Modal Bottom Sheet
+  void _showChallengesModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Tutma Çizgisi
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            
+            // Başlık
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Text(
+                    'Tüm Mücadeleler',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF4A5568),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Mücadele Listesi
+            Expanded(
+              child: Consumer<ChallengeProvider>(
+                builder: (context, challengeProvider, child) {
+                  final allChallenges = ChallengeData.getChallenges();
+                  
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: allChallenges.length,
+                    itemBuilder: (context, index) {
+                      final challenge = allChallenges[index];
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: ChallengeCard(challenge: challenge),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  // Mücadeleye özel motivasyon metni
-  String _getChallengeMotivationText(
-    String challengeId,
-    Map<String, dynamic> progressData,
-  ) {
-    final currentDay = progressData['currentDay'] as int;
-    final totalDays = progressData['totalDays'] as int;
-    final remainingDays = totalDays - currentDay;
-    
-    switch (challengeId) {
-      case 'blue_crystal':
-        if (remainingDays <= 0) {
-          return 'Mücadeleyi tamamladın! Harika iş çıkardın! 💎';
-        } else if (currentDay == 0) {
-          return 'Mavi Kristal mücadelesine başladın! İlk gün, harika! 💎';
-        } else {
-          final remainingText = remainingDays > 0 ? 'Sadece $remainingDays gün kaldı! 💎' : '';
-          return 'Şekersiz $currentDay. günün, harika gidiyorsun! $remainingText';
-        }
-        
-      case 'caffeine_hunter':
-        if (progressData['isCompleted'] == true) {
-          return 'Kafein Avcısı mücadelesini tamamladın! Kahve bağımlılığından kurtulma yolundasın! 🚫☕';
-        } else {
-          return 'Bugün 2 kahve yerine 2 büyük bardak su iç! Kafein bağımlılığından kurtul! 🚫☕';
-        }
-        
-      case 'deep_dive':
-        if (remainingDays <= 0) {
-          return 'Derin Dalış mücadelesini tamamladın! 3 gün üst üste hedefe ulaştın! 🌊';
-        } else if (currentDay == 0) {
-          return 'Derin Dalış mücadelesine başladın! 3 gün üst üste hedefe ulaş! 🌊';
-        } else {
-          return 'Hedefe sadece $remainingDays gün kaldı! $currentDay/3 gün tamamlandı! 🌊';
-        }
-        
-      case 'coral_guardian':
-        if (progressData['isCompleted'] == true) {
-          return 'Mercan Koruyucu mücadelesini tamamladın! Gece rutinin harika! 🪸';
-        } else {
-          return 'Akşam 8\'den sonra sadece su iç! Daha kaliteli uyku için! 🪸';
-        }
-        
-      default:
-        return 'Mücadele devam ediyor! 💪';
-    }
-  }
 
   // Başarılar Sekmesi
   Widget _buildAchievementsTab() {
@@ -778,6 +790,63 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+// Dots Indicator Widget (PageView için)
+class _ChallengeDotsIndicator extends StatefulWidget {
+  final PageController pageController;
+  final int itemCount;
+
+  const _ChallengeDotsIndicator({
+    required this.pageController,
+    required this.itemCount,
+  });
+
+  @override
+  State<_ChallengeDotsIndicator> createState() => _ChallengeDotsIndicatorState();
+}
+
+class _ChallengeDotsIndicatorState extends State<_ChallengeDotsIndicator> {
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.pageController.addListener(_onPageChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.pageController.removeListener(_onPageChanged);
+    super.dispose();
+  }
+
+  void _onPageChanged() {
+    if (widget.pageController.page != null) {
+      setState(() {
+        _currentPage = widget.pageController.page!.round();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(
+        widget.itemCount,
+        (index) => Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: index == _currentPage ? AppColors.softPinkButton : Colors.grey[300],
+          ),
+        ),
       ),
     );
   }

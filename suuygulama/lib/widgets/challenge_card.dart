@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../providers/challenge_provider.dart';
 
 // Mücadele modeli
 class Challenge {
@@ -15,6 +16,8 @@ class Challenge {
   final double progress;
   final String progressText;
   final String badgeEmoji; // Rozet emoji (placeholder görsel)
+  final double currentProgress; // Mevcut ilerleme (örn: 1.0 bardak)
+  final double targetValue; // Hedef değer (örn: 2.0 bardak)
 
   Challenge({
     required this.id,
@@ -29,7 +32,44 @@ class Challenge {
     this.progress = 0.0,
     this.progressText = '',
     required this.badgeEmoji,
+    this.currentProgress = 0.0,
+    this.targetValue = 2.0, // Varsayılan hedef: 2 bardak
   });
+
+  // Yeni değerlerle kopya oluşturma
+  Challenge copyWith({
+    String? id,
+    String? name,
+    String? description,
+    int? coinReward,
+    Color? cardColor,
+    IconData? icon,
+    String? whyStart,
+    String? healthBenefit,
+    bool? isCompleted,
+    double? progress,
+    String? progressText,
+    String? badgeEmoji,
+    double? currentProgress,
+    double? targetValue,
+  }) {
+    return Challenge(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      coinReward: coinReward ?? this.coinReward,
+      cardColor: cardColor ?? this.cardColor,
+      icon: icon ?? this.icon,
+      whyStart: whyStart ?? this.whyStart,
+      healthBenefit: healthBenefit ?? this.healthBenefit,
+      isCompleted: isCompleted ?? this.isCompleted,
+      progress: progress ?? this.progress,
+      progressText: progressText ?? this.progressText,
+      badgeEmoji: badgeEmoji ?? this.badgeEmoji,
+      currentProgress: currentProgress ?? this.currentProgress,
+      targetValue: targetValue ?? this.targetValue,
+    );
+  }
 }
 
 // Pokemon kartı tarzı Challenge Card Widget'ı
@@ -89,15 +129,20 @@ class _ChallengeCardState extends State<ChallengeCard>
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(20),
-        child: _buildDetailCard(),
+      builder: (context) => Consumer<ChallengeProvider>(
+        builder: (context, challengeProvider, child) {
+          final challenge = challengeProvider.getChallenge(widget.challenge.id) ?? widget.challenge;
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(20),
+            child: _buildDetailCard(challenge),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDetailCard() {
+  Widget _buildDetailCard(Challenge challenge) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 300),
@@ -109,16 +154,16 @@ class _ChallengeCardState extends State<ChallengeCard>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(25),
-              border: Border.all(
-                color: widget.challenge.cardColor,
-                width: 4,
-              ),
+                              border: Border.all(
+                                color: challenge.cardColor,
+                                width: 4,
+                              ),
               boxShadow: [
-                BoxShadow(
-                  color: widget.challenge.cardColor.withValues(alpha: 0.3),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
+                  BoxShadow(
+                    color: challenge.cardColor.withValues(alpha: 0.3),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
               ],
             ),
             child: SingleChildScrollView(
@@ -134,8 +179,8 @@ class _ChallengeCardState extends State<ChallengeCard>
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          widget.challenge.cardColor.withValues(alpha: 0.2),
-                          widget.challenge.cardColor.withValues(alpha: 0.1),
+                          challenge.cardColor.withValues(alpha: 0.2),
+                          challenge.cardColor.withValues(alpha: 0.1),
                         ],
                       ),
                       borderRadius: const BorderRadius.vertical(
@@ -147,7 +192,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                         // İkon (Pokemon görseli yerine)
                         Center(
                           child: Icon(
-                            widget.challenge.icon,
+                            challenge.icon,
                             size: 100,
                             color: widget.challenge.cardColor.withValues(alpha: 0.6),
                           ),
@@ -163,7 +208,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                               color: Colors.white,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: widget.challenge.cardColor,
+                                color: challenge.cardColor,
                                 width: 3,
                               ),
                               boxShadow: [
@@ -176,7 +221,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                             ),
                             child: Center(
                               child: Text(
-                                widget.challenge.badgeEmoji,
+                                challenge.badgeEmoji,
                                 style: const TextStyle(fontSize: 32),
                               ),
                             ),
@@ -195,7 +240,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: widget.challenge.cardColor,
+                                color: challenge.cardColor,
                                 width: 2,
                               ),
                               boxShadow: [
@@ -215,11 +260,11 @@ class _ChallengeCardState extends State<ChallengeCard>
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '${widget.challenge.coinReward}',
+                                  '${challenge.coinReward}',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
-                                    color: widget.challenge.cardColor,
+                                    color: challenge.cardColor,
                                   ),
                                 ),
                               ],
@@ -238,7 +283,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                       children: [
                         // Mücadele ismi (Pokemon yeteneği gibi)
                         Text(
-                          widget.challenge.name,
+                          challenge.name,
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
@@ -248,7 +293,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          widget.challenge.description,
+                          challenge.description,
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
@@ -291,7 +336,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                widget.challenge.whyStart,
+                                challenge.whyStart,
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: Colors.grey[800],
@@ -321,7 +366,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                                 children: [
                                   Icon(
                                     Icons.favorite,
-                                    color: widget.challenge.cardColor,
+                                    color: challenge.cardColor,
                                     size: 20,
                                   ),
                                   const SizedBox(width: 8),
@@ -330,14 +375,14 @@ class _ChallengeCardState extends State<ChallengeCard>
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700,
-                                      color: widget.challenge.cardColor,
+                                      color: challenge.cardColor,
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                widget.challenge.healthBenefit,
+                                challenge.healthBenefit,
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: Colors.grey[800],
@@ -356,10 +401,9 @@ class _ChallengeCardState extends State<ChallengeCard>
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () async {
-                                  // Mücadeleyi başlat - SharedPreferences'a kaydet
-                                  final prefs = await SharedPreferences.getInstance();
-                                  await prefs.setBool('challenge_${widget.challenge.id}_started', true);
-                                  await prefs.setString('challenge_${widget.challenge.id}_start_date', DateTime.now().toIso8601String());
+                                  // Mücadeleyi başlat - ChallengeProvider kullan
+                                  final challengeProvider = Provider.of<ChallengeProvider>(context, listen: false);
+                                  await challengeProvider.startChallenge(widget.challenge.id);
                                   
                                   if (!context.mounted) return;
                                   
@@ -376,7 +420,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: widget.challenge.cardColor,
+                                  backgroundColor: challenge.cardColor,
                                   elevation: 4,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -399,10 +443,10 @@ class _ChallengeCardState extends State<ChallengeCard>
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: widget.challenge.cardColor,
+                                  foregroundColor: challenge.cardColor,
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   side: BorderSide(
-                                    color: widget.challenge.cardColor,
+                                    color: challenge.cardColor,
                                     width: 2,
                                   ),
                                   shape: RoundedRectangleBorder(
@@ -434,7 +478,12 @@ class _ChallengeCardState extends State<ChallengeCard>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Consumer<ChallengeProvider>(
+      builder: (context, challengeProvider, child) {
+        // Mücadele ilerlemesini güncelle
+        final challenge = challengeProvider.getChallenge(widget.challenge.id) ?? widget.challenge;
+        
+        return GestureDetector(
       onTap: _handleTap,
       child: ScaleTransition(
         scale: _scaleAnimation,
@@ -479,7 +528,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                     // İkon (Pokemon görseli yerine)
                     Center(
                       child: Icon(
-                        widget.challenge.icon,
+                        challenge.icon,
                         size: 70,
                         color: widget.challenge.cardColor.withValues(alpha: 0.5),
                       ),
@@ -525,7 +574,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                 ),
               ),
               
-              // Alt kısım - Mücadele ismi (Pokemon yeteneği gibi)
+              // Alt kısım - Mücadele ismi ve ilerleme (Pokemon yeteneği gibi)
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -543,7 +592,7 @@ class _ChallengeCardState extends State<ChallengeCard>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        widget.challenge.name,
+                        challenge.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -553,6 +602,40 @@ class _ChallengeCardState extends State<ChallengeCard>
                           letterSpacing: 0.3,
                         ),
                       ),
+                      // İlerleme çubuğu (eğer mücadele başlatıldıysa)
+                      if (challenge.currentProgress > 0 || challenge.isCompleted) ...[
+                        const SizedBox(height: 8),
+                        // İlerleme metni
+                        Text(
+                          challenge.progressText.isNotEmpty
+                              ? challenge.progressText
+                              : '${challenge.currentProgress.toStringAsFixed(1)} / ${challenge.targetValue.toStringAsFixed(1)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: challenge.isCompleted
+                                ? Colors.green[700]
+                                : challenge.cardColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // İlerleme çubuğu
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: challenge.isCompleted
+                                ? 1.0
+                                : (challenge.currentProgress / challenge.targetValue).clamp(0.0, 1.0),
+                            backgroundColor: challenge.cardColor.withValues(alpha: 0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              challenge.isCompleted
+                                  ? Colors.green[700]!
+                                  : challenge.cardColor,
+                            ),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -561,6 +644,8 @@ class _ChallengeCardState extends State<ChallengeCard>
           ),
         ),
       ),
+    );
+      },
     );
   }
 }
@@ -580,6 +665,7 @@ class ChallengeData {
         whyStart: 'Kafein dehidrasyona neden olabilir. Kahve yerine su içerek vücudunuzun gerçekten ihtiyaç duyduğu sıvıyı sağlarsınız.',
         healthBenefit: 'Daha iyi hidrasyon, daha stabil enerji seviyeleri ve daha kaliteli uyku. Kafein bağımlılığından kurtulmak için ilk adım!',
         badgeEmoji: '🚫☕', // Kahve yasağı rozeti
+        targetValue: 2.0, // 2 büyük bardak hedefi
       ),
       // Orta (50 Coin)
       Challenge(

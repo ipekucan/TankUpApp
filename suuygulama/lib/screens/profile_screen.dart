@@ -19,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.verySoftBlue,
+      resizeToAvoidBottomInset: true, // Klavye açıldığında ekranın yukarı kayması
       appBar: AppBar(
         title: const Text(
           'Ayarlar',
@@ -95,13 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildSection(
                   title: 'Birim ve Hatırlatıcılar',
                   children: [
-                    FutureBuilder<String>(
-                      future: _getPreferredUnitAsync(),
-                      builder: (context, snapshot) {
+                    Consumer<UserProvider>(
+                      builder: (context, userProvider, child) {
                         return _buildProfileButton(
                           icon: Icons.straighten,
                           label: 'Birim',
-                          value: snapshot.data ?? 'ml',
+                          value: userProvider.isMetric ? 'ml' : 'oz',
                           onTap: () => _showUnitDialog(context),
                         );
                       },
@@ -377,11 +377,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<String> _getPreferredUnitAsync() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('preferred_unit') ?? 'ml';
-  }
-
   Future<String> _getResetTimeAsync() async {
     final prefs = await SharedPreferences.getInstance();
     final hour = prefs.getInt('reset_time_hour') ?? 0;
@@ -478,6 +473,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (context, setState) {
           // Birim değiştiğinde değeri güncelle
           void updateUnit(bool newIsKg) {
+            if (!mounted) return; // Widget dispose edilmişse işlem yapma
             setState(() {
               if (textController.text.isNotEmpty) {
                 final currentValue = double.tryParse(textController.text) ?? 0.0;
@@ -485,7 +481,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final valueInKg = isKg ? currentValue : currentValue / 2.20462;
                 // Yeni birime göre göster
                 final newValue = newIsKg ? valueInKg : valueInKg * 2.20462;
-                textController.text = newValue.toStringAsFixed(1);
+                if (mounted) {
+                  textController.text = newValue.toStringAsFixed(1);
+                }
               }
               isKg = newIsKg;
             });
@@ -505,122 +503,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             content: SizedBox(
               width: MediaQuery.of(context).size.width * 0.9,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 24),
-                  
-                  // Modern Pill Toggle (Birim Seçici)
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // kg Seçeneği
-                        GestureDetector(
-                          onTap: () => updateUnit(true),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isKg ? AppColors.softPinkButton : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
-                            child: Text(
-                              'kg',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: isKg ? Colors.white : Colors.grey[600],
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 24),
+                    
+                    // Modern Pill Toggle (Birim Seçici)
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // kg Seçeneği
+                          GestureDetector(
+                            onTap: () => updateUnit(true),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isKg ? AppColors.softPinkButton : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                              child: Text(
+                                'kg',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isKg ? Colors.white : Colors.grey[600],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        // lbs Seçeneği
-                        GestureDetector(
-                          onTap: () => updateUnit(false),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: !isKg ? AppColors.softPinkButton : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
-                            child: Text(
-                              'lbs',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: !isKg ? Colors.white : Colors.grey[600],
+                          // lbs Seçeneği
+                          GestureDetector(
+                            onTap: () => updateUnit(false),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !isKg ? AppColors.softPinkButton : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                              child: Text(
+                                'lbs',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: !isKg ? Colors.white : Colors.grey[600],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  // Büyük TextField (Manuel Giriş)
-                  Center(
-                    child: SizedBox(
-                      width: 200,
-                      child: TextField(
-                        controller: textController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4A5568),
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '0.0',
-                          hintStyle: TextStyle(
+                    
+                    const SizedBox(height: 40),
+                    
+                    // Büyük TextField (Manuel Giriş)
+                    Center(
+                      child: SizedBox(
+                        width: 200,
+                        child: TextField(
+                          controller: textController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
                             fontSize: 48,
-                            fontWeight: FontWeight.w300,
-                            color: Colors.grey[300],
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4A5568),
                           ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide(
-                              color: AppColors.softPinkButton,
-                              width: 2,
+                          decoration: InputDecoration(
+                            hintText: '0.0',
+                            hintStyle: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.w300,
+                              color: Colors.grey[300],
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide(
-                              color: AppColors.softPinkButton,
-                              width: 2,
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: AppColors.softPinkButton,
+                                width: 2,
+                              ),
                             ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide(
-                              color: AppColors.softPinkButton,
-                              width: 3,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: AppColors.softPinkButton,
+                                width: 2,
+                              ),
                             ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 24,
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: AppColors.softPinkButton,
+                                width: 3,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 24,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 32),
-                ],
+                    
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -668,8 +668,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
       ),
     ).then((_) {
-      // Dialog kapandığında controller'ı temizle
-      textController.dispose();
+      // Dialog kapandığında controller'ı temizle (güvenli dispose)
+      if (mounted) {
+        textController.dispose();
+      }
     });
   }
 
@@ -723,35 +725,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Günlük Su Hedefi'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Hedef (Litre)',
-                hintText: 'Örn: 2.4',
-                suffixText: 'L',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Hedef (Litre)',
+                  hintText: 'Örn: 2.4',
+                  suffixText: 'L',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Lütfen günlük su hedefinizi litre cinsinden girin',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF4A5568),
+              const SizedBox(height: 16),
+              const Text(
+                'Lütfen günlük su hedefinizi litre cinsinden girin',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF4A5568),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (mounted) {
+                controller.dispose();
+                Navigator.pop(context);
+              }
+            },
             child: const Text('İptal'),
           ),
           TextButton(
             onPressed: () async {
+              if (!mounted) return;
               final goal = double.tryParse(controller.text);
               if (goal != null && goal > 0 && goal <= 10) {
                 await waterProvider.updateDailyGoal(goal * 1000); // ml'ye çevir
@@ -761,6 +771,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await prefs.setBool('custom_goal_set', true);
                 
                 if (!context.mounted) return;
+                controller.dispose();
                 Navigator.pop(context);
                 _showSuccessSnackBar(context, 'Günlük su hedefiniz yenilendi!');
               } else {
@@ -782,41 +793,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      // Dialog kapandığında controller'ı temizle (güvenli dispose)
+      if (mounted) {
+        controller.dispose();
+      }
+    });
   }
 
   void _showUnitDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Birim Seç'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('ml (Mililitre)'),
-              onTap: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('preferred_unit', 'ml');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                setState(() {}); // UI'ı güncelle
-              },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Dialog içinde de Provider'dan güncel değeri al (watch ile)
+          final currentUserProvider = context.watch<UserProvider>();
+          final currentIsMetric = currentUserProvider.isMetric;
+          
+          return AlertDialog(
+            title: const Text('Birim Seç'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('ml (Mililitre)'),
+                  leading: Icon(
+                    currentIsMetric ? Icons.check_circle : Icons.circle_outlined,
+                    color: currentIsMetric ? AppColors.softPinkButton : Colors.grey,
+                  ),
+                  onTap: () async {
+                    if (!context.mounted) return;
+                    await currentUserProvider.setIsMetric(true); // Metric (ml)
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    _showSuccessSnackBar(context, 'Birim başarıyla ml olarak güncellendi.');
+                  },
+                ),
+                ListTile(
+                  title: const Text('oz (Ons)'),
+                  leading: Icon(
+                    !currentIsMetric ? Icons.check_circle : Icons.circle_outlined,
+                    color: !currentIsMetric ? AppColors.softPinkButton : Colors.grey,
+                  ),
+                  onTap: () async {
+                    if (!context.mounted) return;
+                    await currentUserProvider.setIsMetric(false); // Imperial (oz)
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    _showSuccessSnackBar(context, 'Birim başarıyla oz olarak güncellendi.');
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              title: const Text('oz (Ons)'),
-              onTap: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('preferred_unit', 'oz');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                if (mounted) {
-                  setState(() {}); // UI'ı güncelle
-                }
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'providers/water_provider.dart';
 import 'providers/aquarium_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/achievement_provider.dart';
 import 'providers/drink_provider.dart';
+import 'providers/challenge_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_colors.dart';
 import 'services/notification_service.dart';
@@ -72,12 +74,17 @@ class TankUpApp extends StatelessWidget {
           create: (_) => DrinkProvider(),
           lazy: true,
         ),
+        ChangeNotifierProvider(
+          create: (_) => ChallengeProvider(),
+          lazy: true,
+        ),
       ],
-      child: MaterialApp(
-        title: 'TankUp',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
+      child: ShowCaseWidget(
+        builder: (context) => MaterialApp(
+          title: 'TankUp',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFFA8D5E2),
             brightness: Brightness.light,
@@ -104,6 +111,7 @@ class TankUpApp extends StatelessWidget {
           ),
         ),
         home: const SplashScreen(),
+        ),
       ),
     );
   }

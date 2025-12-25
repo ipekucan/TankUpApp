@@ -59,6 +59,12 @@ dependencies:
   
   # Wave Animation
   wave: ^0.2.2
+  
+  # ShowcaseView for coach marks
+  showcaseview: ^3.0.0
+  
+  # Super Tooltip
+  super_tooltip: ^2.1.0
 
 dev_dependencies:
   flutter_test:

@@ -1,8 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/water_model.dart';
 import '../models/drink_model.dart';
+import 'challenge_provider.dart';
 
 class WaterProvider extends ChangeNotifier {
   static const String _waterDataKey = 'water_data';
@@ -307,7 +309,7 @@ class WaterProvider extends ChangeNotifier {
   }
 
   // İçecek içme fonksiyonu - İçecek ve miktar parametreleri ile
-  Future<DrinkWaterResult> drink(Drink drink, double amount) async {
+  Future<DrinkWaterResult> drink(Drink drink, double amount, {BuildContext? context}) async {
     // Günlük limit kontrolü (5 litre)
     if (hasReachedDailyLimit) {
       return DrinkWaterResult(
@@ -387,8 +389,39 @@ class WaterProvider extends ChangeNotifier {
       _dailyGoalBonusClaimed = true;
     }
 
-    // Coin'leri ekle
-    final newTankCoins = _waterData.tankCoins + totalCoinsReward;
+    // Mücadele takibi - Sadece su içecekleri için (büyük bardak >= 330ml)
+    int challengeCoinsReward = 0;
+    if (context != null && drink.id == 'water' && amount >= 330.0) {
+      try {
+        final challengeProvider = Provider.of<ChallengeProvider>(context, listen: false);
+        
+        // Kafein Avcısı mücadelesi aktif mi kontrol et
+        if (challengeProvider.hasActiveChallenge('caffeine_hunter')) {
+          // İlerlemeyi 1 bardak artır
+          challengeCoinsReward = await challengeProvider.updateProgress('caffeine_hunter', 1.0);
+          
+          // Mücadele tamamlandıysa bildirim göster
+          if (challengeCoinsReward > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Tebrikler! Kafein Avcısı mücadelesini tamamladın! 🎉 +$challengeCoinsReward Coin'),
+                    backgroundColor: const Color(0xFF8B4513),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // ChallengeProvider yoksa veya hata varsa sessizce devam et
+      }
+    }
+    
+    // Coin'leri ekle (mücadele ödülü dahil)
+    final newTankCoins = _waterData.tankCoins + totalCoinsReward + challengeCoinsReward;
 
     // Verileri güncelle
     _waterData = _waterData.copyWith(
@@ -413,8 +446,9 @@ class WaterProvider extends ChangeNotifier {
 
     // Mesaj oluştur
     String message = '${drink.name} içildi!';
-    if (totalCoinsReward > 0) {
-      message += ' +$totalCoinsReward Coin';
+    final totalReward = totalCoinsReward + challengeCoinsReward;
+    if (totalReward > 0) {
+      message += ' +$totalReward Coin';
       if (isLuckyDrink) {
         message += ' (Şanslı Yudum! 🍀)';
       }
@@ -432,7 +466,7 @@ class WaterProvider extends ChangeNotifier {
     return DrinkWaterResult(
       success: true,
       message: message,
-      coinsReward: totalCoinsReward,
+      coinsReward: totalCoinsReward + challengeCoinsReward,
       isFirstDrink: wasFirstDrink,
       isLuckyDrink: isLuckyDrink,
       isEarlyBird: isEarlyBird,

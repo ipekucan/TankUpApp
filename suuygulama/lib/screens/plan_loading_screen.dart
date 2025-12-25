@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wave/wave.dart';
+import 'package:wave/config.dart';
 import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
@@ -23,8 +25,10 @@ class PlanLoadingScreen extends StatefulWidget {
 class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProviderStateMixin {
   late AnimationController _waveController;
   late AnimationController _fillController;
+  late AnimationController _bubbleController;
   late Animation<double> _fillAnimation;
   double _fillProgress = 0.0;
+  final List<Bubble> _bubbles = [];
 
   @override
   void initState() {
@@ -36,13 +40,13 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
       vsync: this,
     )..repeat();
     
-    // Dolum animasyonu
+    // Dolum animasyonu (3.5 saniye - makul süre)
     _fillController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 3500),
       vsync: this,
     );
     
-    _fillAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _fillAnimation = Tween<double>(begin: 0.0, end: 1.0).animate( // %100 tam doluluk
       CurvedAnimation(
         parent: _fillController,
         curve: Curves.easeInOut,
@@ -53,25 +57,65 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
       });
     });
     
+    // Animasyon bitiş kontrolü - otomatik yönlendirme
+    _fillController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        // Animasyon tamamlandığında planı kaydet ve yönlendir
+        _navigateToHome();
+      }
+    });
+    
+    // Kabarcık animasyonu
+    _bubbleController = AnimationController(
+      duration: const Duration(seconds: 4),
+      vsync: this,
+    )..repeat();
+    
+    // Kabarcıkları oluştur
+    _generateBubbles();
+    
     // Dolum animasyonunu başlat
     _fillController.forward();
     
+    // Zaman aşımı (Timeout) - 5 saniye sonra her halükarda yönlendir
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        _navigateToHome();
+      }
+    });
+  }
+  
+  void _navigateToHome() {
+    if (!mounted) return;
+    
+    // Önce planı kaydet
     _calculateAndSavePlan();
+  }
+  
+  void _generateBubbles() {
+    _bubbles.clear();
+    final random = math.Random();
+    for (int i = 0; i < 8; i++) {
+      _bubbles.add(Bubble(
+        startX: random.nextDouble() * 0.8 + 0.1, // 0.1 - 0.9 arası
+        size: random.nextDouble() * 8 + 4, // 4-12 arası boyut
+        speed: random.nextDouble() * 0.3 + 0.1, // 0.1 - 0.4 arası hız
+        delay: random.nextDouble() * 2, // 0-2 saniye gecikme
+      ));
+    }
   }
   
   @override
   void dispose() {
     _waveController.dispose();
     _fillController.dispose();
+    _bubbleController.dispose();
     super.dispose();
   }
 
   Future<void> _calculateAndSavePlan() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-    
-    // Kısa bir gecikme (animasyon için)
-    await Future.delayed(const Duration(seconds: 2));
     
     if (!mounted) return;
     
@@ -105,11 +149,15 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     
     if (!mounted) return;
     
-    // Ana sayfaya yönlendir
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
-      (route) => false,
-    );
+    // Güvenli navigasyon - context hatası önleme
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Ana sayfaya yönlendir (geri tuşuyla dönüşü engelle)
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+      );
+    });
   }
 
   @override
@@ -122,7 +170,7 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Tank Animasyonu
-              Container(
+              SizedBox(
                 width: 250,
                 height: 250,
                 child: Stack(
@@ -161,20 +209,94 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
                     ClipOval(
                       clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar için
                       child: AnimatedBuilder(
-                        animation: _fillAnimation,
+                        animation: Listenable.merge([_fillAnimation, _bubbleController]),
                         builder: (context, child) {
                           // Tankın iç çapı: 250 - (6 * 2) = 238
                           final innerDiameter = 238.0;
+                          final waterHeight = innerDiameter * _fillProgress; // Su yüksekliği
+                          final waterTop = innerDiameter - waterHeight; // Su seviyesinin üst noktası
+                          
                           return SizedBox(
-                            width: innerDiameter,
-                            height: innerDiameter,
-                            child: CustomPaint(
-                              size: Size(innerDiameter, innerDiameter),
-                              painter: CircularTankWavePainter(
-                                fillPercentage: _fillProgress,
-                                waveOffset: _waveController.value * 2 * math.pi,
-                                tankDiameter: innerDiameter,
-                              ),
+                            width: innerDiameter, // Tank çapıyla eşit
+                            height: innerDiameter, // Tank çapıyla eşit
+                            child: Stack(
+                              alignment: Alignment.bottomCenter,
+                              children: [
+                                // Ana su katmanı (dibinden başlayarak)
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: waterHeight,
+                                  child: Container(
+                                    color: AppColors.waterColor.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                                
+                                // Wave efekti (sadece su seviyesinin üstünde görünür)
+                                if (_fillProgress > 0.1)
+                                  Positioned(
+                                    bottom: waterHeight - 20, // Wave'in su seviyesinin biraz altında başlaması
+                                    left: 0,
+                                    right: 0,
+                                    height: 40,
+                                    child: ClipRect(
+                                      child: ClipOval(
+                                        child: WaveWidget(
+                                          config: CustomConfig(
+                                            gradients: [
+                                              [
+                                                AppColors.waterColor.withValues(alpha: 0.3),
+                                                AppColors.waterColor.withValues(alpha: 0.5),
+                                              ],
+                                              [
+                                                AppColors.waterColor.withValues(alpha: 0.4),
+                                                AppColors.waterColor.withValues(alpha: 0.6),
+                                              ],
+                                            ],
+                                            durations: [4000, 5000],
+                                            heightPercentages: [0.20, 0.25],
+                                          ),
+                                          waveAmplitude: 5.0,
+                                          waveFrequency: 1.5,
+                                          backgroundColor: Colors.transparent,
+                                          size: Size(innerDiameter, 40),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                
+                                // Yükselen kabarcıklar
+                                ..._bubbles.map((bubble) {
+                                  final bubbleProgress = ((_bubbleController.value * 2 + bubble.delay) % 2) / 2;
+                                  final bubbleY = innerDiameter - (bubbleProgress * waterHeight * 0.8);
+                                  final bubbleX = bubble.startX * innerDiameter;
+                                  
+                                  // Sadece su içindeyse göster
+                                  if (bubbleY > waterTop && bubbleY < innerDiameter) {
+                                    return Positioned(
+                                      left: bubbleX - bubble.size / 2,
+                                      bottom: innerDiameter - bubbleY - bubble.size / 2,
+                                      child: Opacity(
+                                        opacity: math.max(0, 1 - bubbleProgress * 1.5),
+                                        child: Container(
+                                          width: bubble.size,
+                                          height: bubble.size,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.white.withValues(alpha: 0.3),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(alpha: 0.5),
+                                              width: 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                }),
+                              ],
                             ),
                           );
                         },
@@ -207,83 +329,18 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   }
 }
 
-// Tank dalga animasyonu için CustomPainter
-class CircularTankWavePainter extends CustomPainter {
-  final double fillPercentage;
-  final double waveOffset;
-  final double tankDiameter;
+// Kabarcık veri modeli
+class Bubble {
+  final double startX; // 0.0 - 1.0 arası (tank genişliğine göre)
+  final double size; // Kabarcık boyutu
+  final double speed; // Yükselme hızı
+  final double delay; // Başlangıç gecikmesi
 
-  CircularTankWavePainter({
-    required this.fillPercentage,
-    required this.waveOffset,
-    required this.tankDiameter,
+  Bubble({
+    required this.startX,
+    required this.size,
+    required this.speed,
+    required this.delay,
   });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (fillPercentage <= 0) return;
-    
-    // Tankın merkezi ve yarıçapı (tam iç çap)
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-    final radius = tankDiameter / 2;
-    
-    // Su seviyesi hesaplama (alt kısımdan yukarı doğru)
-    // fillPercentage 0.0-1.0 arası, 1.0 = tam dolu
-    final waterHeight = size.height * fillPercentage;
-    final waterTop = size.height - waterHeight;
-    
-    // Su rengi
-    final waterPaint = Paint()
-      ..color = AppColors.waterColor.withValues(alpha: 0.8)
-      ..style = PaintingStyle.fill;
-    
-    // Su dolu alanı çiz (dairesel formda, tankın taban merkezinden başlayarak)
-    final path = Path();
-    
-    // Su seviyesine kadar dairesel formda çiz
-    if (waterTop < size.height) {
-      // Alt yarıyı çiz (su seviyesinin altındaki kısım - tam dairesel)
-      // π'den 2π'ye kadar (alt yarı)
-      bool isFirstPoint = true;
-      for (double angle = math.pi; angle <= 2 * math.pi; angle += 0.01) {
-        final x = centerX + radius * math.cos(angle);
-        final y = centerY + radius * math.sin(angle);
-        if (isFirstPoint) {
-          path.moveTo(x, y); // Başlangıç noktası (tankın sol alt noktası)
-          isFirstPoint = false;
-        } else {
-          path.lineTo(x, y);
-        }
-      }
-      
-      // Üst yarıyı çiz (su seviyesine göre ayarlanmış, dalga efekti ile)
-      // 0'dan π'ye kadar (üst yarı)
-      for (double angle = 0; angle <= math.pi; angle += 0.01) {
-        final x = centerX + radius * math.cos(angle);
-        final y = centerY + radius * math.sin(angle);
-        
-        // Eğer bu nokta su seviyesinin altındaysa, su seviyesine göre ayarla
-        if (y >= waterTop) {
-          // Dalga efekti ekle (sadece üst kısımda)
-          final waveHeight = 5.0 * math.sin((angle * 2 * math.pi) + waveOffset);
-          final adjustedY = math.max(waterTop + waveHeight, y);
-          path.lineTo(x, adjustedY);
-        } else {
-          // Su seviyesinin üstündeki kısım - tankın kenarını takip et
-          path.lineTo(x, y);
-        }
-      }
-      
-      path.close();
-      canvas.drawPath(path, waterPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CircularTankWavePainter oldDelegate) {
-    return oldDelegate.fillPercentage != fillPercentage ||
-        oldDelegate.waveOffset != waveOffset;
-  }
 }
 

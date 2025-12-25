@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:super_tooltip/super_tooltip.dart';
 import '../utils/app_colors.dart';
 import '../models/drink_model.dart';
 import '../providers/water_provider.dart';
@@ -45,6 +47,27 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     _searchController.removeListener(_filterDrinks);
     _searchController.dispose();
     super.dispose();
+  }
+  
+  // İlk açılışta tooltip'i göster (dialog için)
+  Future<void> _checkAndShowQuickAccessTooltipForDialog(SuperTooltipController controller) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenQuickAccessTooltip = prefs.getBool('has_seen_drink_detail_quick_access_tooltip') ?? false;
+    
+    if (!hasSeenQuickAccessTooltip && mounted) {
+      // Kısa bir gecikme ile tooltip'i göster
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) {
+          await prefs.setBool('has_seen_drink_detail_quick_access_tooltip', true);
+          // Tooltip'i göster
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              controller.showTooltip();
+            }
+          });
+        }
+      });
+    }
   }
 
 
@@ -206,12 +229,19 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Container(
+      builder: (dialogContext) {
+        // Controller'ı dialog builder içinde oluştur
+        final tooltipController = SuperTooltipController();
+        // İlk açılış kontrolü
+        _checkAndShowQuickAccessTooltipForDialog(tooltipController);
+        
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Container(
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 400),
             child: SingleChildScrollView(
@@ -258,96 +288,110 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                           ],
                         ),
                       ),
-                      // Sağ Üst İkonlar: Favori (Kalp) ve Hızlı Erişim (Artı)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Favori Butonu (Kalp)
-                          Consumer<DrinkProvider>(
-                            builder: (context, drinkProvider, child) {
-                              final isFavorite = drinkProvider.isFavorite(drink.id);
-                              return IconButton(
-                                icon: Icon(
-                                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                                  color: isFavorite ? Colors.red : Colors.grey[600],
-                                  size: 28,
-                                ),
-                                onPressed: () async {
-                                  if (isFavorite) {
-                                    // Favoriden çıkar
-                                    await drinkProvider.removeFavorite(drink.id);
-                                  } else {
-                                    // Favoriye ekle - varsayılan miktar ile
-                                    await drinkProvider.addFavorite(drink.id, amount: 200.0);
-                                  }
-                                  setDialogState(() {});
-                                },
-                                tooltip: isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle',
-                              );
-                            },
-                          ),
-                          // Hızlı Erişim Butonu (Artı) - Pembe
-                          Consumer<DrinkProvider>(
-                            builder: (context, drinkProvider, child) {
-                              final isQuickAccess = drinkProvider.isQuickAccess(drink.id);
-                              return IconButton(
+                      // Sağ Üst İkon: Hızlı Erişim (Artı) - SuperTooltip ile (Stack yapısı ile görsel bütünlük korunuyor)
+                      Consumer<DrinkProvider>(
+                        builder: (dialogContext, drinkProvider, child) {
+                          final isQuickAccess = drinkProvider.isQuickAccess(drink.id);
+                          
+                          // Tıklama işlevi
+                          void handleQuickAccessTap() async {
+                            // Tooltip'i kapat
+                            // SuperTooltip otomatik olarak kapanacak
+                            if (isQuickAccess) {
+                              // Hızlı erişimden çıkar
+                              await drinkProvider.removeQuickAccess(drink.id);
+                              setDialogState(() {});
+                            } else {
+                              // Hızlı erişime ekle - varsayılan miktar ile
+                              await drinkProvider.addQuickAccess(drink.id, amount: 200.0);
+                              // Modalı kapat ve ana ekrana geri dön
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop();
+                                // Şık SnackBar bildirimi göster
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            'İçecek hızlı erişim için ana sayfaya eklendi!',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    backgroundColor: AppColors.softPinkButton,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    margin: const EdgeInsets.all(16),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                          
+                          return Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Alt Katman: Orijinal IconButton (Görsel - Asla bozulmaz)
+                              IconButton(
                                 icon: Icon(
                                   isQuickAccess ? Icons.add_circle : Icons.add_circle_outline,
-                                  color: isQuickAccess ? AppColors.softPinkButton : AppColors.softPinkButton,
+                                  color: AppColors.softPinkButton,
                                   size: 28,
                                 ),
-                                onPressed: () async {
-                                  if (isQuickAccess) {
-                                    // Hızlı erişimden çıkar
-                                    await drinkProvider.removeQuickAccess(drink.id);
-                                    setDialogState(() {});
-                                  } else {
-                                    // Hızlı erişime ekle - varsayılan miktar ile
-                                    await drinkProvider.addQuickAccess(drink.id, amount: 200.0);
-                                    // Modalı kapat ve ana ekrana geri dön
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop();
-                                      // Şık SnackBar bildirimi göster
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.check_circle,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Text(
-                                                  'İçecek hızlı erişim için ana sayfaya eklendi!',
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          backgroundColor: AppColors.softPinkButton,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          margin: const EdgeInsets.all(16),
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
+                                onPressed: null, // Tıklama devre dışı - üst katman işleyecek
                                 tooltip: isQuickAccess ? 'Hızlı erişimden çıkar' : 'Hızlı erişime ekle',
-                              );
-                            },
-                          ),
-                        ],
+                              ),
+                              
+                              // Üst Katman: Görünmez GestureDetector + SuperTooltip (Tıklama ve Tooltip için)
+                              Positioned.fill(
+                                child: SuperTooltip(
+                                  controller: tooltipController,
+                                  popupDirection: TooltipDirection.down,
+                                  arrowLength: 20.0,
+                                  arrowBaseWidth: 10.0,
+                                  backgroundColor: Colors.blueGrey.shade900,
+                                  hasShadow: true,
+                                  shadowColor: Colors.black.withValues(alpha: 0.5),
+                                  elevation: 8.0,
+                                  content: const Text(
+                                    'Bu içeceği ana ekrana kısayol olarak ekle!',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  child: GestureDetector(
+                                    onTap: handleQuickAccessTap,
+                                    behavior: HitTestBehavior.opaque, // Tüm alanı tıklanabilir yap
+                                    child: Container(
+                                      color: Colors.transparent, // Tamamen şeffaf
+                                      width: 48, // IconButton'ın standart boyutu
+                                      height: 48,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -363,39 +407,48 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _buildQuickSelectButton(
-                        '200ml',
-                        200.0,
-                        drink,
-                        customAmountController,
-                        setDialogState,
-                      ),
-                      _buildQuickSelectButton(
-                        '330ml',
-                        330.0,
-                        drink,
-                        customAmountController,
-                        setDialogState,
-                      ),
-                      _buildQuickSelectButton(
-                        '500ml',
-                        500.0,
-                        drink,
-                        customAmountController,
-                        setDialogState,
-                      ),
-                      _buildQuickSelectButton(
-                        '750ml',
-                        750.0,
-                        drink,
-                        customAmountController,
-                        setDialogState,
-                      ),
-                    ],
+                  Consumer<UserProvider>(
+                    builder: (dialogContext, userProvider, child) {
+                      final isMetric = userProvider.isMetric;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildQuickSelectButton(
+                            isMetric ? '200ml' : '${(200.0 * 0.033814).toStringAsFixed(1)} oz',
+                            200.0,
+                            drink,
+                            customAmountController,
+                            setDialogState,
+                            dialogContext,
+                          ),
+                          _buildQuickSelectButton(
+                            isMetric ? '330ml' : '${(330.0 * 0.033814).toStringAsFixed(1)} oz',
+                            330.0,
+                            drink,
+                            customAmountController,
+                            setDialogState,
+                            dialogContext,
+                          ),
+                          _buildQuickSelectButton(
+                            isMetric ? '500ml' : '${(500.0 * 0.033814).toStringAsFixed(1)} oz',
+                            500.0,
+                            drink,
+                            customAmountController,
+                            setDialogState,
+                            dialogContext,
+                          ),
+                          _buildQuickSelectButton(
+                            isMetric ? '750ml' : '${(750.0 * 0.033814).toStringAsFixed(1)} oz',
+                            750.0,
+                            drink,
+                            customAmountController,
+                            setDialogState,
+                            dialogContext,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 24),
                   
@@ -409,19 +462,24 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: customAmountController,
-                    decoration: InputDecoration(
-                      hintText: 'Miktar (ml)',
-                      suffixText: 'ml',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 16),
+                  Consumer<UserProvider>(
+                    builder: (dialogContext, userProvider, child) {
+                      final unitLabel = userProvider.isMetric ? 'ml' : 'oz';
+                      return TextField(
+                        controller: customAmountController,
+                        decoration: InputDecoration(
+                          hintText: 'Miktar ($unitLabel)',
+                          suffixText: unitLabel,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(decimal: !userProvider.isMetric),
+                        style: const TextStyle(fontSize: 16),
+                      );
+                    },
                   ),
                   const SizedBox(height: 24),
                   
@@ -430,14 +488,19 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final amount = double.tryParse(customAmountController.text);
-                        if (amount != null && amount > 0) {
-                          if (!context.mounted) return;
-                          Navigator.pop(context);
+                        final userProvider = Provider.of<UserProvider>(dialogContext, listen: false);
+                        final inputAmount = double.tryParse(customAmountController.text);
+                        if (inputAmount != null && inputAmount > 0) {
+                          // Birime göre dönüştür: oz ise ml'ye çevir
+                          final amount = userProvider.isMetric 
+                              ? inputAmount 
+                              : inputAmount / 0.033814; // oz'u ml'ye çevir
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
                           await _drinkWithAmount(drink, amount);
                         } else {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          if (!dialogContext.mounted) return;
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
                             const SnackBar(
                               content: Text('Lütfen geçerli bir miktar girin'),
                             ),
@@ -465,23 +528,26 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
               ),
             ),
           ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildQuickSelectButton(
     String label,
-    double amount,
+    double amountMl, // Her zaman ml cinsinden
     Drink drink,
     TextEditingController controller,
     StateSetter setDialogState,
+    BuildContext dialogContext,
   ) {
     return GestureDetector(
       onTap: () async {
-        if (!context.mounted) return;
-        Navigator.pop(context);
-        await _drinkWithAmount(drink, amount);
+        if (!dialogContext.mounted) return;
+        Navigator.pop(dialogContext);
+        await _drinkWithAmount(drink, amountMl);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -514,7 +580,7 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
     
     // WaterProvider'ın drink metodunu kullan (bilimsel hesaplama içinde yapılıyor)
-    final result = await waterProvider.drink(drink, amount);
+    final result = await waterProvider.drink(drink, amount, context: context);
     
     if (!context.mounted) return;
     
