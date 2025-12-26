@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
@@ -34,6 +35,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   
   // Miktar TextField Controller
   late TextEditingController _amountController;
+  
+  // Showcase Key - Günlük Hedef tanıtımı için
+  final GlobalKey _goalShowcaseKey = GlobalKey();
   
   // Canlı hesaplanan su hedefi
   double get _calculatedWaterGoal {
@@ -172,6 +176,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       gender: _selectedGender,
       weight: weightInKg,
       activityLevel: _selectedActivityLevel,
+      climate: _selectedClimate,
     );
     
     // Birim sistemini kaydet (UserProvider'dan anlık birim bilgisini al)
@@ -223,23 +228,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Üst Kontrol Paneli - Sabit (Progress Bar + Atla Butonu)
-            _buildTopControlPanel(),
-            
-            // PageView - 5 Adımlı Akış
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
+    return ShowCaseWidget(
+      blurValue: 3.0,
+      builder: (context) => Scaffold(
+        backgroundColor: AppColors.verySoftBlue,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Üst Kontrol Paneli - Sabit (Progress Bar + Atla Butonu)
+              _buildTopControlPanel(),
+              
+              // PageView - 5 Adımlı Akış
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                    // 4. sayfaya (Günlük Hedef) geldiğinde showcase'i başlat
+                    if (index == 4) {
+                      _checkAndShowGoalTutorial();
+                    }
+                  },
                 physics: const NeverScrollableScrollPhysics(), // Yatay kaydırmayı devre dışı bırak
                 children: [
                   // 1. Adım: Cinsiyet Seçimi
@@ -258,7 +269,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
       ),
+      ),
     );
+  }
+  
+  // Günlük Hedef tanıtımını kontrol et ve göster
+  Future<void> _checkAndShowGoalTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenGoalTutorial = prefs.getBool('has_seen_goal_tutorial') ?? false;
+    
+    // Eğer daha önce görüldüyse hiç gösterme
+    if (hasSeenGoalTutorial) {
+      return;
+    }
+    
+    // İlk seferinde göster
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted && _currentPage == 4) {
+          ShowCaseWidget.of(context).startShowCase([_goalShowcaseKey]);
+          // Hemen SharedPreferences'a kaydet (bir sonraki açılışta gösterme)
+          await prefs.setBool('has_seen_goal_tutorial', true);
+        }
+      });
+    }
   }
   
   // Üst Kontrol Paneli - Progress Bar + Atla Butonu
@@ -1113,12 +1147,42 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           
           const SizedBox(height: 80),
           
-          // Miktar Ayarlama Barı - Geniş, oval, ortada
-          _buildAmountAdjustmentBar(),
-          
-          // Birim Seçim Toggle - Miktar barının hemen altına
-          const SizedBox(height: 24),
-          _buildUnitToggle(),
+          // Miktar Ayarlama Barı ve Birim Toggle - Showcase ile sarmalanmış
+          Showcase(
+            key: _goalShowcaseKey,
+            title: 'Hedefini Belirle',
+            description: 'Günlük su hedefini buradaki butonlarla veya birim değiştiriciyle ayarlayabilirsin.',
+            overlayColor: Colors.black.withValues(alpha: 0.5),
+            overlayOpacity: 0.5,
+            titleTextStyle: const TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+            descTextStyle: const TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            tooltipBackgroundColor: const Color(0xFFFFF59D), // Soft Sarı
+            textColor: Colors.black,
+            tooltipPadding: const EdgeInsets.all(12),
+            targetBorderRadius: BorderRadius.circular(16),
+            targetShapeBorder: RoundedRectangleBorder(
+              side: const BorderSide(color: Colors.black, width: 1.5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                // Miktar Ayarlama Barı - Geniş, oval, ortada
+                _buildAmountAdjustmentBar(),
+                
+                // Birim Seçim Toggle - Miktar barının hemen altına
+                const SizedBox(height: 24),
+                _buildUnitToggle(),
+              ],
+            ),
+          ),
           
           // Akıllı Hedef Önerisi
           if (_selectedWeight > 0 && _calculatedWaterGoal > 0) ...[
@@ -1186,20 +1250,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     void incrementAmount() {
       setState(() {
         if (isMetric) {
-          _customGoal += 50.0;
+          _customGoal += 10.0; // 10 ml artır
         } else {
-          _customGoal += 2.0; // 2 oz artır
+          _customGoal += 10.0; // 10 oz artır
         }
+        // Maksimum sınır kontrolü (isteğe bağlı - gerekirse eklenebilir)
+        // if (isMetric && _customGoal > 5000.0) _customGoal = 5000.0;
       });
     }
     
     void decrementAmount() {
       setState(() {
         if (isMetric) {
-          _customGoal -= 50.0;
+          _customGoal -= 10.0; // 10 ml azalt
         } else {
-          _customGoal -= 2.0; // 2 oz azalt
+          _customGoal -= 10.0; // 10 oz azalt
         }
+        // Minimum sınır kontrolü (0'dan aşağı düşmemeli)
         if (_customGoal < 0) _customGoal = 0.0;
       });
     }

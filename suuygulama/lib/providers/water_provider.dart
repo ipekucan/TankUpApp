@@ -4,13 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/water_model.dart';
 import '../models/drink_model.dart';
+import '../models/drink_entry_model.dart';
 import 'challenge_provider.dart';
 
 class WaterProvider extends ChangeNotifier {
   static const String _waterDataKey = 'water_data';
   static const String _lastDrinkTimeKey = 'last_drink_time';
   static const String _lastResetDateKey = 'last_reset_date';
-  static const String _drinkHistoryKey = 'drink_history'; // Son 30 günün verileri
+  static const String _drinkHistoryKey = 'drink_history'; // Son 30 günün verileri (eski format - geriye dönük uyumluluk)
+  static const String _detailedDrinkHistoryKey = 'detailed_drink_history'; // Detaylı içecek geçmişi (tarih -> list<DrinkEntry>)
   static const String _earlyBirdClaimedKey = 'early_bird_claimed'; // Erken Kuş bonusu alındı mı?
   static const String _nightOwlClaimedKey = 'night_owl_claimed'; // Gece Kuşu bonusu alındı mı?
   static const String _dailyGoalBonusClaimedKey = 'daily_goal_bonus_claimed'; // Günlük hedef bonusu alındı mı?
@@ -20,7 +22,8 @@ class WaterProvider extends ChangeNotifier {
   DateTime? _lastDrinkTime;
   DateTime? _lastResetDate;
   bool _isFirstDrink = true;
-  Map<String, double> _drinkHistory = {}; // Tarih (YYYY-MM-DD) -> Miktar (ml)
+  Map<String, double> _drinkHistory = {}; // Tarih (YYYY-MM-DD) -> Miktar (ml) - geriye dönük uyumluluk için
+  Map<String, List<DrinkEntry>> _detailedDrinkHistory = {}; // Tarih (YYYY-MM-DD) -> İçecek girişleri listesi
   bool _earlyBirdClaimed = false; // Erken Kuş bonusu bugün alındı mı?
   bool _nightOwlClaimed = false; // Gece Kuşu bonusu bugün alındı mı?
   bool _dailyGoalBonusClaimed = false; // Günlük hedef bonusu bugün alındı mı?
@@ -40,8 +43,44 @@ class WaterProvider extends ChangeNotifier {
   // Günlük toplam kalori
   double get dailyCalories => _waterData.dailyCalories;
 
-  // Son 30 günün içme verileri
+  // Son 30 günün içme verileri (geriye dönük uyumluluk)
   Map<String, double> get drinkHistory => Map.unmodifiable(_drinkHistory);
+  
+  // Detaylı içecek geçmişi (tarih -> içecek girişleri)
+  Map<String, List<DrinkEntry>> get detailedDrinkHistory => Map.unmodifiable(_detailedDrinkHistory);
+  
+  // Belirli bir tarihin içecek girişlerini getir
+  List<DrinkEntry> getDrinkEntriesForDate(String dateKey) {
+    return List.unmodifiable(_detailedDrinkHistory[dateKey] ?? []);
+  }
+  
+  // Belirli bir tarih aralığının içecek girişlerini getir
+  List<DrinkEntry> getDrinkEntriesForDateRange(DateTime startDate, DateTime endDate) {
+    final entries = <DrinkEntry>[];
+    var current = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    
+    while (!current.isAfter(end)) {
+      final dateKey = _getDateKey(current);
+      entries.addAll(_detailedDrinkHistory[dateKey] ?? []);
+      current = current.add(const Duration(days: 1));
+    }
+    
+    return entries;
+  }
+  
+  // Belirli bir içecek ID'sine göre filtrele
+  List<DrinkEntry> getDrinkEntriesByDrinkId(String drinkId, {DateTime? startDate, DateTime? endDate}) {
+    if (startDate != null && endDate != null) {
+      return getDrinkEntriesForDateRange(startDate, endDate)
+          .where((entry) => entry.drinkId == drinkId)
+          .toList();
+    }
+    return _detailedDrinkHistory.values
+        .expand((entries) => entries)
+        .where((entry) => entry.drinkId == drinkId)
+        .toList();
+  }
 
   // Tüm su verileri
   WaterModel get waterData => _waterData;
@@ -152,6 +191,7 @@ class WaterProvider extends ChangeNotifier {
       
       // Eski içme geçmişini temizle
       _cleanOldHistory();
+      _cleanOldDetailedHistory();
       
       // consumedAmount'un kesinlikle 0.0 olduğundan emin ol (son kontrol)
       // Eski veriyi temizle - bir kerelik sıfırlama (tank dolu başlama sorununu çözmek için)
@@ -194,8 +234,16 @@ class WaterProvider extends ChangeNotifier {
         await prefs.setString(_lastResetDateKey, _lastResetDate!.toIso8601String());
       }
       
-      // İçme geçmişini kaydet (30 günlük veri)
+      // İçme geçmişini kaydet (30 günlük veri) - geriye dönük uyumluluk
       await prefs.setString(_drinkHistoryKey, jsonEncode(_drinkHistory));
+      
+      // Detaylı içecek geçmişini kaydet
+      final detailedHistoryJson = jsonEncode(
+        _detailedDrinkHistory.map(
+          (key, value) => MapEntry(key, value.map((e) => e.toJson()).toList()),
+        ),
+      );
+      await prefs.setString(_detailedDrinkHistoryKey, detailedHistoryJson);
       
       // Bonus flag'lerini kaydet
       await prefs.setBool(_earlyBirdClaimedKey, _earlyBirdClaimed);
@@ -347,6 +395,18 @@ class WaterProvider extends ChangeNotifier {
     // Bugünün tarihini al (YYYY-MM-DD formatında)
     final todayKey = _getDateKey(now);
     _drinkHistory[todayKey] = (_drinkHistory[todayKey] ?? 0.0) + effectiveAmount;
+    
+    // Detaylı içecek geçmişine ekle
+    final drinkEntry = DrinkEntry(
+      drinkId: drink.id,
+      amount: amount,
+      effectiveAmount: effectiveAmount,
+      timestamp: now,
+    );
+    if (!_detailedDrinkHistory.containsKey(todayKey)) {
+      _detailedDrinkHistory[todayKey] = [];
+    }
+    _detailedDrinkHistory[todayKey]!.add(drinkEntry);
 
     // Coin hesaplamaları
     int totalCoinsReward = 0;
@@ -480,7 +540,18 @@ class WaterProvider extends ChangeNotifier {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  // 30 günden eski verileri temizle
+  // Eski detaylı içecek geçmişini temizle
+  void _cleanOldDetailedHistory() {
+    final now = DateTime.now();
+    final cutoffDate = now.subtract(const Duration(days: 30));
+    final cutoffKey = _getDateKey(cutoffDate);
+    
+    _detailedDrinkHistory.removeWhere((key, value) {
+      return key.compareTo(cutoffKey) < 0;
+    });
+  }
+  
+  // 30 günden eski verileri temizle (geriye dönük uyumluluk)
   void _cleanOldHistory() {
     final now = DateTime.now();
     final cutoffDate = now.subtract(const Duration(days: 30));

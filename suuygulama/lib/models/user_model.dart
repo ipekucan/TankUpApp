@@ -7,6 +7,7 @@ class UserModel {
   final String? gender; // Cinsiyet ('male', 'female', 'other')
   final int? age; // Yaş
   final String? activityLevel; // Aktivite seviyesi ('low', 'medium', 'high')
+  final String? climate; // İklim ('very_hot', 'hot', 'warm', 'cold')
   final String? wakeUpTime; // Uyanma saati (HH:mm formatında)
   final String? sleepTime; // Uyuma saati (HH:mm formatında)
 
@@ -19,6 +20,7 @@ class UserModel {
     this.gender,
     this.age,
     this.activityLevel,
+    this.climate,
     this.wakeUpTime,
     this.sleepTime,
   });
@@ -34,6 +36,7 @@ class UserModel {
       gender: null,
       age: null,
       activityLevel: null,
+      climate: null,
       wakeUpTime: null,
       sleepTime: null,
     );
@@ -49,6 +52,7 @@ class UserModel {
     String? gender,
     int? age,
     String? activityLevel,
+    String? climate,
     String? wakeUpTime,
     String? sleepTime,
   }) {
@@ -61,6 +65,7 @@ class UserModel {
       gender: gender ?? this.gender,
       age: age ?? this.age,
       activityLevel: activityLevel ?? this.activityLevel,
+      climate: climate ?? this.climate,
       wakeUpTime: wakeUpTime ?? this.wakeUpTime,
       sleepTime: sleepTime ?? this.sleepTime,
     );
@@ -77,6 +82,7 @@ class UserModel {
       'gender': gender,
       'age': age,
       'activityLevel': activityLevel,
+      'climate': climate,
       'wakeUpTime': wakeUpTime,
       'sleepTime': sleepTime,
     };
@@ -100,6 +106,7 @@ class UserModel {
       gender: json['gender'] as String?,
       age: json['age'] as int?,
       activityLevel: json['activityLevel'] as String?,
+      climate: json['climate'] as String?,
       wakeUpTime: json['wakeUpTime'] as String?,
       sleepTime: json['sleepTime'] as String?,
     );

@@ -23,6 +23,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   double _currentAmount = 0.0; // ml cinsinden
   bool _isLoading = true;
   double? _selectedTemplateMax; // Seçili şablonun maksimum kapasitesi
+  double? _selectedTemplateAmount; // Hangi hazır buton seçili (null = manuel ayar)
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
   late AnimationController _bubbleController;
@@ -30,14 +31,11 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   final ScrollController _templateScrollController = ScrollController();
   final TextEditingController _amountController = TextEditingController();
   final FocusNode _amountFocusNode = FocusNode();
-  late AnimationController _tooltipAnimationController;
-  late Animation<double> _tooltipAnimation;
-  bool _showTooltip = false;
   
   // Öğretici el animasyonu için
   late AnimationController _handAnimationController;
   late Animation<double> _handAnimation;
-  bool _showHandAnimation = false;
+  bool _showTutorial = false; // Tutorial gösterilecek mi?
   bool _hasInteracted = false; // Kullanıcı ekrana dokundu mu?
   
   // Şablon miktarlar (ml cinsinden) - 250 ile başlar
@@ -73,24 +71,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     );
     _bubbleController.repeat();
     
-    // Tooltip animasyonu (floating/bobbing efekt)
-    _tooltipAnimationController = AnimationController(
+    // Öğretici el animasyonu (pulse/scale + yukarı-aşağı hareket)
+    _handAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    _tooltipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _tooltipAnimationController,
-        curve: Curves.easeInOut,
-      ),
-    );
-    
-    // Öğretici el animasyonu (yukarı-aşağı hareket)
-    _handAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    _handAnimation = Tween<double>(begin: -20.0, end: 20.0).animate(
+    _handAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _handAnimationController,
         curve: Curves.easeInOut,
@@ -98,73 +84,46 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     );
     
     _loadPreferredUnit();
-    _checkAndShowTooltip();
-    _checkAndShowHandAnimation();
+    _checkTutorialStatus();
   }
   
-  // Tooltip gösterimi kontrolü (sadece ilk girişte)
-  Future<void> _checkAndShowTooltip() async {
+  // Tutorial durumunu kontrol et (sadece ilk kullanımda göster)
+  Future<void> _checkTutorialStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasSeenCupTutorial = prefs.getBool('has_seen_cup_tutorial') ?? false;
+    final hasSeen = prefs.getBool('seen_hand_tutorial') ?? false;
     
-    // Eğer daha önce görüldüyse hiç gösterme
-    if (hasSeenCupTutorial) {
-      return;
-    }
-    
-    // İlk seferinde göster ve hemen kaydet
-    if (mounted) {
+    if (!hasSeen && mounted) {
       setState(() {
-        _showTooltip = true;
-      });
-      _tooltipAnimationController.repeat(reverse: true);
-      
-      // Hemen SharedPreferences'a kaydet (bir sonraki açılışta gösterme)
-      await prefs.setBool('has_seen_cup_tutorial', true);
-      
-      // Kullanıcı bir yere tıkladığında veya içecek seçtiğinde kapat
-      _amountFocusNode.addListener(() {
-        if (_amountFocusNode.hasFocus) {
-          _hideTooltip();
-        }
-      });
-    }
-  }
-  
-  // Tooltip'i gizle (artık kaydetme gerekmeyen - initState'te zaten kaydedildi)
-  void _hideTooltip() {
-    if (!_showTooltip) return;
-    
-    if (mounted) {
-      setState(() {
-        _showTooltip = false;
-      });
-      _tooltipAnimationController.stop();
-    }
-  }
-  
-  // Öğretici el animasyonu kontrolü (sadece ilk girişte)
-  Future<void> _checkAndShowHandAnimation() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeenHandAnimation = prefs.getBool('has_seen_hand_animation') ?? false;
-    
-    if (!hasSeenHandAnimation && mounted) {
-      setState(() {
-        _showHandAnimation = true;
+        _showTutorial = true;
       });
       _handAnimationController.repeat(reverse: true);
+      // Hemen kaydet - bir sonraki açılışta gösterme
+      await prefs.setBool('seen_hand_tutorial', true);
+      
+      // 5 saniye sonra otomatik gizle
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted && !_hasInteracted) {
+          setState(() {
+            _showTutorial = false;
+          });
+          _handAnimationController.stop();
+        }
+      });
+    } else {
+      if (mounted) {
+        setState(() {
+          _showTutorial = false;
+        });
+      }
     }
   }
   
   void _hideHandAnimation() {
-    if (!_showHandAnimation || _hasInteracted) return;
-    
-    final prefs = SharedPreferences.getInstance();
-    prefs.then((p) => p.setBool('has_seen_hand_animation', true));
+    if (!_showTutorial || _hasInteracted) return;
     
     if (mounted) {
       setState(() {
-        _showHandAnimation = false;
+        _showTutorial = false;
         _hasInteracted = true;
       });
       _handAnimationController.stop();
@@ -175,7 +134,6 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   void dispose() {
     _waveController.dispose();
     _bubbleController.dispose();
-    _tooltipAnimationController.dispose();
     _handAnimationController.dispose();
     _templateScrollController.dispose();
     _amountController.dispose();
@@ -187,6 +145,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
     // Artık _preferredUnit kullanmıyoruz, UserProvider.isMetric kullanıyoruz
     setState(() {
       _currentAmount = 250.0; // 250 ile başla
+      _selectedTemplateAmount = 250.0; // Başlangıçta 250ml butonu varsayılan olarak seçili (aktif/siyah)
+      _selectedTemplateMax = 250.0; // Maksimum kapasiteyi 250ml olarak ayarla
       _isLoading = false;
     });
     
@@ -198,6 +158,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
             ? _currentAmount 
             : (_currentAmount * 0.033814); // Oz hesaplama: targetMl * 0.033814
         _amountController.text = displayValue.toStringAsFixed(userProvider.isMetric ? 0 : 1);
+        // Seçili öğeyi merkeze getir (250ml butonu)
         _scrollToSelectedTemplate();
       }
     });
@@ -205,6 +166,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   
   void _selectTemplateAmount(double amount) {
     setState(() {
+      _selectedTemplateAmount = amount; // Hangi hazır buton seçili
       _selectedTemplateMax = amount; // Maksimum kapasiteyi şablon miktarına ayarla
       _currentAmount = amount.clamp(0.0, amount);
     });
@@ -256,10 +218,16 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
 
   // Drag işlemi - Artırılmış hassasiyet
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    // Kullanıcı etkileşime geçti, el animasyonunu ve tooltip'i gizle
-    _hideTooltip();
+    // Kullanıcı etkileşime geçti, el animasyonunu gizle
     if (!_hasInteracted) {
       _hideHandAnimation();
+    }
+    
+    // Manuel kaydırma yapıldığında hazır buton seçimini iptal et
+    if (_selectedTemplateAmount != null) {
+      setState(() {
+        _selectedTemplateAmount = null; // Manuel ayar moduna geç
+      });
     }
     
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -313,16 +281,20 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       }
     });
     
-    // Şablon slider'ı güncelle
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToSelectedTemplate();
-    });
+    // Manuel kaydırma sırasında şablon slider'ı güncelleme - butonlar aktif olmamalı
+    // _scrollToSelectedTemplate() çağrısını kaldırdık
   }
 
-  // Su seviyesi yüzdesi - _currentAmount'a göre dinamik hesaplama
+  // Su seviyesi yüzdesi - Hazır buton seçiliyse sabit görsel seviye (%80-85), manuel ayardaysa dinamik
   double get _fillPercentage {
     if (_maxAmountMl <= 0) return 0.0;
-    // Su seviyesi seçilen miktara göre hesaplanır (maksimum %92 ile sınırlı - dudak payı)
+    
+    // Hazır buton seçiliyse sabit görsel yükseklik (tüm butonlar için aynı - içilmeye hazır dolu bardak görünümü)
+    if (_selectedTemplateAmount != null) {
+      return 0.82; // Sabit görsel seviye %82 - içilmeye hazır dolu bir bardak gibi (tam dolu değil, ağzına kadar taşmış değil)
+    }
+    
+    // Manuel ayar modunda: Su seviyesi seçilen miktara göre hesaplanır (maksimum %92 ile sınırlı - dudak payı)
     final percentage = (_currentAmount / _maxAmountMl).clamp(0.0, 0.92);
     return percentage;
   }
@@ -557,8 +529,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                     children: [
                       GestureDetector(
                         onTap: () {
-                          // Kullanıcı dokundu, el animasyonunu ve tooltip'i gizle
-                          _hideTooltip();
+                          // Kullanıcı dokundu, el animasyonunu gizle
                           if (!_hasInteracted) {
                             _hideHandAnimation();
                           }
@@ -568,24 +539,37 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                           alignment: Alignment.center,
                           children: [
                             _buildCupWidget(),
-                            // Öğretici el animasyonu
-                            if (_showHandAnimation && !_hasInteracted)
-                              Positioned(
-                                top: 100, // Bardak üstünde konumlandır
-                                child: AnimatedBuilder(
-                                  animation: _handAnimation,
-                                  builder: (context, child) {
-                                    return Transform.translate(
-                                      offset: Offset(0, _handAnimation.value),
-                                      child: Icon(
-                                        Icons.pan_tool_alt,
-                                        size: 48,
-                                        color: AppColors.softPinkButton.withValues(alpha: 0.8),
+                            // Öğretici el animasyonu - Suyun tam ortasında, pulse + yukarı-aşağı
+                            Visibility(
+                              visible: _showTutorial && !_hasInteracted,
+                              child: AnimatedBuilder(
+                                animation: _handAnimation,
+                                builder: (context, child) {
+                                  // Pulse animasyonu (büyüyüp küçülme)
+                                  final scale = 0.8 + (_handAnimation.value * 0.4); // 0.8 - 1.2 arası
+                                  // Hafif yukarı-aşağı hareket
+                                  final verticalOffset = math.sin(_handAnimation.value * 2 * math.pi) * 15;
+                                  
+                                  return Positioned(
+                                    // Suyun tam ortasında konumlandır (bardağın ortası)
+                                    // cupWidth = 200, cupHeight = 300
+                                    top: 300 * 0.4, // Bardağın ortası (120px)
+                                    left: 200 * 0.5 - 24, // Merkez (ikon genişliği 48, yarısı 24)
+                                    child: Transform.translate(
+                                      offset: Offset(0, verticalOffset),
+                                      child: Transform.scale(
+                                        scale: scale,
+                                        child: Icon(
+                                          Icons.touch_app, // Parmak ikonu
+                                          size: 48,
+                                          color: Colors.white.withValues(alpha: 0.9), // Yarı saydam beyaz
+                                        ),
                                       ),
-                                    );
-                                  },
-                                ),
+                                    ),
+                                  );
+                                },
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -612,7 +596,6 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 child: ElevatedButton(
                   onPressed: _currentAmount > 0 ? () {
-                    _hideTooltip();
                     _addDrink();
                   } : null,
                   style: ElevatedButton.styleFrom(
@@ -638,186 +621,107 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
             ],
           ),
         ),
-        
-        // Tooltip Balonu - Sağ üst köşede (Modal'ın sağ üst köşesi)
-        if (_showTooltip)
-          Positioned(
-            top: 20, // Modal'ın üstünden 20px aşağıda
-            right: 20, // Modal'ın sağından 20px içeride
-            child: GestureDetector(
-              onTap: _hideTooltip,
-              child: AnimatedBuilder(
-                animation: _tooltipAnimation,
-                builder: (context, child) {
-                  // Floating animasyon (yukarı-aşağı hareket)
-                  final offset = math.sin(_tooltipAnimation.value * 2 * math.pi) * 8.0;
-                  return Transform.translate(
-                    offset: Offset(0, -offset),
-                    child: _buildTooltipBubble(),
-                  );
-                },
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  // Tooltip Balonu Widget'ı (Oklu)
-  Widget _buildTooltipBubble() {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Ana Balon - Taşma önleme ile
-        Container(
-          constraints: const BoxConstraints(
-            minWidth: 100,
-            maxWidth: 150,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A2E), // Koyu lacivert arka plan
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  'Kısayola Ekle!',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Ok (Balonun altından çıkan üçgen ok)
-        Positioned(
-          bottom: -8,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: CustomPaint(
-              size: const Size(16, 8),
-              painter: _TooltipArrowPainter(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Görsel Bardak Widget'ı - Gerçekçi form ve taşma önleme
+  // Görsel Bardak Widget'ı - Temiz ve hatasız Stack yapısı
   Widget _buildCupWidget() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        width: 200,
-        height: 300,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: AppColors.softPinkButton.withValues(alpha: 0.3),
-            width: 3,
+    const double cupBorderRadius = 30.0;
+    const double cupBorderWidth = 3.0;
+    const double cupWidth = 200.0;
+    const double cupHeight = 300.0;
+    
+    return Container(
+      width: cupWidth,
+      height: cupHeight,
+      decoration: BoxDecoration(
+        color: Colors.white, // Bardağın arka plan rengi
+        borderRadius: BorderRadius.circular(cupBorderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Su seviyesi (dalgalı ve animasyonlu) - ClipRRect ile taşma önleme
-            if (_fillPercentage > 0)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(30), // Bardak çerçevesi ile birebir aynı
-                  child: AnimatedBuilder(
-                    animation: Listenable.merge([_waveAnimation, _bubbleAnimation]),
-                    builder: (context, child) {
-                      final waterHeight = 300 * _fillPercentage;
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final cupWidth = constraints.maxWidth;
-                          return SizedBox(
-                            width: cupWidth, // Bardağın iç genişliğine tam otur
-                            height: waterHeight,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(30), // Bardağın köşe yuvarlaklığıyla birebir aynı (30)
-                              clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar
-                              child: Stack(
-                                children: [
-                                  // Su dolgusu - Wave paketi ile dalgalı üst kısım
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.only(
-                                      bottomLeft: Radius.circular(30), // Alt köşeler yuvarlak
-                                      bottomRight: Radius.circular(30),
-                                    ),
-                                    child: WaveWidget(
-                                      config: CustomConfig(
-                                        gradients: [
-                                          [
-                                            AppColors.waterColor.withValues(alpha: 0.9),
-                                            AppColors.waterColor.withValues(alpha: 0.7),
-                                          ],
-                                          [
-                                            AppColors.waterColor.withValues(alpha: 0.85),
-                                            AppColors.waterColor.withValues(alpha: 0.75),
-                                          ],
-                                        ],
-                                        durations: [3500, 4000],
-                                        heightPercentages: [0.20, 0.23],
-                                        blur: MaskFilter.blur(BlurStyle.solid, 5),
-                                        gradientBegin: Alignment.bottomLeft,
-                                        gradientEnd: Alignment.topRight,
-                                      ),
-                                      waveAmplitude: 5.0,
-                                      waveFrequency: 1.5,
-                                      size: Size(cupWidth, waterHeight),
-                                      backgroundColor: AppColors.waterColor.withValues(alpha: 0.85),
-                                    ),
-                                  ),
-                                  // Kabarcıklar
-                                  CustomPaint(
-                                    size: Size(cupWidth, waterHeight),
-                                    painter: BubblePainter(
-                                      bubbleOffset: _bubbleAnimation.value,
-                                      fillPercentage: _fillPercentage,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
+        ],
+      ),
+      clipBehavior: Clip.hardEdge, // KRİTİK: Suyun köşelerden taşmasını engeller
+      child: Stack(
+        children: [
+          // KATMAN 1 (EN ALT): Su Animasyonu
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_waveAnimation, _bubbleAnimation]),
+              builder: (context, child) {
+                // Hazır buton seçiliyse %82 sabit, manuel sürükleme ise dinamik
+                double waterHeight;
+                if (_selectedTemplateAmount != null) {
+                  // Hazır buton seçili - hesaplama yapmadan direkt %82 (daha yüksek seviye)
+                  waterHeight = cupHeight * 0.82;
+                } else {
+                  // Manuel ayar - dinamik yükseklik
+                  waterHeight = cupHeight * _fillPercentage;
+                }
+                
+                if (waterHeight <= 0) {
+                  return const SizedBox.shrink();
+                }
+                
+                // Hazır buton seçildiğinde su seviyesi %80-85, manuel sürüklemede dinamik
+                final isPresetSelected = _selectedTemplateAmount != null;
+                final heightPercentages = isPresetSelected
+                    ? const [0.15, 0.20] // Hazır buton: Su bardağın %80-85'ine kadar dolu (dalga üst yüzeyde)
+                    : [
+                        0.20 - (_fillPercentage * 0.15), // Manuel: Dinamik seviye
+                        0.25 - (_fillPercentage * 0.20),
+                      ];
+                
+                return SizedBox(
+                  width: cupWidth,
+                  height: waterHeight,
+                  child: WaveWidget(
+                    config: CustomConfig(
+                      gradients: [
+                        [
+                          const Color(0xFF4FC3F7), // Ferah mavi - daha belirgin
+                          const Color(0xFF0288D1).withOpacity(0.7), // Derin mavi
+                        ],
+                        [
+                          const Color(0xFF4FC3F7).withOpacity(0.9),
+                          const Color(0xFF0288D1).withOpacity(0.8),
+                        ],
+                      ],
+                      durations: const [4000, 5000],
+                      heightPercentages: heightPercentages,
+                    ),
+                    waveAmplitude: 8.0, // Biraz daha belirgin dalga
+                    waveFrequency: 1.5,
+                    backgroundColor: Colors.transparent, // Sabit açık mavi alanı kaldır - sadece dalga görünsün
+                    size: Size(cupWidth, waterHeight),
                   ),
-                ),
+                );
+              },
+            ),
+          ),
+          
+          // KATMAN 2 (ORTA): Metin/İkon (varsa) - Şimdilik boş
+          
+          // KATMAN 3 (EN ÜST): Bardak Çerçevesi
+          Container(
+            width: cupWidth,
+            height: cupHeight,
+            decoration: BoxDecoration(
+              color: Colors.transparent, // Şeffaf içerik
+              borderRadius: BorderRadius.circular(cupBorderRadius),
+              border: Border.all(
+                color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                width: cupBorderWidth,
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -844,12 +748,11 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                     final displayText = userProvider.isMetric
                         ? '${amount.toStringAsFixed(0)} ml'
                         : '${(amount * 0.033814).toStringAsFixed(1)} oz';
-                    // Seçili öğe kontrolü - daha hassas tolerans
-                    final isSelected = (_currentAmount - amount).abs() < 10.0; // 10ml tolerans
+                    // Seçili öğe kontrolü - sadece buton tıklandığında aktif (manuel drag sırasında aktif olmamalı)
+                    final isSelected = _selectedTemplateAmount == amount;
 
                     return GestureDetector(
                       onTap: () {
-                        _hideTooltip(); // Template seçildiğinde tooltip'i kapat
                         _selectTemplateAmount(amount);
                       },
                       child: AnimatedContainer(
@@ -952,13 +855,13 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
               contentPadding: EdgeInsets.zero,
               isDense: true,
             ),
-            onTap: () => _hideTooltip(), // TextField'a tıklandığında tooltip'i kapat
             onChanged: (value) {
-              _hideTooltip(); // Değer değiştiğinde tooltip'i kapat
               // TextField değişikliğini işle - global birim ayarına göre
+              // Manuel giriş yapıldığında hazır buton seçimini iptal et
               if (value.isEmpty) {
                 setState(() {
                   _currentAmount = 0.0;
+                  _selectedTemplateAmount = null; // Manuel giriş moduna geç
                 });
                 return;
               }
@@ -981,6 +884,7 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                 if ((_currentAmount - newAmount).abs() > 0.1) {
                   setState(() {
                     _currentAmount = newAmount;
+                    _selectedTemplateAmount = null; // Manuel giriş moduna geç
                   });
                 }
               }
@@ -994,29 +898,6 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
       },
     );
   }
-}
-
-// Tooltip Ok Çizici
-class _TooltipArrowPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Butona zıt renk - Pembe (daha belirgin)
-    final paint = Paint()
-      ..color = AppColors.softPinkButton
-      ..style = PaintingStyle.fill;
-    
-    final path = Path();
-    // Üçgen ok çiz (aşağı bakan ok)
-    path.moveTo(size.width / 2, size.height); // Alt nokta (okun ucu)
-    path.lineTo(0, 0); // Sol üst
-    path.lineTo(size.width, 0); // Sağ üst
-    path.close();
-    
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_TooltipArrowPainter oldDelegate) => false;
 }
 
 // Bardak dalga animasyonu için CustomPainter - Gerçekçi dalgalı su

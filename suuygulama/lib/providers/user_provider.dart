@@ -187,6 +187,7 @@ class UserProvider extends ChangeNotifier {
     String? gender,
     int? age,
     String? activityLevel,
+    String? climate,
     String? wakeUpTime,
     String? sleepTime,
   }) async {
@@ -198,6 +199,7 @@ class UserProvider extends ChangeNotifier {
       gender: gender,
       age: age,
       activityLevel: activityLevel,
+      climate: climate,
       wakeUpTime: wakeUpTime,
       sleepTime: sleepTime,
     );

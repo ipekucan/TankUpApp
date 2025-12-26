@@ -8,6 +8,7 @@ import '../providers/water_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
+import '../providers/challenge_provider.dart';
 import '../models/achievement_model.dart';
 import '../models/decoration_item.dart';
 import '../widgets/interactive_cup_modal.dart';
@@ -34,6 +35,8 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late DraggableScrollableController _challengeSheetController;
   double _animatedFillPercentage = 0.0; // Animasyonlu doluluk yüzdesi
   final List<_Bubble> _bubbles = []; // Bubble listesi
+  
+  // WaveWidget konfigürasyonu - Ferah mavi renkler (kullanıcı isteği)
   
   @override
   void initState() {
@@ -120,22 +123,32 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     return Consumer4<WaterProvider, AquariumProvider, UserProvider, AchievementProvider>(
       builder: (context, waterProvider, aquariumProvider, userProvider, achievementProvider, child) {
         // Performans optimizasyonu: Hesaplamaları önceden yap
-        // fillPercentage'ı 1.0 ile sınırla (görsel olarak %100'ü geçmemeli)
-        final fillPercentage = waterProvider.tankFillPercentage.clamp(0.0, 1.0);
-        final consumedAmount = waterProvider.consumedAmount;
+        // UserProvider verilerinden doğrudan hesapla
+        final currentIntake = waterProvider.consumedAmount;
         final dailyGoal = waterProvider.dailyGoal;
+        // fillPercentage'ı 1.0 ile sınırla (görsel animasyon için %100'ü geçmemeli)
+        // NOT: Sadece görsel animasyon için sınırlandırıyoruz, metin gösterimleri olduğu gibi kalacak
+        final fillPercentage = (dailyGoal > 0) 
+            ? (currentIntake / dailyGoal).clamp(0.0, 1.0) 
+            : 0.0;
+        // progressPercentage'ı clamp'lamıyoruz - %172 gibi değerler gösterilebilir
         final progressPercentage = dailyGoal > 0 
-            ? (consumedAmount / dailyGoal * 100).clamp(0.0, 100.0)
+            ? (currentIntake / dailyGoal * 100)
             : 0.0;
         
         // Animasyonlu dolum: fillPercentage değiştiğinde animasyonu başlat
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if ((fillPercentage - _animatedFillPercentage).abs() > 0.01 && mounted) {
+          if (!mounted) return;
+          
+          final currentAnimatedFill = _animatedFillPercentage.clamp(0.0, 1.0);
+          final targetFill = fillPercentage.clamp(0.0, 1.0);
+          
+          if ((targetFill - currentAnimatedFill).abs() > 0.01) {
             // Hedef doluluk yüzdesine animasyonlu olarak yaklaş
             _fillController.reset();
             _fillAnimation = Tween<double>(
-              begin: _animatedFillPercentage,
-              end: fillPercentage,
+              begin: currentAnimatedFill,
+              end: targetFill,
             ).animate(
               CurvedAnimation(
                 parent: _fillController,
@@ -143,12 +156,20 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               ),
             )..addListener(() {
               if (mounted) {
-                setState(() {
-                  _animatedFillPercentage = _fillAnimation.value;
-                });
+                final newValue = _fillAnimation.value.clamp(0.0, 1.0);
+                if ((newValue - _animatedFillPercentage).abs() > 0.001) {
+                  _animatedFillPercentage = newValue;
+                  setState(() {});
+                }
               }
             });
             _fillController.forward();
+          } else if (currentAnimatedFill == 0.0 && targetFill > 0.0) {
+            // İlk render'da direkt atama (animasyonsuz)
+            _animatedFillPercentage = targetFill;
+            if (mounted) {
+              setState(() {});
+            }
           }
         });
         
@@ -168,84 +189,112 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Sol: Günlük Seri Butonu (Dairesel + Progress Ring)
-                    GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SuccessScreen(),
+                    // Sol: Günlük Seri/Challenge Butonu (Dinamik)
+                    Consumer<ChallengeProvider>(
+                      builder: (context, challengeProvider, child) {
+                        // Aktif mücadeleleri kontrol et (tamamlanmamış)
+                        final activeChallenges = challengeProvider.activeIncompleteChallenges;
+                        final hasActiveChallenge = activeChallenges.isNotEmpty;
+                        
+                        // Eğer aktif mücadele varsa, ilk mücadelenin bilgilerini al
+                        Challenge? firstActiveChallenge;
+                        String displayText = '${userProvider.consecutiveDays}';
+                        IconData displayIcon = Icons.local_fire_department;
+                        Color iconColor = AppColors.softPinkButton;
+                        Color progressColor = AppColors.softPinkButton;
+                        
+                        if (hasActiveChallenge) {
+                          firstActiveChallenge = activeChallenges.first;
+                          displayIcon = Icons.emoji_events; // Kupa ikonu
+                          iconColor = Colors.orange; // Altın sarısı
+                          progressColor = Colors.orange;
+                          
+                          // İlerleme yüzdesini göster (örn: %20)
+                          final progressPercent = (firstActiveChallenge.progress * 100).toInt();
+                          displayText = '$progressPercent%';
+                        }
+                        
+                        return GestureDetector(
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SuccessScreen(),
+                              ),
+                            );
+                            
+                            if (!mounted) return;
+                            
+                            // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
+                            if (result == 'open_challenges_panel') {
+                              _challengeSheetController.animateTo(
+                                0.85,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          },
+                          child: SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Progress Ring (Günlük hedefe göre veya mücadele ilerlemesine göre)
+                                SizedBox(
+                                  width: 60,
+                                  height: 60,
+                                  child: CircularProgressIndicator(
+                                    value: hasActiveChallenge && firstActiveChallenge != null
+                                        ? firstActiveChallenge.progress.clamp(0.0, 1.0)
+                                        : progressPercentage / 100,
+                                    strokeWidth: 4,
+                                    backgroundColor: Colors.grey[300],
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      progressColor,
+                                    ),
+                                  ),
+                                ),
+                                // İçerideki Dairesel Buton
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        displayIcon,
+                                        color: iconColor,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        displayText,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: iconColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
-                        
-                        if (!mounted) return;
-                        
-                        // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
-                        if (result == 'open_challenges_panel') {
-                          _challengeSheetController.animateTo(
-                            0.85,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                          );
-                        }
                       },
-                      child: SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Progress Ring (Günlük hedefe göre dolan)
-                            SizedBox(
-                              width: 60,
-                              height: 60,
-                              child: CircularProgressIndicator(
-                                value: progressPercentage / 100,
-                                strokeWidth: 4,
-                                backgroundColor: Colors.grey[300],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.softPinkButton,
-                                ),
-                              ),
-                            ),
-                            // İçerideki Dairesel Buton
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.local_fire_department,
-                                    color: AppColors.softPinkButton,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${userProvider.consecutiveDays}',
-          style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.softPinkButton,
-          ),
-        ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                     
                     // Sağ: Dairesel Coin Butonu
@@ -296,7 +345,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Center(
                   child: Text(
-                    '${UnitConverter.formatVolume(consumedAmount, userProvider.isMetric)} İçildi',
+                    '${UnitConverter.formatVolume(currentIntake, userProvider.isMetric)} İçildi',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w400,
@@ -343,87 +392,73 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                         child: Stack(
                           alignment: Alignment.center,
                           clipBehavior: Clip.antiAlias, // Overflow kapama
-              children: [
-                    // Dış Çerçeve - Kalın Border ile Yuvarlak Fanus
-                Container(
-                      width: MediaQuery.of(context).size.width * 0.65,
-                      height: MediaQuery.of(context).size.width * 0.65,
-                  decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                    border: Border.all(
-                            color: AppColors.softPinkButton,
-                            width: 6, // Kalın border
-                          ),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.softPinkButton.withValues(alpha: 0.1),
-                              const Color(0xFF9B7EDE).withValues(alpha: 0.1), // Mor
-                              const Color(0xFF6B9BD1).withValues(alpha: 0.1), // Mavi
-                            ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                              color: AppColors.softPinkButton.withValues(alpha: 0.3),
-                              blurRadius: 30,
-                        offset: const Offset(0, 10),
-                              spreadRadius: 5,
+                          children: [
+                            // KATMAN 1 (EN ALT): Arka Plan - Beyaz arka plan
+                            Container(
+                              width: MediaQuery.of(context).size.width * 0.65,
+                              height: MediaQuery.of(context).size.width * 0.65,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white, // Beyaz arka plan
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.softPinkButton.withValues(alpha: 0.3),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 10),
+                                    spreadRadius: 5,
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0xFF9B7EDE).withValues(alpha: 0.2),
+                                    blurRadius: 20,
+                                    offset: const Offset(-5, -5),
+                                  ),
+                                ],
+                              ),
                             ),
-                            BoxShadow(
-                              color: const Color(0xFF9B7EDE).withValues(alpha: 0.2),
-                        blurRadius: 20,
-                              offset: const Offset(-5, -5),
-                      ),
-                    ],
-                  ),
-                      ),
-                      
-                      // Su Seviyesi - ClipOval ile Taşma Önleme, RepaintBoundary ile Optimize
-                      RepaintBoundary(
-                        child: ClipOval(
-                          clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar ve kesin maskeleme
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.65, // Tank genişliğiyle birebir aynı
-                            height: MediaQuery.of(context).size.width * 0.65, // Tank yüksekliğiyle birebir aynı
-                            child: Stack(
-                              alignment: Alignment.bottomCenter,
-                              clipBehavior: Clip.antiAlias, // Stack içinde de taşmayı önle
-                              children: [
-                                // Su doluluk animasyonu - Plan loading ekranındaki gibi
-                                if (_animatedFillPercentage > 0)
-                                  AnimatedBuilder(
-                                    animation: Listenable.merge([_fillAnimation, _bubbleController]),
-                                    builder: (context, child) {
-                                      final tankSize = MediaQuery.of(context).size.width * 0.65;
-                                      // Animasyonlu su yüksekliği
-                                      final waterHeight = (tankSize * _animatedFillPercentage).clamp(0.0, tankSize);
-                                      final waterTop = tankSize - waterHeight; // Su seviyesinin üst noktası
-                                      
-                                      return Positioned(
-                                        bottom: 0,
-                                        left: 0,
-                                        child: ClipOval(
-                                          clipBehavior: Clip.antiAlias,
-                                          child: SizedBox(
+                            
+                            // KATMAN 2 (ORTA): Su Seviyesi - ClipOval ile Taşma Önleme
+                            RepaintBoundary(
+                              child: ClipOval(
+                                clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar ve kesin maskeleme
+                                child: SizedBox(
+                                  width: MediaQuery.of(context).size.width * 0.65,
+                                  height: MediaQuery.of(context).size.width * 0.65,
+                                  child: Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    clipBehavior: Clip.antiAlias,
+                                    children: [
+                                      // Su doluluk animasyonu - Plan loading ekranındaki gibi
+                                      AnimatedBuilder(
+                                        animation: Listenable.merge([_fillAnimation, _bubbleController, _waveController]),
+                                        builder: (context, child) {
+                                          final tankSize = MediaQuery.of(context).size.width * 0.65;
+                                          // fillPercentage'ı direkt kullan (animasyonlu değer yerine) - daha güvenilir
+                                          final currentFill = fillPercentage.clamp(0.0, 1.0);
+                                          // Su yüksekliğini currentFill'e göre hesapla (tankın tepesine kadar dolsun)
+                                          final waterHeight = tankSize * currentFill;
+                                          final waterTop = tankSize - waterHeight; // Su seviyesinin üst noktası
+                                          
+                                          return SizedBox(
                                             width: tankSize,
                                             height: tankSize,
                                             child: Stack(
                                               alignment: Alignment.bottomCenter,
+                                              clipBehavior: Clip.antiAlias,
                                               children: [
-                                                // Ana su katmanı (dibinden başlayarak)
-                                                Positioned(
-                                                  bottom: 0,
-                                                  left: 0,
-                                                  right: 0,
-                                                  height: waterHeight,
-                                                  child: Container(
-                                                    color: AppColors.waterColor.withValues(alpha: 0.8),
+                                                // Ana su katmanı (dibinden başlayarak) - Ferah ve belirgin mavi
+                                                if (waterHeight > 0)
+                                                  Positioned(
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: waterHeight,
+                                                    child: Container(
+                                                      color: const Color(0xFF4FC3F7), // Ferah mavi - belirgin renk
+                                                    ),
                                                   ),
-                                                ),
                                                 
-                                                // Wave efekti (sadece su seviyesinin üstünde görünür)
-                                                if (_animatedFillPercentage > 0.1)
+                                                // Wave efekti (sadece su seviyesinin üstünde görünür) - Ferah mavi dalgalar
+                                                if (currentFill > 0.05 && waterHeight > 15)
                                                   Positioned(
                                                     bottom: waterHeight - 20, // Wave'in su seviyesinin biraz altında başlaması
                                                     left: 0,
@@ -435,16 +470,16 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                                           config: CustomConfig(
                                                             gradients: [
                                                               [
-                                                                AppColors.waterColor.withValues(alpha: 0.3),
-                                                                AppColors.waterColor.withValues(alpha: 0.5),
+                                                                const Color(0xFF4FC3F7).withOpacity(0.7), // Ferah mavi
+                                                                const Color(0xFF0288D1).withOpacity(0.5), // Derin mavi
                                                               ],
                                                               [
-                                                                AppColors.waterColor.withValues(alpha: 0.4),
-                                                                AppColors.waterColor.withValues(alpha: 0.6),
+                                                                const Color(0xFF4FC3F7).withOpacity(0.6),
+                                                                const Color(0xFF0288D1).withOpacity(0.4),
                                                               ],
                                                             ],
-                                                            durations: [4000, 5000],
-                                                            heightPercentages: [0.20, 0.25],
+                                                            durations: const [4000, 5000],
+                                                            heightPercentages: const [0.20, 0.25],
                                                           ),
                                                           waveAmplitude: 5.0,
                                                           waveFrequency: 1.5,
@@ -456,47 +491,60 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                                                   ),
                                                 
                                                 // Yükselen kabarcıklar
-                                                ..._bubbles.map((bubble) {
-                                                  final bubbleProgress = ((_bubbleController.value * 2 + bubble.delay) % 2) / 2;
-                                                  final bubbleY = tankSize - (bubbleProgress * waterHeight * 0.8);
-                                                  
-                                                  // Sadece su içindeyse göster
-                                                  if (bubbleY > waterTop && bubbleY < tankSize) {
-                                                    final bubbleX = bubble.startX * tankSize;
-                                                    return Positioned(
-                                                      left: bubbleX - bubble.size / 2,
-                                                      bottom: tankSize - bubbleY - bubble.size / 2,
-                                                      child: Opacity(
-                                                        opacity: math.max(0, 1 - bubbleProgress * 1.5),
-                                                        child: Container(
-                                                          width: bubble.size,
-                                                          height: bubble.size,
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: Colors.white.withValues(alpha: 0.3),
-                                                            border: Border.all(
-                                                              color: Colors.white.withValues(alpha: 0.5),
-                                                              width: 1,
+                                                if (waterHeight > 0)
+                                                  ..._bubbles.map((bubble) {
+                                                    final bubbleProgress = ((_bubbleController.value * 2 + bubble.delay) % 2) / 2;
+                                                    final bubbleY = tankSize - (bubbleProgress * waterHeight * 0.8);
+                                                    
+                                                    // Sadece su içindeyse göster
+                                                    if (bubbleY > waterTop && bubbleY < tankSize && waterHeight > 10) {
+                                                      final bubbleX = bubble.startX * tankSize;
+                                                      return Positioned(
+                                                        left: bubbleX - bubble.size / 2,
+                                                        bottom: tankSize - bubbleY - bubble.size / 2,
+                                                        child: Opacity(
+                                                          opacity: math.max(0, 1 - bubbleProgress * 1.5),
+                                                          child: Container(
+                                                            width: bubble.size,
+                                                            height: bubble.size,
+                                                            decoration: BoxDecoration(
+                                                              shape: BoxShape.circle,
+                                                              color: Colors.white.withValues(alpha: 0.3),
+                                                              border: Border.all(
+                                                                color: Colors.white.withValues(alpha: 0.5),
+                                                                width: 1,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
-                                                      ),
-                                                    );
-                                                  }
-                                                  return const SizedBox.shrink();
-                                                }),
+                                                      );
+                                                    }
+                                                    return const SizedBox.shrink();
+                                                  }),
                                               ],
                                             ),
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
-                              ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
+                            
+                            // KATMAN 3 (EN ÜST): Dış Sınır Çizgisi - Her zaman görünür olmalı
+                            Container(
+                              width: MediaQuery.of(context).size.width * 0.65,
+                              height: MediaQuery.of(context).size.width * 0.65,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.transparent, // Şeffaf içerik
+                                border: Border.all(
+                                  color: AppColors.softPinkButton,
+                                  width: 6, // Kalın border
+                                ),
+                              ),
+                            ),
                       
                       // Modüler dekorasyonlar - Yuvarlak tank için optimize edilmiş
                       ...decorations.map((decoration) {
@@ -984,9 +1032,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    if (mounted) {
-                      setState(() {}); // UI'ı güncelle (coin miktarı için)
-                    }
+                    // setState kaldırıldı - Consumer widget'ı zaten otomatik güncellenecek
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,

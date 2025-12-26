@@ -87,6 +87,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     ),
+                    _buildProfileButton(
+                      icon: Icons.wb_sunny,
+                      label: 'İklim',
+                      value: _getClimateText(userProvider.userData.climate),
+                      isPlaceholder: userProvider.userData.climate == null,
+                      onTap: () => _showClimateDialog(context, userProvider),
+                    ),
                   ],
                 ),
                 
@@ -351,6 +358,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return 'Orta';
       case 'high':
         return 'Yüksek';
+      default:
+        return 'Belirtilmemiş';
+    }
+  }
+
+  String _getClimateText(String? climate) {
+    if (climate == null) {
+      return 'Belirtilmemiş';
+    }
+    switch (climate) {
+      case 'very_hot':
+        return 'Çok Sıcak';
+      case 'hot':
+        return 'Sıcak';
+      case 'warm':
+        return 'Ilıman';
+      case 'cold':
+        return 'Soğuk';
       default:
         return 'Belirtilmemiş';
     }
@@ -708,6 +733,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showClimateDialog(BuildContext context, UserProvider userProvider) {
+    final currentClimate = userProvider.userData.climate;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('İklim Seçimi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Çok Sıcak
+            ListTile(
+              leading: Icon(
+                Icons.wb_sunny,
+                color: currentClimate == 'very_hot' 
+                    ? AppColors.softPinkButton 
+                    : Colors.grey[400],
+              ),
+              title: const Text('Çok Sıcak'),
+              trailing: currentClimate == 'very_hot' 
+                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
+                  : null,
+              onTap: () async {
+                await userProvider.updateProfile(climate: 'very_hot');
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
+              },
+            ),
+            // Sıcak
+            ListTile(
+              leading: Icon(
+                Icons.wb_twilight,
+                color: currentClimate == 'hot' 
+                    ? AppColors.softPinkButton 
+                    : Colors.grey[400],
+              ),
+              title: const Text('Sıcak'),
+              trailing: currentClimate == 'hot' 
+                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
+                  : null,
+              onTap: () async {
+                await userProvider.updateProfile(climate: 'hot');
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
+              },
+            ),
+            // Ilıman
+            ListTile(
+              leading: Icon(
+                Icons.wb_cloudy,
+                color: currentClimate == 'warm' 
+                    ? AppColors.softPinkButton 
+                    : Colors.grey[400],
+              ),
+              title: const Text('Ilıman'),
+              trailing: currentClimate == 'warm' 
+                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
+                  : null,
+              onTap: () async {
+                await userProvider.updateProfile(climate: 'warm');
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
+              },
+            ),
+            // Soğuk
+            ListTile(
+              leading: Icon(
+                Icons.ac_unit,
+                color: currentClimate == 'cold' 
+                    ? AppColors.softPinkButton 
+                    : Colors.grey[400],
+              ),
+              title: const Text('Soğuk'),
+              trailing: currentClimate == 'cold' 
+                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
+                  : null,
+              onTap: () async {
+                await userProvider.updateProfile(climate: 'cold');
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
               },
             ),
           ],
