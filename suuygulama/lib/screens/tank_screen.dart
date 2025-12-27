@@ -17,6 +17,7 @@ import '../providers/drink_provider.dart';
 import '../utils/unit_converter.dart';
 import 'drink_gallery_screen.dart';
 import 'success_screen.dart';
+import 'dart:async';
 
 class TankScreen extends StatefulWidget {
   const TankScreen({super.key});
@@ -189,111 +190,29 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Sol: Günlük Seri/Challenge Butonu (Dinamik)
-                    Consumer<ChallengeProvider>(
-                      builder: (context, challengeProvider, child) {
-                        // Aktif mücadeleleri kontrol et (tamamlanmamış)
-                        final activeChallenges = challengeProvider.activeIncompleteChallenges;
-                        final hasActiveChallenge = activeChallenges.isNotEmpty;
-                        
-                        // Eğer aktif mücadele varsa, ilk mücadelenin bilgilerini al
-                        Challenge? firstActiveChallenge;
-                        String displayText = '${userProvider.consecutiveDays}';
-                        IconData displayIcon = Icons.local_fire_department;
-                        Color iconColor = AppColors.softPinkButton;
-                        Color progressColor = AppColors.softPinkButton;
-                        
-                        if (hasActiveChallenge) {
-                          firstActiveChallenge = activeChallenges.first;
-                          displayIcon = Icons.emoji_events; // Kupa ikonu
-                          iconColor = Colors.orange; // Altın sarısı
-                          progressColor = Colors.orange;
-                          
-                          // İlerleme yüzdesini göster (örn: %20)
-                          final progressPercent = (firstActiveChallenge.progress * 100).toInt();
-                          displayText = '$progressPercent%';
-                        }
-                        
-                        return GestureDetector(
-                          onTap: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SuccessScreen(),
-                              ),
-                            );
-                            
-                            if (!mounted) return;
-                            
-                            // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
-                            if (result == 'open_challenges_panel') {
-                              _challengeSheetController.animateTo(
-                                0.85,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
-                            }
-                          },
-                          child: SizedBox(
-                            width: 60,
-                            height: 60,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Progress Ring (Günlük hedefe göre veya mücadele ilerlemesine göre)
-                                SizedBox(
-                                  width: 60,
-                                  height: 60,
-                                  child: CircularProgressIndicator(
-                                    value: hasActiveChallenge && firstActiveChallenge != null
-                                        ? firstActiveChallenge.progress.clamp(0.0, 1.0)
-                                        : progressPercentage / 100,
-                                    strokeWidth: 4,
-                                    backgroundColor: Colors.grey[300],
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      progressColor,
-                                    ),
-                                  ),
-                                ),
-                                // İçerideki Dairesel Buton
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        displayIcon,
-                                        color: iconColor,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        displayText,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: iconColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                    // Sol: Günlük Seri/Challenge Butonu (Akıllı ve Hareketli)
+                    _StatusToggleButton(
+                      challengeProvider: Provider.of<ChallengeProvider>(context, listen: false),
+                      userProvider: userProvider,
+                      progressPercentage: progressPercentage,
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SuccessScreen(),
                           ),
                         );
+                        
+                        if (!mounted) return;
+                        
+                        // Eğer 'open_challenges_panel' döndüyse, mücadele panelini aç
+                        if (result == 'open_challenges_panel') {
+                          _challengeSheetController.animateTo(
+                            0.85,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
                       },
                     ),
                     
@@ -1244,4 +1163,247 @@ class _Bubble {
     required this.speed,
     required this.delay,
   });
+}
+
+// Akıllı ve Hareketli Durum Butonu
+class _StatusToggleButton extends StatefulWidget {
+  final ChallengeProvider challengeProvider;
+  final UserProvider userProvider;
+  final double progressPercentage;
+  final VoidCallback onTap;
+
+  const _StatusToggleButton({
+    required this.challengeProvider,
+    required this.userProvider,
+    required this.progressPercentage,
+    required this.onTap,
+  });
+
+  @override
+  State<_StatusToggleButton> createState() => _StatusToggleButtonState();
+}
+
+class _StatusToggleButtonState extends State<_StatusToggleButton> {
+  Timer? _toggleTimer;
+  bool _showChallenge = false; // false = Streak, true = Challenge
+  Challenge? _firstActiveChallenge;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkActiveChallenge();
+    
+    // Eğer aktif mücadele varsa, 3.5 saniyede bir geçiş yap
+    if (_firstActiveChallenge != null) {
+      _toggleTimer = Timer.periodic(const Duration(milliseconds: 3500), (timer) {
+        if (mounted) {
+          setState(() {
+            _showChallenge = !_showChallenge;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _toggleTimer?.cancel();
+    super.dispose();
+  }
+
+  void _checkActiveChallenge() {
+    final activeChallenges = widget.challengeProvider.activeIncompleteChallenges;
+    final hasActiveChallenge = activeChallenges.isNotEmpty;
+    
+    if (hasActiveChallenge) {
+      _firstActiveChallenge = activeChallenges.first;
+      // Timer'ı başlat (eğer henüz başlatılmadıysa)
+      if (_toggleTimer == null || !_toggleTimer!.isActive) {
+        _toggleTimer?.cancel();
+        _toggleTimer = Timer.periodic(const Duration(milliseconds: 3500), (timer) {
+          if (mounted) {
+            setState(() {
+              _showChallenge = !_showChallenge;
+            });
+          }
+        });
+      }
+    } else {
+      _firstActiveChallenge = null;
+      // Timer'ı durdur (mücadele yoksa)
+      _toggleTimer?.cancel();
+      _toggleTimer = null;
+      if (mounted && _showChallenge) {
+        setState(() {
+          _showChallenge = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Aktif mücadele durumunu tekrar kontrol et (provider güncellenmiş olabilir)
+    _checkActiveChallenge();
+    final hasActiveChallenge = _firstActiveChallenge != null;
+
+    // Aktif mücadele yoksa, sadece Streak göster (sabit)
+    if (!hasActiveChallenge) {
+      return GestureDetector(
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: 60,
+          height: 60,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Progress Ring (Günlük hedef) - Pembe/Kırmızı tonlarında
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: CircularProgressIndicator(
+                  value: widget.progressPercentage / 100,
+                  strokeWidth: 4,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.softPinkButton,
+                  ),
+                ),
+              ),
+              // İçerideki Dairesel Buton (Streak)
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.local_fire_department,
+                      color: AppColors.softPinkButton,
+                      size: 20,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${widget.userProvider.consecutiveDays}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.softPinkButton,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Aktif mücadele varsa, iki görünüm arasında geçiş yap
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: SizedBox(
+        width: 60,
+        height: 60,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Progress Ring (Mücadele ilerlemesi veya Streak)
+            SizedBox(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                value: _showChallenge && _firstActiveChallenge != null
+                    ? _firstActiveChallenge!.progress.clamp(0.0, 1.0)
+                    : widget.progressPercentage / 100,
+                strokeWidth: 4,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _showChallenge ? Colors.orange : AppColors.softPinkButton,
+                ),
+              ),
+            ),
+            // İçerideki Dairesel Buton (AnimatedSwitcher ile geçiş)
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  );
+                },
+                child: _showChallenge
+                    ? Column(
+                        key: const ValueKey('challenge'),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.emoji_events,
+                            color: Colors.orange,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${(_firstActiveChallenge!.progress * 100).toInt()}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        key: const ValueKey('streak'),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.local_fire_department,
+                            color: AppColors.softPinkButton,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${widget.userProvider.consecutiveDays}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.softPinkButton,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -23,7 +23,7 @@ class WaterProvider extends ChangeNotifier {
   DateTime? _lastResetDate;
   bool _isFirstDrink = true;
   Map<String, double> _drinkHistory = {}; // Tarih (YYYY-MM-DD) -> Miktar (ml) - geriye dönük uyumluluk için
-  Map<String, List<DrinkEntry>> _detailedDrinkHistory = {}; // Tarih (YYYY-MM-DD) -> İçecek girişleri listesi
+  final Map<String, List<DrinkEntry>> _detailedDrinkHistory = {}; // Tarih (YYYY-MM-DD) -> İçecek girişleri listesi
   bool _earlyBirdClaimed = false; // Erken Kuş bonusu bugün alındı mı?
   bool _nightOwlClaimed = false; // Gece Kuşu bonusu bugün alındı mı?
   bool _dailyGoalBonusClaimed = false; // Günlük hedef bonusu bugün alındı mı?
@@ -179,6 +179,27 @@ class WaterProvider extends ChangeNotifier {
         }
       } else {
         _drinkHistory = {};
+      }
+      
+      // Detaylı içecek geçmişini yükle
+      final detailedHistoryJson = prefs.getString(_detailedDrinkHistoryKey);
+      if (detailedHistoryJson != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(detailedHistoryJson);
+          _detailedDrinkHistory.clear();
+          _detailedDrinkHistory.addAll(
+            decoded.map(
+              (key, value) => MapEntry(
+                key,
+                (value as List).map((e) => DrinkEntry.fromJson(e as Map<String, dynamic>)).toList(),
+              ),
+            ),
+          );
+        } catch (e) {
+          _detailedDrinkHistory.clear();
+        }
+      } else {
+        _detailedDrinkHistory.clear();
       }
       
       // Bonus flag'lerini yükle

@@ -8,11 +8,13 @@ class UserProvider extends ChangeNotifier {
   static const String _lastResetDateKey = 'last_reset_date';
   static const String _consecutiveDaysKey = 'consecutive_days';
   static const String _isMetricKey = 'is_metric'; // Birim sistemi (true = Metric, false = Imperial)
+  static const String _lastStreakIncrementDateKey = 'last_streak_increment_date'; // Son streak artış tarihi
   
   UserModel _userData = UserModel.initial();
   DateTime? _lastResetDate;
   int _consecutiveDays = 0;
   bool _isMetric = true; // Varsayılan olarak Metric (kg, L, ml)
+  DateTime? _lastStreakIncrementDate; // Bugün streak artırıldı mı kontrolü için
 
   UserModel get userData => _userData;
   int get consecutiveDays => _consecutiveDays;
@@ -42,6 +44,18 @@ class UserProvider extends ChangeNotifier {
       
       // Ardışık gün sayısını yükle
       _consecutiveDays = prefs.getInt(_consecutiveDaysKey) ?? 0;
+      
+      // Son streak artış tarihini yükle
+      final lastStreakIncrementDateString = prefs.getString(_lastStreakIncrementDateKey);
+      if (lastStreakIncrementDateString != null) {
+        try {
+          _lastStreakIncrementDate = DateTime.parse(lastStreakIncrementDateString);
+        } catch (e) {
+          _lastStreakIncrementDate = null;
+        }
+      } else {
+        _lastStreakIncrementDate = null;
+      }
       
       // Birim sistemini yükle (varsayılan: Metric)
       _isMetric = prefs.getBool(_isMetricKey) ?? true;
@@ -77,6 +91,8 @@ class UserProvider extends ChangeNotifier {
     // Yeni gün başladıysa
     if (today.isAfter(lastReset)) {
       _lastResetDate = today;
+      // Yeni gün başladığında streak artış tarihini sıfırla
+      _lastStreakIncrementDate = null;
       await _saveUserData();
     }
   }
@@ -98,6 +114,13 @@ class UserProvider extends ChangeNotifier {
       
       // Ardışık gün sayısını kaydet
       await prefs.setInt(_consecutiveDaysKey, _consecutiveDays);
+      
+      // Son streak artış tarihini kaydet
+      if (_lastStreakIncrementDate != null) {
+        await prefs.setString(_lastStreakIncrementDateKey, _lastStreakIncrementDate!.toIso8601String());
+      } else {
+        await prefs.remove(_lastStreakIncrementDateKey);
+      }
       
       // Birim sistemini kaydet
       await prefs.setBool(_isMetricKey, _isMetric);
@@ -245,12 +268,38 @@ class UserProvider extends ChangeNotifier {
   // Ardışık gün sayısını güncelle
   Future<void> updateConsecutiveDays(bool goalReached) async {
     if (goalReached) {
-      _consecutiveDays++;
+      // Bugünün tarihini al
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // Bugün streak zaten artırıldı mı kontrol et
+      bool alreadyIncrementedToday = false;
+      if (_lastStreakIncrementDate != null) {
+        final lastIncrement = DateTime(
+          _lastStreakIncrementDate!.year,
+          _lastStreakIncrementDate!.month,
+          _lastStreakIncrementDate!.day,
+        );
+        // Eğer son artış bugün yapıldıysa, tekrar artırma
+        if (today.isAtSameMomentAs(lastIncrement)) {
+          alreadyIncrementedToday = true;
+        }
+      }
+      
+      // Eğer bugün henüz artırılmadıysa, artır ve tarihi kaydet
+      if (!alreadyIncrementedToday) {
+        _consecutiveDays++;
+        _lastStreakIncrementDate = now;
+        await _saveUserData();
+        notifyListeners();
+      }
+      // Eğer zaten artırıldıysa, hiçbir şey yapma (sessizce çık)
     } else {
       _consecutiveDays = 0;
+      _lastStreakIncrementDate = null;
+      await _saveUserData();
+      notifyListeners();
     }
-    await _saveUserData();
-    notifyListeners();
   }
 
   // Bugün yeni gün mü kontrolü

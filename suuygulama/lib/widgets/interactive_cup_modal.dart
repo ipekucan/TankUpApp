@@ -655,11 +655,11 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
             child: AnimatedBuilder(
               animation: Listenable.merge([_waveAnimation, _bubbleAnimation]),
               builder: (context, child) {
-                // Hazır buton seçiliyse %82 sabit, manuel sürükleme ise dinamik
+                // Hazır buton seçiliyse %85 sabit, manuel sürükleme ise dinamik
                 double waterHeight;
                 if (_selectedTemplateAmount != null) {
-                  // Hazır buton seçili - hesaplama yapmadan direkt %82 (daha yüksek seviye)
-                  waterHeight = cupHeight * 0.82;
+                  // Hazır buton seçili - hesaplama yapmadan direkt %85
+                  waterHeight = cupHeight * 0.85;
                 } else {
                   // Manuel ayar - dinamik yükseklik
                   waterHeight = cupHeight * _fillPercentage;
@@ -669,10 +669,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                   return const SizedBox.shrink();
                 }
                 
-                // Hazır buton seçildiğinde su seviyesi %80-85, manuel sürüklemede dinamik
+                // Hazır buton seçildiğinde su seviyesi %85, manuel sürüklemede dinamik
+                // WaveWidget'ta heightPercentages ters çalışır (1.0 = boş, 0.0 = dolu)
+                // Su %85 doluyken, dalga katmanları üst yüzeyde olmalı
                 final isPresetSelected = _selectedTemplateAmount != null;
                 final heightPercentages = isPresetSelected
-                    ? const [0.15, 0.20] // Hazır buton: Su bardağın %80-85'ine kadar dolu (dalga üst yüzeyde)
+                    ? const [0.12, 0.15] // Hazır buton: Su bardağın %85'ine kadar dolu (dalga üst yüzeyde)
                     : [
                         0.20 - (_fillPercentage * 0.15), // Manuel: Dinamik seviye
                         0.25 - (_fillPercentage * 0.20),
@@ -685,12 +687,12 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
                     config: CustomConfig(
                       gradients: [
                         [
-                          const Color(0xFF4FC3F7), // Ferah mavi - daha belirgin
-                          const Color(0xFF0288D1).withOpacity(0.7), // Derin mavi
+                          const Color(0xFFB3E5FC), // Soft mavi
+                          const Color(0xFF81D4FA), // Soft mavi
                         ],
                         [
-                          const Color(0xFF4FC3F7).withOpacity(0.9),
-                          const Color(0xFF0288D1).withOpacity(0.8),
+                          const Color(0xFFB3E5FC).withValues(alpha: 0.9),
+                          const Color(0xFF81D4FA).withValues(alpha: 0.8),
                         ],
                       ],
                       durations: const [4000, 5000],
