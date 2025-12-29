@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'providers/water_provider.dart';
 import 'providers/aquarium_provider.dart';
@@ -20,14 +19,6 @@ void main() async {
   // Release modda tüm print mesajlarını sustur
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
-  }
-  
-  // HAFIZA RESET (Geçici - bir kez çalıştırılacak, sonra silinebilir)
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-  } catch (e) {
-    // Hata durumunda sessizce devam et
   }
   
   // Bildirim servisini arka planda başlat - uygulama başlatmayı engellemesin
@@ -85,31 +76,67 @@ class TankUpApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFA8D5E2),
-            brightness: Brightness.light,
-          ),
-          textTheme: GoogleFonts.nunitoTextTheme(),
-          scaffoldBackgroundColor: AppColors.softBlue,
-          appBarTheme: AppBarTheme(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: true,
-            titleTextStyle: GoogleFonts.nunito(
-              fontSize: 24,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 1.2,
-              color: const Color(0xFF4A5568),
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primaryBlue,
+              secondary: AppColors.secondaryAqua,
+              tertiary: AppColors.accentCoral,
+              surface: AppColors.cardBackground,
+              error: AppColors.errorRed,
+              onPrimary: AppColors.textWhite,
+              onSecondary: AppColors.textWhite,
+              onSurface: AppColors.textPrimary,
+              onError: AppColors.textWhite,
+            ),
+            textTheme: GoogleFonts.nunitoTextTheme().copyWith(
+              bodyLarge: GoogleFonts.nunito(color: AppColors.textPrimary),
+              bodyMedium: GoogleFonts.nunito(color: AppColors.textSecondary),
+              bodySmall: GoogleFonts.nunito(color: AppColors.textTertiary),
+            ),
+            scaffoldBackgroundColor: AppColors.backgroundLight,
+            appBarTheme: AppBarTheme(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: GoogleFonts.nunito(
+                fontSize: 24,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 1.2,
+                color: AppColors.textSecondary,
+              ),
+              iconTheme: const IconThemeData(color: AppColors.textPrimary),
+            ),
+            cardTheme: CardThemeData(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: AppColors.cardBorder,
+                  width: 1,
+                ),
+              ),
+              color: AppColors.cardBackground,
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.buttonPrimary,
+                foregroundColor: AppColors.textWhite,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: GoogleFonts.nunito(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            floatingActionButtonTheme: FloatingActionButtonThemeData(
+              backgroundColor: AppColors.buttonSecondary,
+              foregroundColor: AppColors.textWhite,
+              elevation: 4,
             ),
           ),
-          cardTheme: CardThemeData(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(25),
-            ),
-            color: Colors.white,
-          ),
-        ),
         home: const SplashScreen(),
         ),
       ),

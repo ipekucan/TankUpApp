@@ -482,12 +482,12 @@ class _TankRoomScreenState extends State<TankRoomScreen>
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: AppColors.softPink.withValues(alpha: 0.6),
+            color: AppColors.softPinkButton.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(25),
           ),
           child: const Icon(
             Icons.auto_awesome,
-            color: AppColors.softPink,
+            color: AppColors.softPinkButton,
             size: 28,
           ),
         );

@@ -29,14 +29,32 @@ class ChallengeProvider extends ChangeNotifier {
             orElse: () => ChallengeData.getChallenges().first,
           );
           
-          // İlerleme verilerini yükle
+          // İlerleme verilerini yükle - SAHTE VERİLERİ TEMİZLE
           final progressKey = _challengeProgressKey + json['id'];
-          final currentProgress = prefs.getDouble(progressKey) ?? 0.0;
-          final isCompleted = prefs.getBool('challenge_${json['id']}_completed') ?? false;
+          final savedProgress = prefs.getDouble(progressKey) ?? 0.0;
+          final savedCompleted = prefs.getBool('challenge_${json['id']}_completed') ?? false;
+          
+          // İlerleme değerlerini kontrol et - geçersizse sıfırla
+          final currentProgress = savedProgress > 0.0 ? savedProgress : 0.0;
+          final isCompleted = savedCompleted;
+          
+          // İlerleme yüzdesini hesapla (0-1 arası)
+          final progress = currentProgress > 0.0 && challengeData.targetValue > 0.0
+              ? (currentProgress / challengeData.targetValue).clamp(0.0, 1.0)
+              : 0.0;
+          
+          // Progress text oluştur (sadece ilerleme varsa)
+          final progressText = isCompleted 
+              ? 'Tamamlandı! 🎉'
+              : (currentProgress > 0.0 
+                  ? '${currentProgress.toStringAsFixed(1)} / ${challengeData.targetValue.toStringAsFixed(1)}'
+                  : '');
           
           return challengeData.copyWith(
             currentProgress: currentProgress,
             isCompleted: isCompleted,
+            progress: progress,
+            progressText: progressText,
           );
         }).toList();
       }
@@ -62,14 +80,22 @@ class ChallengeProvider extends ChangeNotifier {
         (c) => c.id == challengeId,
       );
       
+      // Mücadeleyi sıfırdan başlat (currentProgress: 0.0, isCompleted: false)
+      final newChallenge = challenge.copyWith(
+        currentProgress: 0.0,
+        isCompleted: false,
+        progress: 0.0,
+        progressText: '',
+      );
+      
       // Eğer tamamlanmış bir mücadele varsa, yeni bir örnek olarak ekle
       final existingIndex = _activeChallenges.indexWhere((c) => c.id == challengeId);
       if (existingIndex != -1) {
         // Mevcut mücadeleyi yeni bir örnekle değiştir (sıfırdan başlat)
-        _activeChallenges[existingIndex] = challenge;
+        _activeChallenges[existingIndex] = newChallenge;
       } else {
         // Aktif mücadelelere ekle
-        _activeChallenges.add(challenge);
+        _activeChallenges.add(newChallenge);
       }
       
       // SharedPreferences'a kaydet

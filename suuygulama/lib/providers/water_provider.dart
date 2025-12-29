@@ -6,6 +6,7 @@ import '../models/water_model.dart';
 import '../models/drink_model.dart';
 import '../models/drink_entry_model.dart';
 import 'challenge_provider.dart';
+import '../utils/date_helpers.dart';
 
 class WaterProvider extends ChangeNotifier {
   static const String _waterDataKey = 'water_data';
@@ -61,7 +62,7 @@ class WaterProvider extends ChangeNotifier {
     final end = DateTime(endDate.year, endDate.month, endDate.day);
     
     while (!current.isAfter(end)) {
-      final dateKey = _getDateKey(current);
+      final dateKey = DateHelpers.toDateKey(current);
       entries.addAll(_detailedDrinkHistory[dateKey] ?? []);
       current = current.add(const Duration(days: 1));
     }
@@ -102,20 +103,18 @@ class WaterProvider extends ChangeNotifier {
       if (waterDataJson != null) {
         try {
           final Map<String, dynamic> decoded = jsonDecode(waterDataJson);
-          _waterData = WaterModel.fromJson(decoded);
+          final loadedData = WaterModel.fromJson(decoded);
           
           // Eğer günlük hedef 5L değilse güncelle (eski veriler için)
-          if (_waterData.dailyGoal != 5000.0) {
-            _waterData = _waterData.copyWith(dailyGoal: 5000.0);
-          }
+          final dailyGoal = loadedData.dailyGoal != 5000.0 ? 5000.0 : loadedData.dailyGoal;
           
-          // consumedAmount'u kesinlikle kontrol et ve 0.0 yap
-          // Null, negatif, NaN veya geçersiz değerler için 0.0 ata
-          if (_waterData.consumedAmount.isNaN || 
-              _waterData.consumedAmount.isInfinite || 
-              _waterData.consumedAmount < 0) {
-            _waterData = _waterData.copyWith(consumedAmount: 0.0);
-          }
+          // consumedAmount'u KESINLIKLE 0.0 yap (sahte verileri temizlemek için)
+          _waterData = loadedData.copyWith(
+            dailyGoal: dailyGoal,
+            consumedAmount: 0.0, // Her zaman 0.0 ile başla
+            progressPercentage: 0.0, // İlerleme de %0
+            dailyCalories: 0.0, // Kalori de 0
+          );
         } catch (e) {
           // JSON parse hatası durumunda varsayılan değerlerle başla
           _waterData = WaterModel.initial();
@@ -126,15 +125,9 @@ class WaterProvider extends ChangeNotifier {
       }
       
       // consumedAmount'un kesinlikle 0.0 olduğundan emin ol (ekstra güvenlik)
-      // Eğer consumedAmount geçersiz bir değerse veya 0 değilse, kontrol et
-      if (_waterData.consumedAmount.isNaN || 
-          _waterData.consumedAmount.isInfinite || 
-          _waterData.consumedAmount < 0) {
-        _waterData = _waterData.copyWith(consumedAmount: 0.0);
+      if (_waterData.consumedAmount != 0.0) {
+        _waterData = _waterData.copyWith(consumedAmount: 0.0, progressPercentage: 0.0);
       }
-      
-      // Yeni gün başlamışsa veya veri yoksa consumedAmount kesinlikle 0.0 olmalı
-      // Bu kontrol _checkAndResetDay() içinde de yapılıyor ama burada da emin oluyoruz
       
       // Son su içme zamanını yükle
       final lastDrinkTimeString = prefs.getString(_lastDrinkTimeKey);
@@ -214,11 +207,15 @@ class WaterProvider extends ChangeNotifier {
       _cleanOldHistory();
       _cleanOldDetailedHistory();
       
-      // consumedAmount'un kesinlikle 0.0 olduğundan emin ol (son kontrol)
-      // Eski veriyi temizle - bir kerelik sıfırlama (tank dolu başlama sorununu çözmek için)
-      if (_waterData.consumedAmount != 0.0) {
-        _waterData = _waterData.copyWith(consumedAmount: 0.0);
-        // Eski veriyi hafızadan da temizle
+      // SAHTE VERİLERİ TEMİZLE: consumedAmount her zaman 0.0 olmalı (ekstra güvenlik)
+      // Bu kontrol _checkAndResetDay() içinde de yapılıyor ama burada da emin oluyoruz
+      if (_waterData.consumedAmount != 0.0 || _waterData.progressPercentage != 0.0 || _waterData.dailyCalories != 0.0) {
+        _waterData = _waterData.copyWith(
+          consumedAmount: 0.0,
+          progressPercentage: 0.0,
+          dailyCalories: 0.0,
+        );
+        // Eski veriyi SharedPreferences'tan da temizle
         await prefs.setString(_waterDataKey, jsonEncode(_waterData.toJson()));
       }
       
@@ -414,7 +411,7 @@ class WaterProvider extends ChangeNotifier {
     _lastDrinkTime = now;
 
     // Bugünün tarihini al (YYYY-MM-DD formatında)
-    final todayKey = _getDateKey(now);
+    final todayKey = DateHelpers.toDateKey(now);
     _drinkHistory[todayKey] = (_drinkHistory[todayKey] ?? 0.0) + effectiveAmount;
     
     // Detaylı içecek geçmişine ekle
@@ -556,16 +553,13 @@ class WaterProvider extends ChangeNotifier {
     );
   }
 
-  // Tarih anahtarı oluştur (YYYY-MM-DD)
-  String _getDateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+  // Tarih anahtarı oluştur (moved to DateHelpers utility class)
 
   // Eski detaylı içecek geçmişini temizle
   void _cleanOldDetailedHistory() {
     final now = DateTime.now();
     final cutoffDate = now.subtract(const Duration(days: 30));
-    final cutoffKey = _getDateKey(cutoffDate);
+    final cutoffKey = DateHelpers.toDateKey(cutoffDate);
     
     _detailedDrinkHistory.removeWhere((key, value) {
       return key.compareTo(cutoffKey) < 0;
@@ -576,7 +570,7 @@ class WaterProvider extends ChangeNotifier {
   void _cleanOldHistory() {
     final now = DateTime.now();
     final cutoffDate = now.subtract(const Duration(days: 30));
-    final cutoffKey = _getDateKey(cutoffDate);
+    final cutoffKey = DateHelpers.toDateKey(cutoffDate);
     
     _drinkHistory.removeWhere((key, value) {
       // Tarih karşılaştırması (string karşılaştırması yeterli çünkü YYYY-MM-DD formatı)
@@ -680,7 +674,7 @@ class WaterProvider extends ChangeNotifier {
     await _saveWaterData();
     notifyListeners();
   }
-  
+
   // Test için verileri sıfırla
   Future<void> resetData() async {
     _waterData = WaterModel.initial();

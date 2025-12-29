@@ -8,7 +8,10 @@ import '../providers/user_provider.dart';
 import '../utils/unit_converter.dart';
 import '../models/achievement_model.dart';
 import '../widgets/challenge_card.dart';
+import '../widgets/empty_challenge_card.dart';
 import 'history_screen.dart';
+import '../utils/date_helpers.dart';
+import '../theme/app_text_styles.dart';
 
 class SuccessScreen extends StatefulWidget {
   const SuccessScreen({super.key});
@@ -62,7 +65,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       body: SafeArea(
         child: Column(
           children: [
@@ -74,12 +77,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                   Expanded(
                     child: Text(
                       _getFormattedDate(),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4A5568),
-                        letterSpacing: 0.5,
-                      ),
+                      style: AppTextStyles.dateText,
                     ),
                   ),
                   // Kapatma Butonu (X)
@@ -139,14 +137,8 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                   dividerColor: Colors.transparent,
                   labelColor: Colors.white,
                   unselectedLabelColor: const Color(0xFF4A5568),
-                  labelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  labelStyle: AppTextStyles.tabLabelSelected,
+                  unselectedLabelStyle: AppTextStyles.tabLabelUnselected,
                   tabs: const [
                     Tab(text: 'İstatistikler'),
                     Tab(text: 'Mücadeleler'),
@@ -188,7 +180,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
       builder: (context, waterProvider, userProvider, child) {
         // Bugünün verilerini al
         final today = DateTime.now();
-        final todayKey = _getDateKey(today);
+        final todayKey = DateHelpers.toDateKey(today);
         final entries = waterProvider.getDrinkEntriesForDate(todayKey);
         
         // İçecek miktarlarını hesapla
@@ -311,7 +303,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   void _showInsightDialog(BuildContext context, WaterProvider waterProvider, UserProvider userProvider) {
     // Bugünün verilerini al
     final today = DateTime.now();
-    final todayKey = _getDateKey(today);
+    final todayKey = DateHelpers.toDateKey(today);
     final entries = waterProvider.getDrinkEntriesForDate(todayKey);
     
     // İçecek miktarlarını hesapla
@@ -427,12 +419,9 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                       ),
                   ],
                 )
-              : const Text(
+              : Text(
                   'Harika gidiyorsun! Her şey yolunda.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+                  style: AppTextStyles.bodyGrey.copyWith(fontSize: 16),
                 ),
         ),
         actions: [
@@ -521,10 +510,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
     );
   }
 
-  // Tarih anahtarı oluştur (yardımcı metod)
-  String _getDateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+  // Tarih anahtarı oluştur (moved to DateHelpers utility class)
 
   // Mücadeleler Sekmesi - Oyunlaştırma Merkezi
   Widget _buildChallengesTab() {
@@ -547,33 +533,26 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFFFF6B6B), // Turuncu-Kırmızı
-                      Color(0xFFFF8E53), // Turuncu
+                      Color(0xFFB3E5FC), // Hafif Mavi (Başlangıç)
+                      Color(0xFF29B6F6), // Gök Mavisi/Sky Blue (Bitiş)
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.orange.withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
+                      color: Colors.blue.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Row(
                   children: [
-                    // Sol: Hediye Kutusu İkonu
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.card_giftcard,
-                        color: Colors.white,
-                        size: 32,
-                      ),
+                    // Sol: Hediye Kutusu İkonu (kutu background'u kaldırıldı)
+                    const Icon(
+                      Icons.card_giftcard,
+                      color: Color(0xFFE91E63), // Canlı pembe/kırmızı
+                      size: 32,
                     ),
                     const SizedBox(width: 16),
                     // Orta: Başlık ve Alt Başlık
@@ -584,7 +563,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                           const Text(
                             'Günün Görevi',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF01579B), // Koyu Lacivert (Daha belirgin)
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -594,40 +573,33 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                             isBefore3PM
                                 ? '15:00\'dan önce 1.5 Litre su iç!'
                                 : 'Bugün 1.5 Litre su iç!',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                            style: const TextStyle(
+                              color: Color(0xFF01579B), // Koyu Lacivert (Daha belirgin)
                               fontSize: 14,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Sağ: Coin Ödülü
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.monetization_on,
-                            color: Colors.amber,
-                            size: 20.0,
+                    // Sağ: Coin Ödülü (hap şeklindeki arka plan kaldırıldı)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber,
+                          size: 28, // Büyütüldü (20 -> 28)
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          '+50 Coin',
+                          style: TextStyle(
+                            color: Color(0xFF01579B), // Koyu Lacivert (Daha belirgin)
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            '+50 Coin',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -647,6 +619,14 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 12),
                 _buildActiveChallengeStatusCard(activeChallenges.first),
+                const SizedBox(height: 16),
+                // Boş Slot Kartı
+                EmptyChallengeSlot(
+                  onTap: () {
+                    // Mücadele keşfet ekranını aç
+                    _showDiscoverChallengesModal(context, challengeProvider);
+                  },
+                ),
                 const SizedBox(height: 24),
               ] else ...[
                 const Text(
@@ -677,25 +657,6 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                 const SizedBox(height: 24),
               ],
               
-              // BÖLÜM 3: KEŞFET BUTONU
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Şimdilik boş - ileride mücadele keşfet ekranına yönlendirilebilir
-                  print('Yeni Mücadeleler Keşfet butonuna tıklandı');
-                },
-                icon: const Icon(Icons.explore),
-                label: const Text('Yeni Mücadeleler Keşfet'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  side: BorderSide(
-                    color: Colors.grey[300]!,
-                    width: 1,
-                  ),
-                ),
-              ),
             ],
           ),
         );
@@ -752,13 +713,30 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      challenge.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4A5568),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            challenge.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4A5568),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Bilgi butonu
+                        InkWell(
+                          onTap: () => _showChallengeInfoDialog(context, challenge),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Icon(
+                            Icons.info_outline,
+                            size: 22,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -793,6 +771,118 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.right,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Mücadele keşfet modal'ı
+  void _showDiscoverChallengesModal(BuildContext context, ChallengeProvider challengeProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(30),
+            topRight: Radius.circular(30),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Başlık
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Yeni Mücadeleler Keşfet',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4A5568),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            // Mücadele Listesi
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: ChallengeData.getChallenges()
+                      .where((challenge) => !challengeProvider.hasActiveChallenge(challenge.id))
+                      .map((challenge) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: ChallengeCard(
+                              challenge: challenge,
+                              onTap: () async {
+                                await challengeProvider.startChallenge(challenge.id);
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  setState(() {}); // Ekranı güncelle
+                                }
+                              },
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mücadele bilgi dialog'u
+  void _showChallengeInfoDialog(BuildContext context, Challenge challenge) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          challenge.name,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4A5568),
+          ),
+        ),
+        content: Text(
+          challenge.description,
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey[700],
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.teal[700],
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text(
+              'Tamam',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

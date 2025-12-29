@@ -8,6 +8,7 @@ import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
 import '../providers/drink_provider.dart';
+import '../utils/drink_helpers.dart';
 
 class DrinkGalleryScreen extends StatefulWidget {
   const DrinkGalleryScreen({super.key});
@@ -81,7 +82,7 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
         }
         
         return Scaffold(
-          backgroundColor: AppColors.verySoftBlue,
+          backgroundColor: AppColors.backgroundSubtle,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -190,12 +191,12 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
               width: 70,
               height: 70,
               decoration: BoxDecoration(
-                color: _getDrinkColor(drink.id).withValues(alpha: 0.15),
+                color: DrinkHelpers.getColor(drink.id).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _getDrinkIcon(drink.id),
-                color: _getDrinkColor(drink.id),
+                DrinkHelpers.getIcon(drink.id),
+                color: DrinkHelpers.getColor(drink.id),
                 size: 36,
               ),
             ),
@@ -227,6 +228,9 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     if (!mounted) return;
     final TextEditingController customAmountController = TextEditingController();
     
+    // Seçili miktar state'i (ml cinsinden) - dialog dışında tutulmalı
+    double? selectedAmount;
+    
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -256,12 +260,12 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          color: _getDrinkColor(drink.id).withValues(alpha: 0.15),
+                          color: DrinkHelpers.getColor(drink.id).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _getDrinkIcon(drink.id),
-                          color: _getDrinkColor(drink.id),
+                          DrinkHelpers.getIcon(drink.id),
+                          color: DrinkHelpers.getColor(drink.id),
                           size: 28,
                         ),
                       ),
@@ -410,43 +414,38 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                   Consumer<UserProvider>(
                     builder: (dialogContext, userProvider, child) {
                       final isMetric = userProvider.isMetric;
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildQuickSelectButton(
-                            isMetric ? '200ml' : '${(200.0 * 0.033814).toStringAsFixed(1)} oz',
-                            200.0,
+                      // Miktar butonları - Küçükten büyüğe: 200ml, 250ml, 330ml, 500ml, 750ml, 1000ml
+                      final quickSelectAmounts = [200.0, 250.0, 330.0, 500.0, 750.0, 1000.0];
+                      
+                      return GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 2.1, // Genişlik/yükseklik oranı (2.5'ten 2.1'e düşürüldü - daha fazla dikey alan)
+                        children: quickSelectAmounts.map((amountMl) {
+                          final displayText = isMetric
+                              ? '${amountMl.toStringAsFixed(0)}ml'
+                              : '${(amountMl * 0.033814).toStringAsFixed(1)} oz';
+                          final isSelected = selectedAmount == amountMl;
+                          
+                          return _buildQuickSelectButton(
+                            displayText,
+                            amountMl,
                             drink,
                             customAmountController,
                             setDialogState,
                             dialogContext,
-                          ),
-                          _buildQuickSelectButton(
-                            isMetric ? '330ml' : '${(330.0 * 0.033814).toStringAsFixed(1)} oz',
-                            330.0,
-                            drink,
-                            customAmountController,
-                            setDialogState,
-                            dialogContext,
-                          ),
-                          _buildQuickSelectButton(
-                            isMetric ? '500ml' : '${(500.0 * 0.033814).toStringAsFixed(1)} oz',
-                            500.0,
-                            drink,
-                            customAmountController,
-                            setDialogState,
-                            dialogContext,
-                          ),
-                          _buildQuickSelectButton(
-                            isMetric ? '750ml' : '${(750.0 * 0.033814).toStringAsFixed(1)} oz',
-                            750.0,
-                            drink,
-                            customAmountController,
-                            setDialogState,
-                            dialogContext,
-                          ),
-                        ],
+                            isSelected,
+                            () {
+                              // Seçili miktarı güncelle (closure içinde dış değişkene erişim)
+                              selectedAmount = amountMl;
+                              // TextField'a yazma - kullanıcı elle girecek
+                              setDialogState(() {});
+                            },
+                          );
+                        }).toList(),
                       );
                     },
                   ),
@@ -467,6 +466,13 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                       final unitLabel = userProvider.isMetric ? 'ml' : 'oz';
                       return TextField(
                         controller: customAmountController,
+                        onChanged: (value) {
+                          // TextField'a elle girildiğinde buton seçimini kaldır
+                          if (value.isNotEmpty) {
+                            selectedAmount = null;
+                            setDialogState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Miktar ($unitLabel)',
                           suffixText: unitLabel,
@@ -483,18 +489,27 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Onay Butonu
+                  // Onay Butonu (İÇ)
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
                         final userProvider = Provider.of<UserProvider>(dialogContext, listen: false);
+                        double? amount;
+                        
+                        // Önce TextField'dan değeri kontrol et
                         final inputAmount = double.tryParse(customAmountController.text);
                         if (inputAmount != null && inputAmount > 0) {
                           // Birime göre dönüştür: oz ise ml'ye çevir
-                          final amount = userProvider.isMetric 
+                          amount = userProvider.isMetric 
                               ? inputAmount 
                               : inputAmount / 0.033814; // oz'u ml'ye çevir
+                        } else if (selectedAmount != null && selectedAmount! > 0) {
+                          // TextField boşsa ama buton seçiliyse, seçili miktarı kullan
+                          amount = selectedAmount;
+                        }
+                        
+                        if (amount != null && amount > 0) {
                           if (!dialogContext.mounted) return;
                           Navigator.pop(dialogContext);
                           await _drinkWithAmount(drink, amount);
@@ -502,7 +517,7 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
                           if (!dialogContext.mounted) return;
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
                             const SnackBar(
-                              content: Text('Lütfen geçerli bir miktar girin'),
+                              content: Text('Lütfen geçerli bir miktar seçin veya girin'),
                             ),
                           );
                         }
@@ -542,29 +557,30 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     TextEditingController controller,
     StateSetter setDialogState,
     BuildContext dialogContext,
+    bool isSelected,
+    VoidCallback onTap,
   ) {
     return GestureDetector(
-      onTap: () async {
-        if (!dialogContext.mounted) return;
-        Navigator.pop(dialogContext);
-        await _drinkWithAmount(drink, amountMl);
-      },
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        // REMOVED PADDING HERE to prevent text clipping
         decoration: BoxDecoration(
-          color: AppColors.softPinkButton.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppColors.softPinkButton : Colors.grey.shade200, // Seçili değilken açık gri
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.softPinkButton.withValues(alpha: 0.3),
-            width: 1,
+            color: isSelected ? AppColors.softPinkButton : Colors.grey.shade300,
+            width: 2,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.softPinkButton,
+        child: Center( // Center aligns the text perfectly
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey.shade700, // Seçili değilken koyu gri
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ),
@@ -738,130 +754,6 @@ class _DrinkGalleryScreenState extends State<DrinkGalleryScreen> {
     }
   }
 
-  Color _getDrinkColor(String drinkId) {
-    switch (drinkId) {
-      // Temel İçecekler
-      case 'water':
-        return Colors.blue;
-      case 'mineral_water':
-        return const Color(0xFF4A9ED8);
-      
-      // Sıcak İçecekler
-      case 'coffee':
-        return Colors.brown;
-      case 'tea':
-        return Colors.green;
-      case 'herbal_tea':
-        return const Color(0xFF6B8E23);
-      case 'green_tea':
-        return const Color(0xFF228B22);
-      
-      // Soğuk İçecekler
-      case 'cold_tea':
-        return const Color(0xFF8B7355);
-      case 'lemonade':
-        return const Color(0xFFFFD700);
-      case 'iced_coffee':
-        return const Color(0xFF8B4513);
-      
-      // Süt Ürünleri
-      case 'ayran':
-        return const Color(0xFFF5F5DC);
-      case 'kefir':
-        return const Color(0xFFFFE4B5);
-      case 'milk':
-        return Colors.white70;
-      
-      // Meyve İçecekleri
-      case 'juice':
-        return Colors.orange;
-      case 'smoothie':
-        return const Color(0xFFFF6347);
-      case 'fresh_juice':
-        return const Color(0xFFFF8C00);
-      
-      // Spor ve Sağlık
-      case 'sports':
-        return Colors.cyan;
-      case 'protein_shake':
-        return const Color(0xFF9370DB);
-      case 'coconut_water':
-        return const Color(0xFFDEB887);
-      
-      // Diğer
-      case 'soda':
-        return Colors.red;
-      case 'energy_drink':
-        return const Color(0xFFFF1493);
-      case 'detox_water':
-        return const Color(0xFF98D8C8);
-      
-      default:
-        return AppColors.softPinkButton;
-    }
-  }
-
-  IconData _getDrinkIcon(String drinkId) {
-    switch (drinkId) {
-      // Temel İçecekler
-      case 'water':
-        return Icons.water_drop;
-      case 'mineral_water':
-        return Icons.water;
-      
-      // Sıcak İçecekler
-      case 'coffee':
-        return Icons.local_cafe;
-      case 'tea':
-        return Icons.emoji_food_beverage;
-      case 'herbal_tea':
-        return Icons.eco;
-      case 'green_tea':
-        return Icons.eco;
-      
-      // Soğuk İçecekler
-      case 'cold_tea':
-        return Icons.emoji_food_beverage;
-      case 'lemonade':
-        return Icons.local_drink;
-      case 'iced_coffee':
-        return Icons.local_cafe;
-      
-      // Süt Ürünleri
-      case 'ayran':
-        return Icons.liquor;
-      case 'kefir':
-        return Icons.liquor;
-      case 'milk':
-        return Icons.local_drink;
-      
-      // Meyve İçecekleri
-      case 'juice':
-        return Icons.local_drink;
-      case 'smoothie':
-        return Icons.blender;
-      case 'fresh_juice':
-        return Icons.local_drink;
-      
-      // Spor ve Sağlık
-      case 'sports':
-        return Icons.fitness_center;
-      case 'protein_shake':
-        return Icons.sports_gymnastics;
-      case 'coconut_water':
-        return Icons.water_drop;
-      
-      // Diğer
-      case 'soda':
-        return Icons.sports_bar;
-      case 'energy_drink':
-        return Icons.bolt;
-      case 'detox_water':
-        return Icons.spa;
-      
-      default:
-        return Icons.local_drink;
-    }
-  }
+  // Drink color and icon helpers moved to DrinkHelpers utility class
 }
 

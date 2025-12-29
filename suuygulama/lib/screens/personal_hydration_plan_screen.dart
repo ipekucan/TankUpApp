@@ -20,7 +20,7 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       body: SafeArea(
         child: Consumer2<UserProvider, WaterProvider>(
           builder: (context, userProvider, waterProvider, child) {

@@ -6,6 +6,8 @@ import '../utils/unit_converter.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
 import 'reset_time_screen.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/common/app_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       resizeToAvoidBottomInset: true, // Klavye açıldığında ekranın yukarı kayması
       appBar: AppBar(
         title: const Text(
@@ -239,25 +241,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4A5568),
-            ),
+            style: AppTextStyles.heading3,
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
+        AppCardContainer(
+          padding: EdgeInsets.zero,
           child: Column(
             children: children,
           ),
@@ -299,25 +287,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4A5568),
-                    ),
+                    style: AppTextStyles.bodyLarge,
                   ),
                   if (value.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       value,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isPlaceholder 
-                            ? Colors.grey[400] 
-                            : Colors.grey[600],
-                        fontStyle: isPlaceholder 
-                            ? FontStyle.italic 
-                            : FontStyle.normal,
-                      ),
+                      style: isPlaceholder 
+                          ? AppTextStyles.placeholder
+                          : AppTextStyles.bodyGrey,
                     ),
                   ],
                 ],

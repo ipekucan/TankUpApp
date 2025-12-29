@@ -144,7 +144,7 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       appBar: AppBar(
         title: const Text('Mağaza'),
         backgroundColor: Colors.transparent,
@@ -514,7 +514,7 @@ class _ShopScreenState extends State<ShopScreen> {
       case 'Süs':
         return const Color(0xFFFF6B9D);
       default:
-        return AppColors.softPink;
+        return AppColors.softPinkButton;
     }
   }
 

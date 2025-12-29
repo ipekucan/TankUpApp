@@ -2,13 +2,37 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wave/wave.dart';
-import 'package:wave/config.dart';
-import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
 import '../providers/water_provider.dart';
 import '../services/notification_service.dart';
 import 'main_navigation_screen.dart';
+
+// Baloncuk Modeli
+class Bubble {
+  double x; // Yatay pozisyon (0.0 - 1.0)
+  double y; // Dikey pozisyon (0.0 = alt, 1.0 = üst)
+  double size; // Baloncuk boyutu (piksel)
+  double speed; // Yükselme hızı (0.0 - 1.0 arası)
+  double opacity; // Opaklık (0.0 - 1.0)
+
+  Bubble({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.speed,
+    required this.opacity,
+  });
+
+  // Baloncuğu yukarı hareket ettir
+  void update(double deltaTime) {
+    y -= speed * deltaTime;
+    // Ekranın üstünden çıkınca alttan tekrar başla
+    if (y < -0.1) {
+      y = 1.1; // Ekranın altından başla
+      x = math.Random().nextDouble(); // Yeni rastgele x pozisyonu
+    }
+  }
+}
 
 class PlanLoadingScreen extends StatefulWidget {
   final double? customGoal;
@@ -23,59 +47,22 @@ class PlanLoadingScreen extends StatefulWidget {
 }
 
 class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProviderStateMixin {
-  late AnimationController _waveController;
-  late AnimationController _fillController;
-  late AnimationController _bubbleController;
-  late Animation<double> _fillAnimation;
-  double _fillProgress = 0.0;
+  late AnimationController _bubbleController; // Baloncuk animasyonu
   final List<Bubble> _bubbles = [];
+  final math.Random _random = math.Random();
 
   @override
   void initState() {
     super.initState();
     
-    // Dalga animasyonu
-    _waveController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
-    
-    // Dolum animasyonu (3.5 saniye - makul süre)
-    _fillController = AnimationController(
-      duration: const Duration(milliseconds: 3500),
-      vsync: this,
-    );
-    
-    _fillAnimation = Tween<double>(begin: 0.0, end: 1.0).animate( // %100 tam doluluk
-      CurvedAnimation(
-        parent: _fillController,
-        curve: Curves.easeInOut,
-      ),
-    )..addListener(() {
-      setState(() {
-        _fillProgress = _fillAnimation.value;
-      });
-    });
-    
-    // Animasyon bitiş kontrolü - otomatik yönlendirme
-    _fillController.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        // Animasyon tamamlandığında planı kaydet ve yönlendir
-        _navigateToHome();
-      }
-    });
-    
-    // Kabarcık animasyonu
+    // Baloncuk animasyonu (60 FPS - smooth animasyon)
     _bubbleController = AnimationController(
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 1),
       vsync: this,
     )..repeat();
     
-    // Kabarcıkları oluştur
-    _generateBubbles();
-    
-    // Dolum animasyonunu başlat
-    _fillController.forward();
+    // Baloncukları oluştur (20-30 arası)
+    _initializeBubbles();
     
     // Zaman aşımı (Timeout) - 5 saniye sonra her halükarda yönlendir
     Future.delayed(const Duration(seconds: 5), () {
@@ -85,6 +72,21 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     });
   }
   
+  void _initializeBubbles() {
+    _bubbles.clear();
+    final bubbleCount = 20 + _random.nextInt(11); // 20-30 arası
+    
+    for (int i = 0; i < bubbleCount; i++) {
+      _bubbles.add(Bubble(
+        x: _random.nextDouble(), // Rastgele yatay pozisyon
+        y: 0.8 + _random.nextDouble() * 0.3, // Ekranın alt kısmından başla (0.8-1.1)
+        size: 8.0 + _random.nextDouble() * 20.0, // 8-28 piksel arası
+        speed: 0.3 + _random.nextDouble() * 0.4, // 0.3-0.7 arası hız
+        opacity: 0.2 + _random.nextDouble() * 0.2, // 0.2-0.4 arası opaklık
+      ));
+    }
+  }
+  
   void _navigateToHome() {
     if (!mounted) return;
     
@@ -92,23 +94,8 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     _calculateAndSavePlan();
   }
   
-  void _generateBubbles() {
-    _bubbles.clear();
-    final random = math.Random();
-    for (int i = 0; i < 8; i++) {
-      _bubbles.add(Bubble(
-        startX: random.nextDouble() * 0.8 + 0.1, // 0.1 - 0.9 arası
-        size: random.nextDouble() * 8 + 4, // 4-12 arası boyut
-        speed: random.nextDouble() * 0.3 + 0.1, // 0.1 - 0.4 arası hız
-        delay: random.nextDouble() * 2, // 0-2 saniye gecikme
-      ));
-    }
-  }
-  
   @override
   void dispose() {
-    _waveController.dispose();
-    _fillController.dispose();
     _bubbleController.dispose();
     super.dispose();
   }
@@ -162,163 +149,71 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: Container(
+        decoration: const BoxDecoration(
+          // Sabit Su Altı Mavisi Gradyanı
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF4FC3F7), // Üst: Aydınlık mavi
+              Color(0xFF0288D1), // Alt: Derin mavi
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Stack(
             children: [
-              // Tank Animasyonu
-              SizedBox(
-                width: 250,
-                height: 250,
-                child: Stack(
-                  alignment: Alignment.center,
+              // Yükselen Baloncuklar (Arka Plan)
+              AnimatedBuilder(
+                animation: _bubbleController,
+                builder: (context, child) {
+                  // Her frame'de baloncukları güncelle
+                  // AnimationController 1 saniyede 1 tur döner, bu yüzden deltaTime = 1/60 ≈ 0.0167
+                  final deltaTime = 0.0167; // ~60 FPS
+                  for (var bubble in _bubbles) {
+                    bubble.update(deltaTime);
+                  }
+                  
+                  return CustomPaint(
+                    size: screenSize,
+                    painter: _BubblePainter(_bubbles, screenSize),
+                  );
+                },
+              ),
+              
+              // Merkez İçerik (Ön Plan)
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Dış Çerçeve - Yuvarlak Fanus
-                    Container(
-                      width: 250,
-                      height: 250,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.softPinkButton,
-                          width: 6,
-                        ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.softPinkButton.withValues(alpha: 0.1),
-                            const Color(0xFF9B7EDE).withValues(alpha: 0.1),
-                            const Color(0xFF6B9BD1).withValues(alpha: 0.1),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.softPinkButton.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
+                    // Su Damlası İkonu
+                    const Icon(
+                      Icons.water_drop,
+                      size: 60,
+                      color: Colors.white,
                     ),
                     
-                    // Su Dolumu - Animasyonlu (ClipOval ile tankın dairesel sınırlarına uyumlu)
-                    ClipOval(
-                      clipBehavior: Clip.antiAlias, // Pürüzsüz kenarlar için
-                      child: AnimatedBuilder(
-                        animation: Listenable.merge([_fillAnimation, _bubbleController]),
-                        builder: (context, child) {
-                          // Tankın iç çapı: 250 - (6 * 2) = 238
-                          final innerDiameter = 238.0;
-                          final waterHeight = innerDiameter * _fillProgress; // Su yüksekliği
-                          final waterTop = innerDiameter - waterHeight; // Su seviyesinin üst noktası
-                          
-                          return SizedBox(
-                            width: innerDiameter, // Tank çapıyla eşit
-                            height: innerDiameter, // Tank çapıyla eşit
-                            child: Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                // Ana su katmanı (dibinden başlayarak)
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: waterHeight,
-                                  child: Container(
-                                    color: AppColors.waterColor.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                                
-                                // Wave efekti (sadece su seviyesinin üstünde görünür)
-                                if (_fillProgress > 0.1)
-                                  Positioned(
-                                    bottom: waterHeight - 20, // Wave'in su seviyesinin biraz altında başlaması
-                                    left: 0,
-                                    right: 0,
-                                    height: 40,
-                                    child: ClipRect(
-                                      child: ClipOval(
-                                        child: WaveWidget(
-                                          config: CustomConfig(
-                                            gradients: [
-                                              [
-                                                AppColors.waterColor.withValues(alpha: 0.3),
-                                                AppColors.waterColor.withValues(alpha: 0.5),
-                                              ],
-                                              [
-                                                AppColors.waterColor.withValues(alpha: 0.4),
-                                                AppColors.waterColor.withValues(alpha: 0.6),
-                                              ],
-                                            ],
-                                            durations: [4000, 5000],
-                                            heightPercentages: [0.20, 0.25],
-                                          ),
-                                          waveAmplitude: 5.0,
-                                          waveFrequency: 1.5,
-                                          backgroundColor: Colors.transparent,
-                                          size: Size(innerDiameter, 40),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                
-                                // Yükselen kabarcıklar
-                                ..._bubbles.map((bubble) {
-                                  final bubbleProgress = ((_bubbleController.value * 2 + bubble.delay) % 2) / 2;
-                                  final bubbleY = innerDiameter - (bubbleProgress * waterHeight * 0.8);
-                                  final bubbleX = bubble.startX * innerDiameter;
-                                  
-                                  // Sadece su içindeyse göster
-                                  if (bubbleY > waterTop && bubbleY < innerDiameter) {
-                                    return Positioned(
-                                      left: bubbleX - bubble.size / 2,
-                                      bottom: innerDiameter - bubbleY - bubble.size / 2,
-                                      child: Opacity(
-                                        opacity: math.max(0, 1 - bubbleProgress * 1.5),
-                                        child: Container(
-                                          width: bubble.size,
-                                          height: bubble.size,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white.withValues(alpha: 0.3),
-                                            border: Border.all(
-                                              color: Colors.white.withValues(alpha: 0.5),
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                }),
-                              ],
-                            ),
-                          );
-                        },
+                    const SizedBox(height: 32),
+                    
+                    // Metin
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 40),
+                      child: Text(
+                        'Sizin için kişisel planınız oluşturuluyor...',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w300,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
-                ),
-              ),
-              
-              const SizedBox(height: 32), // Dengeli mesafe
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: const Text(
-                  'Sizin için kişisel planınız oluşturuluyor...',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w300,
-                    color: Color(0xFF4A5568),
-                    letterSpacing: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -329,18 +224,50 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   }
 }
 
-// Kabarcık veri modeli
-class Bubble {
-  final double startX; // 0.0 - 1.0 arası (tank genişliğine göre)
-  final double size; // Kabarcık boyutu
-  final double speed; // Yükselme hızı
-  final double delay; // Başlangıç gecikmesi
+// Baloncuk Çizim Painter'ı
+class _BubblePainter extends CustomPainter {
+  final List<Bubble> bubbles;
+  final Size screenSize;
 
-  Bubble({
-    required this.startX,
-    required this.size,
-    required this.speed,
-    required this.delay,
-  });
+  _BubblePainter(this.bubbles, this.screenSize);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var bubble in bubbles) {
+      // Y pozisyonunu ekran koordinatlarına çevir (0.0 = alt, 1.0 = üst)
+      final y = screenSize.height * (1.0 - bubble.y); // Ters çevir (yukarı pozitif)
+      final x = screenSize.width * bubble.x;
+      
+      // Baloncuğu çiz
+      final paint = Paint()
+        ..color = Colors.white.withValues(alpha: bubble.opacity)
+        ..style = PaintingStyle.fill;
+      
+      // Ana baloncuk (daire)
+      canvas.drawCircle(
+        Offset(x, y),
+        bubble.size / 2,
+        paint,
+      );
+      
+      // Hafif parlaklık efekti (kenar)
+      final borderPaint = Paint()
+        ..color = Colors.white.withValues(alpha: bubble.opacity * 1.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      
+      canvas.drawCircle(
+        Offset(x, y),
+        bubble.size / 2,
+        borderPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BubblePainter oldDelegate) {
+    return true; // Her frame'de yeniden çiz
+  }
 }
+
 

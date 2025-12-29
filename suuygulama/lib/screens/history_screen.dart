@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
 import '../models/drink_model.dart';
 import '../utils/unit_converter.dart';
+import '../utils/drink_helpers.dart';
+import '../utils/date_helpers.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/common/app_card.dart';
+import '../services/chart_data_service.dart' show ChartDataService, ChartPeriod;
+import '../widgets/history/chart_view.dart';
+import '../widgets/history/period_selector.dart';
+import '../widgets/history/insight_card.dart';
 
 class HistoryScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -17,66 +24,23 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-enum ChartPeriod { day, week, month }
-
-class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProviderStateMixin {
+class _HistoryScreenState extends State<HistoryScreen> {
   ChartPeriod _selectedPeriod = ChartPeriod.day;
   Set<String> _selectedDrinkFilters = {}; // Boş = Tümü
-  int _touchedBarIndex = -1;
-  late AnimationController _lightbulbAnimationController;
+  int? _touchedBarIndex;
   
   @override
   void initState() {
     super.initState();
     // Her ekran açılışında varsayılan olarak 'Gün' modunu seç
     _selectedPeriod = ChartPeriod.day;
-    _touchedBarIndex = -1;
-    
-    // Ampul animasyon kontrolcüsü (1.5 saniye, sürekli döngü)
-    _lightbulbAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _lightbulbAnimationController.repeat(reverse: true);
+    _touchedBarIndex = null;
   }
-  
-  @override
-  void dispose() {
-    _lightbulbAnimationController.dispose();
-    super.dispose();
-  }
-
-
-
-  // İçecek renkleri
-  static const Map<String, Color> _drinkColors = {
-    'water': Colors.blue,
-    'coffee': Colors.brown,
-    'tea': Colors.green,
-    'soda': Colors.orange,
-    'mineral_water': Colors.lightBlue,
-    'herbal_tea': Colors.lightGreen,
-    'green_tea': Colors.teal,
-    'cold_tea': Colors.cyan,
-    'lemonade': Colors.yellow,
-    'iced_coffee': Colors.deepOrange,
-    'ayran': Colors.blueGrey,
-    'kefir': Colors.grey,
-    'milk': Colors.white,
-    'juice': Colors.redAccent,
-    'smoothie': Colors.purpleAccent,
-    'fresh_juice': Colors.lime,
-    'sports': Colors.indigo,
-    'protein_shake': Colors.deepPurple,
-    'coconut_water': Colors.lightGreenAccent,
-    'energy_drink': Colors.red,
-    'detox_water': Colors.cyanAccent,
-  };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       appBar: widget.hideAppBar ? null : AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -91,7 +55,13 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
         ),
         actions: [
           // Akıllı Ampul İkonu (İçgörüler)
-          _buildInsightLightbulbButton(context),
+          Consumer2<WaterProvider, UserProvider>(
+            builder: (context, waterProvider, userProvider, child) {
+              return InsightCard(
+                onTap: () => _showInsightDialog(context, waterProvider, userProvider),
+              );
+            },
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -102,11 +72,15 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               _buildFilterButton(context),
               const SizedBox(width: 12),
               // Zaman Butonları
-              _buildPeriodButton('Gün', ChartPeriod.day),
-              const SizedBox(width: 8),
-              _buildPeriodButton('Hafta', ChartPeriod.week),
-              const SizedBox(width: 8),
-              _buildPeriodButton('Ay', ChartPeriod.month),
+              PeriodSelector(
+                selectedPeriod: _selectedPeriod,
+                onPeriodChanged: (period) {
+                  setState(() {
+                    _selectedPeriod = period;
+                    _touchedBarIndex = null;
+                  });
+                },
+              ),
             ],
           ),
         ),
@@ -126,11 +100,15 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                     _buildFilterButton(context),
                     const SizedBox(width: 12),
                     // Zaman Butonları
-                    _buildPeriodButton('Gün', ChartPeriod.day),
-                    const SizedBox(width: 8),
-                    _buildPeriodButton('Hafta', ChartPeriod.week),
-                    const SizedBox(width: 8),
-                    _buildPeriodButton('Ay', ChartPeriod.month),
+                    PeriodSelector(
+                      selectedPeriod: _selectedPeriod,
+                      onPeriodChanged: (period) {
+                        setState(() {
+                          _selectedPeriod = period;
+                          _touchedBarIndex = null;
+                        });
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -142,29 +120,37 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Grafik Başlığı
-                            Text(
-                              'Sıvı Tüketim Grafiği',
-                              style: const TextStyle(
-                                fontSize: 22.0, // Büyütüldü
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF4A5568),
-                              ),
-                            ),
-                            const SizedBox(height: 16.0),
-                            // Grafik Alanı
-                            _buildBarChart(context),
-                          ],
-                        ),
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Grafik Başlığı
+                          Text(
+                            'Sıvı Tüketim Grafiği',
+                            style: AppTextStyles.heading2,
+                          ),
+                          const SizedBox(height: 16.0),
+                          // Grafik Alanı
+                          Consumer<WaterProvider>(
+                            builder: (context, waterProvider, child) {
+                              final chartData = ChartDataService.buildChartData(
+                                waterProvider,
+                                _selectedPeriod,
+                                _selectedDrinkFilters,
+                              );
+                              return ChartView(
+                                chartData: chartData,
+                                selectedPeriod: _selectedPeriod,
+                                touchedBarIndex: _touchedBarIndex ?? -1,
+                                onBarTouched: (index) {
+                                  setState(() {
+                                    _touchedBarIndex = index;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -176,19 +162,14 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      color: Colors.white,
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          top: 20.0,
-                          left: 20.0,
-                          right: 20.0,
-                          bottom: widget.lightbulbButton != null ? 90.0 : 20.0, // Ampul varsa alt padding artır
-                        ),
-                        child: _buildSummaryAndDetailArea(context),
+                    AppCard(
+                      padding: EdgeInsets.only(
+                        top: 20.0,
+                        left: 20.0,
+                        right: 20.0,
+                        bottom: widget.lightbulbButton != null ? 90.0 : 20.0, // Ampul varsa alt padding artır
                       ),
+                      child: _buildSummaryAndDetailArea(context),
                     ),
                     // Ampul butonu (eğer sağlanmışsa) - Liste kutusunun SOL ALT köşesinde
                     if (widget.lightbulbButton != null)
@@ -207,119 +188,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     );
   }
 
-  // Akıllı Ampul İkonu (İçgörüler)
-  Widget _buildInsightLightbulbButton(BuildContext context) {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
-        // Bugünün verilerini al
-        final today = DateTime.now();
-        final todayKey = _getDateKey(today);
-        final entries = waterProvider.getDrinkEntriesForDate(todayKey);
-        
-        // İçecek miktarlarını hesapla
-        final Map<String, double> drinkAmounts = {};
-        for (var entry in entries) {
-          drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0.0) + entry.amount;
-        }
-        
-        // Kafeinli içecekler
-        final caffeineDrinks = ['coffee', 'tea', 'herbal_tea', 'green_tea', 'iced_coffee', 'cold_tea', 'energy_drink'];
-        double caffeineVolume = 0.0;
-        for (var drinkId in caffeineDrinks) {
-          caffeineVolume += drinkAmounts[drinkId] ?? 0.0;
-        }
-        
-        // Şekerli içecekler
-        final sugaryDrinks = ['juice', 'fresh_juice', 'soda', 'lemonade', 'cold_tea', 'smoothie'];
-        double sugaryVolume = 0.0;
-        for (var drinkId in sugaryDrinks) {
-          sugaryVolume += drinkAmounts[drinkId] ?? 0.0;
-        }
-        
-        // Su miktarı
-        final waterVolume = drinkAmounts['water'] ?? 0.0;
-        final totalVolume = drinkAmounts.values.fold(0.0, (sum, amount) => sum + amount);
-        
-        // Uyarı durumları
-        final hasHighCaffeine = caffeineVolume > waterVolume && caffeineVolume > 500;
-        final hasHighSugar = sugaryVolume > waterVolume && sugaryVolume > 500;
-        final hasLowWaterRatio = totalVolume > 0 && waterVolume < (totalVolume * 0.6);
-        final hasWarning = hasHighCaffeine || hasHighSugar || hasLowWaterRatio;
-        
-        return AnimatedBuilder(
-          animation: _lightbulbAnimationController,
-          builder: (context, child) {
-            // Uyarı varsa animasyonlu scale değeri (1.0 -> 1.2)
-            final scale = hasWarning 
-                ? 1.0 + (_lightbulbAnimationController.value * 0.2)
-                : 1.0;
-            
-            // Uyarı varsa animasyonlu glow değeri (blur radius)
-            final glowIntensity = hasWarning
-                ? 8.0 + (_lightbulbAnimationController.value * 12.0) // 8 -> 20 arası
-                : 0.0;
-            
-            return Stack(
-              children: [
-                // Glow efekti (sadece uyarı varsa)
-                if (hasWarning)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.6),
-                            blurRadius: glowIntensity,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                
-                // İkon butonu
-                Transform.scale(
-                  scale: scale,
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.lightbulb,
-                      color: hasWarning ? Colors.amber : Colors.grey[400],
-                      size: 34.0, // Daha büyük ve görünür
-                    ),
-                    onPressed: () => _showInsightDialog(context, waterProvider, userProvider),
-                  ),
-                ),
-                
-                // Kırmızı badge (uyarı varsa)
-                if (hasWarning)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+  // Old _buildInsightLightbulbButton method removed - now using InsightCard widget
 
   // Filtre butonu
   Widget _buildFilterButton(BuildContext context) {
@@ -411,544 +280,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     );
   }
 
-  // Zaman modu butonu
-  Widget _buildPeriodButton(String label, ChartPeriod period) {
-    final isActive = _selectedPeriod == period;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedPeriod = period;
-          _touchedBarIndex = -1;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.black : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.grey[800],
-            fontWeight: FontWeight.w600,
-            fontSize: 17.0, // Büyütüldü (14 -> 17)
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Stacked Bar Chart
-  Widget _buildBarChart(BuildContext context) {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
-        final chartData = _buildChartData(waterProvider);
-        
-        if (chartData.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text(
-                'Henüz veri yok',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 18.0, // Büyütüldü (16 -> 18)
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Ay modu için bar genişliği ve aralık ayarları
-        final isMonthMode = _selectedPeriod == ChartPeriod.month;
-        final groupsSpace = isMonthMode ? 4.0 : 8.0;
-        
-        // Aylık mod için kaydırılabilir grafik
-        if (isMonthMode) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final chartWidth = screenWidth * 2.0; // 2x ekran genişliği (yaklaşık 6 ay görünür olacak)
-          
-          return SizedBox(
-            height: MediaQuery.of(context).size.width / 1.6, // AspectRatio 1.6'ya uygun yükseklik
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: chartWidth,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: _getMaxY(chartData),
-                    groupsSpace: groupsSpace,
-                    barTouchData: BarTouchData(
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (group) => Colors.black87,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
-                          double totalValue = 0;
-                          if (group.barRods.isNotEmpty) {
-                            // En üstteki rod'un toY değeri toplamı verir
-                            totalValue = group.barRods.last.toY;
-                          }
-                          
-                          // Birim formatını kullan
-                          final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
-                          
-                          return BarTooltipItem(
-                            formattedValue,
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.0, // Büyütüldü (14 -> 16)
-                            ),
-                          );
-                        },
-                        tooltipRoundedRadius: 8,
-                      ),
-                      touchCallback: (FlTouchEvent event, barTouchResponse) {
-                        if (event.isInterestedForInteractions &&
-                            barTouchResponse != null &&
-                            barTouchResponse.spot != null) {
-                          setState(() {
-                            _touchedBarIndex = barTouchResponse.spot!.touchedBarGroupIndex;
-                          });
-                        } else {
-                          setState(() {
-                            _touchedBarIndex = -1;
-                          });
-                        }
-                      },
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            if (value.toInt() >= 0 && value.toInt() < chartData.length) {
-                              // Gün modu için manuel mapping: Tek harf gösterim
-                              String label;
-                              if (_selectedPeriod == ChartPeriod.day) {
-                                final dataPoint = chartData[value.toInt()];
-                                // DateTime.weekday: 1=Pazartesi, 2=Salı, ..., 7=Pazar
-                                switch (dataPoint.date.weekday) {
-                                  case DateTime.monday: // 1
-                                    label = 'P';
-                                    break;
-                                  case DateTime.tuesday: // 2
-                                    label = 'S';
-                                    break;
-                                  case DateTime.wednesday: // 3
-                                    label = 'Ç';
-                                    break;
-                                  case DateTime.thursday: // 4
-                                    label = 'P';
-                                    break;
-                                  case DateTime.friday: // 5
-                                    label = 'C';
-                                    break;
-                                  case DateTime.saturday: // 6
-                                    label = 'C';
-                                    break;
-                                  case DateTime.sunday: // 7
-                                    label = 'P';
-                                    break;
-                                  default:
-                                    label = '';
-                                }
-                              } else {
-                                // Hafta ve Ay modları için mevcut label'ı kullan
-                                label = chartData[value.toInt()].label;
-                              }
-                              
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: _selectedPeriod == ChartPeriod.day ? 14.0 : 11,
-                                    fontWeight: _selectedPeriod == ChartPeriod.day ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              );
-                            }
-                            return const Text('');
-                          },
-                          reservedSize: 40,
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: false, // Sol ekseni kaldır
-                        ),
-                      ),
-                    ),
-                    gridData: FlGridData(
-                      show: false, // Grid çizgilerini tamamen kaldır
-                    ),
-                    borderData: FlBorderData(show: false),
-                    barGroups: _buildBarGroups(chartData),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        
-        // Gün ve Hafta modları için normal görünüm
-        return AspectRatio(
-          aspectRatio: 1.6,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              maxY: _getMaxY(chartData),
-              groupsSpace: groupsSpace,
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipColor: (group) => Colors.black87,
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
-                    double totalValue = 0;
-                    if (group.barRods.isNotEmpty) {
-                      // En üstteki rod'un toY değeri toplamı verir
-                      totalValue = group.barRods.last.toY;
-                    }
-                    
-                    // Birim formatını kullan
-                    final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
-                    
-                            return BarTooltipItem(
-                              formattedValue,
-                              const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16.0, // Büyütüldü (14 -> 16)
-                              ),
-                            );
-                  },
-                  tooltipRoundedRadius: 8,
-                ),
-                touchCallback: (FlTouchEvent event, barTouchResponse) {
-                  if (event.isInterestedForInteractions &&
-                      barTouchResponse != null &&
-                      barTouchResponse.spot != null) {
-                    setState(() {
-                      _touchedBarIndex = barTouchResponse.spot!.touchedBarGroupIndex;
-                    });
-                  } else {
-                    setState(() {
-                      _touchedBarIndex = -1;
-                    });
-                  }
-                },
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      if (value.toInt() >= 0 && value.toInt() < chartData.length) {
-                        // Gün modu için manuel mapping: Tek harf gösterim
-                        String label;
-                        if (_selectedPeriod == ChartPeriod.day) {
-                          final dataPoint = chartData[value.toInt()];
-                          // DateTime.weekday: 1=Pazartesi, 2=Salı, ..., 7=Pazar
-                          switch (dataPoint.date.weekday) {
-                            case DateTime.monday: // 1
-                              label = 'P';
-                              break;
-                            case DateTime.tuesday: // 2
-                              label = 'S';
-                              break;
-                            case DateTime.wednesday: // 3
-                              label = 'Ç';
-                              break;
-                            case DateTime.thursday: // 4
-                              label = 'P';
-                              break;
-                            case DateTime.friday: // 5
-                              label = 'C';
-                              break;
-                            case DateTime.saturday: // 6
-                              label = 'C';
-                              break;
-                            case DateTime.sunday: // 7
-                              label = 'P';
-                              break;
-                            default:
-                              label = '';
-                          }
-                        } else if (_selectedPeriod == ChartPeriod.week) {
-                          // Haftalık mod için mevcut label'ı kullan (büyük ve bold)
-                          label = chartData[value.toInt()].label;
-                        } else {
-                          // Ay modu için mevcut label'ı kullan
-                          label = chartData[value.toInt()].label;
-                        }
-                        
-                        // Haftalık mod için büyük ve bold yazı
-                        if (_selectedPeriod == ChartPeriod.week) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              label,
-                              style: const TextStyle(
-                                color: Color(0xFF2C3E50), // Koyu gri
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-                        
-                        // Gün modu için bold ve büyük yazı
-                        if (_selectedPeriod == ChartPeriod.day) {
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: 14.0,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              );
-                        }
-                        
-                        // Ay modu için normal stil
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 11,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                    reservedSize: _selectedPeriod == ChartPeriod.day || _selectedPeriod == ChartPeriod.week ? 40 : 32,
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: false, // Sol ekseni kaldır
-                  ),
-                ),
-              ),
-              gridData: FlGridData(
-                show: false, // Grid çizgilerini tamamen kaldır
-              ),
-              borderData: FlBorderData(show: false),
-              barGroups: _buildBarGroups(chartData),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Grafik verilerini oluştur
-  List<_ChartDataPoint> _buildChartData(WaterProvider waterProvider) {
-    final List<_ChartDataPoint> data = [];
-    final now = DateTime.now();
-    
-    if (_selectedPeriod == ChartPeriod.day) {
-      // GÜN Modu: Son 7 gün
-      for (int i = 6; i >= 0; i--) {
-        final date = now.subtract(Duration(days: i));
-        final dateKey = _getDateKey(date);
-        final entries = waterProvider.getDrinkEntriesForDate(dateKey);
-        
-        // Filtre uygula
-        final filteredEntries = _selectedDrinkFilters.isEmpty
-            ? entries
-            : entries.where((e) => _selectedDrinkFilters.contains(e.drinkId)).toList();
-        
-        // İçecek bazında grupla
-        final drinkAmounts = <String, double>{};
-        for (var entry in filteredEntries) {
-          drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
-        }
-        
-        // Etiket: Haftanın günleri
-        final dayLabels = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-        final dayIndex = date.weekday - 1;
-        
-        data.add(_ChartDataPoint(
-          label: dayLabels[dayIndex],
-          drinkAmounts: drinkAmounts,
-          date: date,
-        ));
-      }
-    } else if (_selectedPeriod == ChartPeriod.week) {
-      // HAFTA Modu: Son 4 hafta - Her hafta için günlerin baş harfleri
-      for (int i = 3; i >= 0; i--) {
-        final weekStart = now.subtract(Duration(days: now.weekday - 1 + i * 7));
-        final weekEnd = weekStart.add(const Duration(days: 6));
-        final entries = waterProvider.getDrinkEntriesForDateRange(weekStart, weekEnd);
-        
-        // Filtre uygula
-        final filteredEntries = _selectedDrinkFilters.isEmpty
-            ? entries
-            : entries.where((e) => _selectedDrinkFilters.contains(e.drinkId)).toList();
-        
-        // İçecek bazında grupla
-        final drinkAmounts = <String, double>{};
-        for (var entry in filteredEntries) {
-          drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
-        }
-        
-        // Haftanın ilk gününün baş harfini al (Pazartesi=1, Salı=2, ..., Pazar=7)
-        final dayLabels = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P']; // Pazartesi, Salı, Çarşamba, Perşembe, Cuma, Cumartesi, Pazar
-        final firstDayOfWeek = weekStart.weekday; // 1=Pazartesi, 7=Pazar
-        final label = dayLabels[firstDayOfWeek - 1]; // Haftanın ilk gününün baş harfi
-        
-        data.add(_ChartDataPoint(
-          label: label,
-          drinkAmounts: drinkAmounts,
-          date: weekStart,
-        ));
-      }
-    } else {
-      // AY Modu: Mevcut yılın 12 ayı (Ocak - Aralık)
-      final monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-      
-      for (int month = 1; month <= 12; month++) {
-        final monthDate = DateTime(now.year, month, 1);
-        final nextMonth = month == 12 
-            ? DateTime(now.year + 1, 1, 1)
-            : DateTime(now.year, month + 1, 1);
-        final monthEnd = nextMonth.subtract(const Duration(days: 1));
-        final entries = waterProvider.getDrinkEntriesForDateRange(monthDate, monthEnd);
-        
-        // Filtre uygula
-        final filteredEntries = _selectedDrinkFilters.isEmpty
-            ? entries
-            : entries.where((e) => _selectedDrinkFilters.contains(e.drinkId)).toList();
-        
-        // İçecek bazında grupla
-        final drinkAmounts = <String, double>{};
-        for (var entry in filteredEntries) {
-          drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
-        }
-        
-        data.add(_ChartDataPoint(
-          label: monthNames[month - 1],
-          drinkAmounts: drinkAmounts,
-          date: monthDate,
-        ));
-      }
-    }
-    
-    return data;
-  }
-
-  // Bar gruplarını oluştur
-  List<BarChartGroupData> _buildBarGroups(List<_ChartDataPoint> chartData) {
-    return chartData.asMap().entries.map((entry) {
-      final index = entry.key;
-      final dataPoint = entry.value;
-      
-      // Her bar için toplam miktarı hesapla (filtre uygula)
-      double totalAmount = 0.0;
-      final drinkAmounts = <String, double>{};
-      
-      if (_selectedDrinkFilters.isEmpty) {
-        // Tüm içecekleri dahil et
-        drinkAmounts.addAll(dataPoint.drinkAmounts);
-      } else {
-        // Sadece seçili içecekleri dahil et
-        for (var filterId in _selectedDrinkFilters) {
-          if (dataPoint.drinkAmounts.containsKey(filterId)) {
-            drinkAmounts[filterId] = dataPoint.drinkAmounts[filterId]!;
-          }
-        }
-      }
-      
-      totalAmount = drinkAmounts.values.fold(0.0, (sum, val) => sum + val);
-      
-      // Stacked bar için rodStackItems oluştur
-      final rodStackItems = <BarChartRodStackItem>[];
-      double currentY = 0.0; // Her bar SIFIRDAN başlamalı
-      
-      // Önemli içecekleri sırayla ekle
-      final importantDrinks = ['water', 'coffee', 'tea', 'soda'];
-      for (var drinkId in importantDrinks) {
-        final amount = drinkAmounts[drinkId] ?? 0.0;
-        if (amount > 0) {
-          rodStackItems.add(
-            BarChartRodStackItem(
-              currentY, // fromY
-              currentY + amount, // toY
-              _drinkColors[drinkId] ?? Colors.grey,
-            ),
-          );
-          currentY += amount;
-        }
-      }
-      
-      // Diğer içecekleri ekle
-      for (var entry in drinkAmounts.entries) {
-        if (!importantDrinks.contains(entry.key) && entry.value > 0) {
-          rodStackItems.add(
-            BarChartRodStackItem(
-              currentY, // fromY
-              currentY + entry.value, // toY
-              _drinkColors[entry.key] ?? Colors.grey,
-            ),
-          );
-          currentY += entry.value;
-        }
-      }
-      
-      // Tek bir BarChartRodData ile stacked bar oluştur
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: totalAmount,
-            width: _selectedPeriod == ChartPeriod.month ? 12.0 : 20.0,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-            rodStackItems: rodStackItems.isNotEmpty ? rodStackItems : null,
-            color: rodStackItems.isEmpty ? Colors.grey[300] : null,
-          ),
-        ],
-        barsSpace: 0,
-      );
-    }).toList();
-  }
-
-  // Maksimum Y değerini hesapla
-  double _getMaxY(List<_ChartDataPoint> chartData) {
-    double max = 0;
-    for (var dataPoint in chartData) {
-      final total = dataPoint.drinkAmounts.values.fold(0.0, (sum, val) => sum + val);
-      if (total > max) max = total;
-    }
-    return (max * 1.2).ceilToDouble().clamp(500.0, double.infinity);
-  }
+  // Old _buildPeriodButton method removed - now using PeriodSelector widget
+  // Old _buildBarChart, _buildChartData, _buildBarGroups, _getMaxY methods removed
+  // Now using ChartDataService and ChartView widget
 
   // Özet ve Detay Alanı
   Widget _buildSummaryAndDetailArea(BuildContext context) {
@@ -959,22 +293,26 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
         DateTime? selectedEndDate;
         String periodLabel = '';
 
-        if (_touchedBarIndex != -1) {
-          final chartData = _buildChartData(waterProvider);
-          if (_touchedBarIndex >= 0 && _touchedBarIndex < chartData.length) {
-            final dataPoint = chartData[_touchedBarIndex];
+        if (_touchedBarIndex != null && _touchedBarIndex! >= 0) {
+          final chartData = ChartDataService.buildChartData(
+            waterProvider,
+            _selectedPeriod,
+            _selectedDrinkFilters,
+          );
+          if (_touchedBarIndex! < chartData.length) {
+            final dataPoint = chartData[_touchedBarIndex!];
             selectedStartDate = dataPoint.date;
             selectedEndDate = dataPoint.date;
             
             switch (_selectedPeriod) {
               case ChartPeriod.day:
-                periodLabel = _getWeekdayName(dataPoint.date.weekday);
+                periodLabel = DateHelpers.getWeekdayName(dataPoint.date.weekday);
                 break;
               case ChartPeriod.week:
-                periodLabel = '${_touchedBarIndex + 1}. Hafta';
+                periodLabel = '${_touchedBarIndex! + 1}. Hafta';
                 break;
               case ChartPeriod.month:
-                final monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
+                const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
                                     'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
                 periodLabel = monthNames[dataPoint.date.month - 1];
                 break;
@@ -1045,11 +383,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           children: [
             Text(
               '$periodLabel Detayları',
-              style: const TextStyle(
-                fontSize: 22.0, // Büyütüldü (16 -> 22)
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4A5568),
-              ),
+              style: AppTextStyles.heading2,
             ),
             const SizedBox(height: 12),
             GridView.builder(
@@ -1066,8 +400,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 final entry = consumedDrinks[index];
                 final drinkId = entry.key;
                 final amount = entry.value;
-                final emoji = _getDrinkEmoji(drinkId);
-                final color = _drinkColors[drinkId] ?? Colors.grey;
+                final emoji = DrinkHelpers.getEmoji(drinkId);
+                final color = ChartDataService.drinkColors[drinkId] ?? Colors.grey;
 
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0), // Vertical padding artırıldı (2.0 -> 4.0)
@@ -1091,7 +425,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _getDrinkName(drinkId),
+                              DrinkHelpers.getName(drinkId),
                               style: TextStyle(
                                 fontSize: 14.0, // Başlık font boyutu
                                 height: 1.0, // Satır yüksekliği sıkılaştırıldı (1.1 -> 1.0)
@@ -1101,13 +435,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 4), // Metinler arası boşluk eklendi
                             Text(
                               UnitConverter.formatVolume(amount, userProvider.isMetric),
-                              style: TextStyle(
-                                fontSize: 15.0, // Değer font boyutu
-                                height: 1.0, // Satır yüksekliği sıkılaştırıldı (1.1 -> 1.0)
-                                color: Colors.grey[900],
-                                fontWeight: FontWeight.bold,
+                              style: AppTextStyles.valueText.copyWith(
+                                height: 1.0, // Satır yüksekliği sıkılaştırıldı
                               ),
                             ),
                           ],
@@ -1128,7 +460,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
   void _showInsightDialog(BuildContext context, WaterProvider waterProvider, UserProvider userProvider) {
     // Bugünün verilerini al
     final today = DateTime.now();
-    final todayKey = _getDateKey(today);
+    final todayKey = DateHelpers.toDateKey(today);
     final entries = waterProvider.getDrinkEntriesForDate(todayKey);
     
     // İçecek miktarlarını hesapla
@@ -1167,13 +499,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: const Text(
+        title: Text(
           'Günlük Sağlık Özeti',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF4A5568),
-          ),
+          style: AppTextStyles.heading3,
         ),
         content: SingleChildScrollView(
           child: hasAnyData
@@ -1255,11 +583,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Tamam',
-              style: TextStyle(
-                color: Color(0xFF4A5568),
-                fontWeight: FontWeight.w600,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: const Color(0xFF4A5568),
               ),
             ),
           ),
@@ -1308,24 +635,17 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4A5568),
-                  ),
+                  style: AppTextStyles.bodyLarge,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: AppTextStyles.bodyGrey,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   message,
-                  style: TextStyle(
+                  style: AppTextStyles.bodySmall.copyWith(
                     fontSize: 13,
                     color: Colors.grey[700],
                   ),
@@ -1354,7 +674,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           builder: (context, waterProvider, child) {
             // Bugünün içecek girişlerini al
             final today = DateTime.now();
-            final todayKey = _getDateKey(today);
+            final todayKey = DateHelpers.toDateKey(today);
             final todayEntries = waterProvider.getDrinkEntriesForDate(todayKey);
             
             // İçecek gruplama (ID -> toplam miktar)
@@ -1380,64 +700,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     );
   }
 
-  // Yardımcı metodlar
-  String _getDateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  String _getWeekdayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return 'Pazartesi';
-      case DateTime.tuesday:
-        return 'Salı';
-      case DateTime.wednesday:
-        return 'Çarşamba';
-      case DateTime.thursday:
-        return 'Perşembe';
-      case DateTime.friday:
-        return 'Cuma';
-      case DateTime.saturday:
-        return 'Cumartesi';
-      case DateTime.sunday:
-        return 'Pazar';
-      default:
-        return '';
-    }
-  }
-
-  String _getDrinkEmoji(String drinkId) {
-    switch (drinkId) {
-      case 'water':
-      case 'mineral_water':
-        return '💧';
-      case 'coffee':
-        return '☕';
-      case 'tea':
-      case 'herbal_tea':
-      case 'green_tea':
-        return '🍵';
-      case 'soda':
-        return '🥤';
-      case 'juice':
-      case 'fresh_juice':
-        return '🧃';
-      case 'milk':
-        return '🥛';
-      case 'smoothie':
-        return '🥤';
-      default:
-        return '🥤';
-    }
-  }
-
-  String _getDrinkName(String drinkId) {
-    final allDrinks = DrinkData.getDrinks();
-    return allDrinks.firstWhere(
-      (drink) => drink.id == drinkId,
-      orElse: () => Drink(id: 'other', name: 'Diğer', caloriePer100ml: 0, hydrationFactor: 0),
-    ).name;
-  }
+  // Yardımcı metodlar (moved to DrinkHelpers and DateHelpers)
 }
 
 // Filtre Bottom Sheet içeriği (StatefulWidget olarak ayrıldı)
@@ -1478,31 +741,7 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
     return amounts;
   }
 
-  // İçecek emoji'sini al (static helper method)
-  static String _getDrinkEmojiStatic(String drinkId) {
-    switch (drinkId) {
-      case 'water':
-      case 'mineral_water':
-        return '💧';
-      case 'coffee':
-        return '☕';
-      case 'tea':
-      case 'herbal_tea':
-      case 'green_tea':
-        return '🍵';
-      case 'soda':
-        return '🥤';
-      case 'juice':
-      case 'fresh_juice':
-        return '🧃';
-      case 'milk':
-        return '🥛';
-      case 'smoothie':
-        return '🥤';
-      default:
-        return '🥤';
-    }
-  }
+  // İçecek emoji'sini al (using DrinkHelpers)
 
   @override
   Widget build(BuildContext context) {
@@ -1517,13 +756,9 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'İçecek Filtresi',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF4A5568),
-                            ),
+                            style: AppTextStyles.heading3,
                           ),
                           IconButton(
                             icon: const Icon(Icons.close),
@@ -1599,14 +834,10 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                                     const SizedBox(width: 16),
                                     
                                     // İçecek adı
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
                                         'Tümü',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF4A5568),
-                                        ),
+                                        style: AppTextStyles.bodyLarge,
                                       ),
                                     ),
                                   ],
@@ -1682,7 +913,7 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                                       
                                       // Emoji
                                       Text(
-                                        _getDrinkEmojiStatic(drink.id),
+                                        DrinkHelpers.getEmoji(drink.id),
                                         style: const TextStyle(fontSize: 32),
                                       ),
                                       const SizedBox(width: 16),
@@ -1694,28 +925,17 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                                           children: [
                                             Text(
                                               drink.name,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF4A5568),
-                                              ),
+                                              style: AppTextStyles.bodyLarge,
                                             ),
                                             if (amount > 0)
                                               Text(
                                                 UnitConverter.formatVolume(amount, userProvider.isMetric),
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[600],
-                                                ),
+                                                style: AppTextStyles.bodyGrey,
                                               )
                                             else
                                               Text(
                                                 'Henüz içilmedi',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[400],
-                                                  fontStyle: FontStyle.italic,
-                                                ),
+                                                style: AppTextStyles.placeholder,
                                               ),
                                           ],
                                         ),
@@ -1779,15 +999,4 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
   }
 }
 
-// Grafik veri noktası
-class _ChartDataPoint {
-  final String label;
-  final Map<String, double> drinkAmounts;
-  final DateTime date;
-  
-  _ChartDataPoint({
-    required this.label,
-    required this.drinkAmounts,
-    required this.date,
-  });
-}
+// Old _ChartDataPoint class removed - now using ChartDataPoint from ChartDataService

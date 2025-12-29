@@ -69,7 +69,7 @@ class _ResetTimeScreenState extends State<ResetTimeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.verySoftBlue,
+      backgroundColor: AppColors.backgroundSubtle,
       appBar: AppBar(
         title: const Text(
           'Gün Sıfırlama Saati',
