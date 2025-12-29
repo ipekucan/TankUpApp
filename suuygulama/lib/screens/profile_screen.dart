@@ -8,6 +8,11 @@ import '../providers/user_provider.dart';
 import 'reset_time_screen.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/profile/gender_dialog.dart';
+import '../widgets/profile/weight_dialog.dart';
+import '../widgets/profile/activity_dialog.dart';
+import '../widgets/profile/climate_dialog.dart';
+import '../core/constants/app_constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Consumer2<WaterProvider, UserProvider>(
           builder: (context, waterProvider, userProvider, child) {
             return Column(
@@ -50,7 +55,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: 'Cinsiyet',
                       value: _getGenderText(userProvider.userData.gender),
                       isPlaceholder: userProvider.userData.gender == null,
-                      onTap: () => _showGenderDialog(context, userProvider),
+                      onTap: () => GenderDialog.show(
+                        context,
+                        userProvider,
+                        (message) => _showSuccessSnackBar(context, message),
+                      ),
                     ),
                     _buildProfileButton(
                       icon: Icons.monitor_weight,
@@ -59,14 +68,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? UnitConverter.formatWeight(userProvider.userData.weight!, userProvider.isMetric)
                           : 'Girilmemiş',
                       isPlaceholder: (userProvider.userData.weight == null || userProvider.userData.weight! <= 0),
-                      onTap: () => _showWeightDialog(context, userProvider),
+                      onTap: () => WeightDialog.show(
+                        context,
+                        userProvider,
+                        (message) => _showSuccessSnackBar(context, message),
+                      ),
                     ),
                     _buildProfileButton(
                       icon: Icons.directions_run,
                       label: 'Aktivite',
                       value: _getActivityText(userProvider.userData.activityLevel),
                       isPlaceholder: userProvider.userData.activityLevel == null,
-                      onTap: () => _showActivityDialog(context, userProvider),
+                      onTap: () => ActivityDialog.show(
+                        context,
+                        userProvider,
+                        (message) => _showSuccessSnackBar(context, message),
+                      ),
                     ),
                     Consumer<UserProvider>(
                       builder: (context, userProvider, child) {
@@ -94,12 +111,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: 'İklim',
                       value: _getClimateText(userProvider.userData.climate),
                       isPlaceholder: userProvider.userData.climate == null,
-                      onTap: () => _showClimateDialog(context, userProvider),
+                      onTap: () => ClimateDialog.show(
+                        context,
+                        userProvider,
+                        (message) => _showSuccessSnackBar(context, message),
+                      ),
                     ),
                   ],
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: AppConstants.largePadding),
                 
                 // Birim ve Hatırlatıcılar
                 _buildSection(
@@ -144,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: AppConstants.largePadding),
                 
                 // Gün Sıfırlama Saati
                 _buildSection(
@@ -173,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: AppConstants.largePadding),
                 
                 // Geliştirici Bölümü
                 _buildSection(
@@ -221,7 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 
-                const SizedBox(height: 40),
+                SizedBox(height: AppConstants.extraLargePadding),
               ],
             );
           },
@@ -238,7 +259,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          padding: const EdgeInsets.only(
+          left: AppConstants.smallSpacing,
+          bottom: AppConstants.defaultSpacing,
+        ),
           child: Text(
             title,
             style: AppTextStyles.heading3,
@@ -264,7 +288,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConstants.defaultPadding,
+          vertical: AppConstants.mediumSpacing,
+        ),
         child: Row(
           children: [
             Container(
@@ -280,7 +307,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 size: 20,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppConstants.mediumSpacing),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: AppTextStyles.bodyLarge,
                   ),
                   if (value.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: AppConstants.smallSpacing),
                     Text(
                       value,
                       style: isPlaceholder 
@@ -402,414 +429,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: AppColors.softPinkButton,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
         ),
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(AppConstants.mediumSpacing),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  void _showGenderDialog(BuildContext context, UserProvider userProvider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cinsiyet Seç'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Kadın'),
-              onTap: () async {
-                await userProvider.updateProfile(gender: 'female');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
-              },
-            ),
-            ListTile(
-              title: const Text('Erkek'),
-              onTap: () async {
-                await userProvider.updateProfile(gender: 'male');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
-              },
-            ),
-            ListTile(
-              title: const Text('Belirtmek İstemiyorum'),
-              onTap: () async {
-                await userProvider.updateProfile(gender: 'other');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Cinsiyet bilginiz güncellendi!');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showWeightDialog(BuildContext context, UserProvider userProvider) {
-    // Birim seçimi için state - mevcut isMetric değerini kullan
-    bool isKg = userProvider.isMetric;
-    
-    // Mevcut kiloyu kg olarak al
-    final currentWeightKg = userProvider.userData.weight ?? 0.0;
-    
-    // TextField için controller
-    final TextEditingController textController = TextEditingController();
-    
-    // Mevcut değeri birime göre göster
-    if (currentWeightKg > 0) {
-      if (isKg) {
-        textController.text = currentWeightKg.toStringAsFixed(1);
-      } else {
-        textController.text = (currentWeightKg * 2.20462).toStringAsFixed(1);
-      }
-    }
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          // Birim değiştiğinde değeri güncelle
-          void updateUnit(bool newIsKg) {
-            if (!mounted) return; // Widget dispose edilmişse işlem yapma
-            setState(() {
-              if (textController.text.isNotEmpty) {
-                final currentValue = double.tryParse(textController.text) ?? 0.0;
-                // Mevcut değeri kg cinsine çevir
-                final valueInKg = isKg ? currentValue : currentValue / 2.20462;
-                // Yeni birime göre göster
-                final newValue = newIsKg ? valueInKg : valueInKg * 2.20462;
-                if (mounted) {
-                  textController.text = newValue.toStringAsFixed(1);
-                }
-              }
-              isKg = newIsKg;
-            });
-          }
-          
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text(
-              'Kilo Seçiniz',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF4A5568),
-              ),
-            ),
-            content: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.9,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 24),
-                    
-                    // Modern Pill Toggle (Birim Seçici)
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // kg Seçeneği
-                          GestureDetector(
-                            onTap: () => updateUnit(true),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isKg ? AppColors.softPinkButton : Colors.transparent,
-                                borderRadius: BorderRadius.circular(26),
-                              ),
-                              child: Text(
-                                'kg',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: isKg ? Colors.white : Colors.grey[600],
-                                ),
-                              ),
-                            ),
-                          ),
-                          // lbs Seçeneği
-                          GestureDetector(
-                            onTap: () => updateUnit(false),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: !isKg ? AppColors.softPinkButton : Colors.transparent,
-                                borderRadius: BorderRadius.circular(26),
-                              ),
-                              child: Text(
-                                'lbs',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: !isKg ? Colors.white : Colors.grey[600],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 40),
-                    
-                    // Büyük TextField (Manuel Giriş)
-                    Center(
-                      child: SizedBox(
-                        width: 200,
-                        child: TextField(
-                          controller: textController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF4A5568),
-                          ),
-                          decoration: InputDecoration(
-                            hintText: '0.0',
-                            hintStyle: TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.w300,
-                              color: Colors.grey[300],
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(
-                                color: AppColors.softPinkButton,
-                                width: 2,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(
-                                color: AppColors.softPinkButton,
-                                width: 2,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(
-                                color: AppColors.softPinkButton,
-                                width: 3,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('İptal'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final textValue = textController.text.trim();
-                  if (textValue.isNotEmpty) {
-                    final enteredValue = double.tryParse(textValue) ?? 0.0;
-                    if (enteredValue > 0) {
-                      // Girilen değeri kg'ye çevir
-                      final weightInKg = isKg ? enteredValue : enteredValue / 2.20462;
-                      await userProvider.updateProfile(weight: weightInKg);
-                      // Birim sistemini güncelle (kg = metric, lbs = imperial)
-                      await userProvider.setIsMetric(isKg);
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      _showSuccessSnackBar(context, 'Kilonuz başarıyla kaydedildi!');
-                    }
-                  } else {
-                    Navigator.pop(context);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.softPinkButton,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                ),
-                child: const Text(
-                  'Tamam',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    ).then((_) {
-      // Dialog kapandığında controller'ı temizle (güvenli dispose)
-      if (mounted) {
-        textController.dispose();
-      }
-    });
-  }
-
-  void _showActivityDialog(BuildContext context, UserProvider userProvider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Aktivite Seviyesi'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Düşük'),
-              onTap: () async {
-                await userProvider.updateProfile(activityLevel: 'low');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
-              },
-            ),
-            ListTile(
-              title: const Text('Orta'),
-              onTap: () async {
-                await userProvider.updateProfile(activityLevel: 'medium');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
-              },
-            ),
-            ListTile(
-              title: const Text('Yüksek'),
-              onTap: () async {
-                await userProvider.updateProfile(activityLevel: 'high');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Aktivite seviyeniz güncellendi!');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showClimateDialog(BuildContext context, UserProvider userProvider) {
-    final currentClimate = userProvider.userData.climate;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('İklim Seçimi'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Çok Sıcak
-            ListTile(
-              leading: Icon(
-                Icons.wb_sunny,
-                color: currentClimate == 'very_hot' 
-                    ? AppColors.softPinkButton 
-                    : Colors.grey[400],
-              ),
-              title: const Text('Çok Sıcak'),
-              trailing: currentClimate == 'very_hot' 
-                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
-                  : null,
-              onTap: () async {
-                await userProvider.updateProfile(climate: 'very_hot');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
-              },
-            ),
-            // Sıcak
-            ListTile(
-              leading: Icon(
-                Icons.wb_twilight,
-                color: currentClimate == 'hot' 
-                    ? AppColors.softPinkButton 
-                    : Colors.grey[400],
-              ),
-              title: const Text('Sıcak'),
-              trailing: currentClimate == 'hot' 
-                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
-                  : null,
-              onTap: () async {
-                await userProvider.updateProfile(climate: 'hot');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
-              },
-            ),
-            // Ilıman
-            ListTile(
-              leading: Icon(
-                Icons.wb_cloudy,
-                color: currentClimate == 'warm' 
-                    ? AppColors.softPinkButton 
-                    : Colors.grey[400],
-              ),
-              title: const Text('Ilıman'),
-              trailing: currentClimate == 'warm' 
-                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
-                  : null,
-              onTap: () async {
-                await userProvider.updateProfile(climate: 'warm');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
-              },
-            ),
-            // Soğuk
-            ListTile(
-              leading: Icon(
-                Icons.ac_unit,
-                color: currentClimate == 'cold' 
-                    ? AppColors.softPinkButton 
-                    : Colors.grey[400],
-              ),
-              title: const Text('Soğuk'),
-              trailing: currentClimate == 'cold' 
-                  ? Icon(Icons.check_circle, color: AppColors.softPinkButton)
-                  : null,
-              onTap: () async {
-                await userProvider.updateProfile(climate: 'cold');
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'İklim başarıyla güncellendi!');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showCustomGoalDialog(BuildContext context, WaterProvider waterProvider) {
     final controller = TextEditingController(
