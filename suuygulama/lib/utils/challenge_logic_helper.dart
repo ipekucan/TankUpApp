@@ -138,7 +138,6 @@ class ChallengeLogicHelper {
       // Bu mücadele için özel mantık: 7 gün boyunca sadece su içilmeli
       // Basitleştirilmiş: Günlük hedefe ulaşıldıysa ve sadece su içildiyse ilerleme sayılır
       // Şimdilik: Günlük hedefe ulaşıldıysa 1/7 gün olarak sayılır (basitleştirilmiş)
-      // TODO: Gerçek implementasyon için 7 günlük takip gerekli
       final daysCompleted = userProvider.consecutiveDays.clamp(0, 7);
       final isCompleted = daysCompleted >= 7 && waterProvider.hasReachedDailyGoal;
       final progress = isCompleted ? 1.0 : (daysCompleted / 7).clamp(0.0, 1.0);
