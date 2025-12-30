@@ -217,6 +217,12 @@ class DrinkProvider extends ChangeNotifier {
     }
   }
 
+  /// Removes a drink from the home screen (quick access list).
+  /// This is an alias for removeQuickAccess for better semantic clarity.
+  Future<void> removeDrinkFromHome(String drinkId) async {
+    await removeQuickAccess(drinkId);
+  }
+
   Future<void> updateQuickAccessAmount(String drinkId, double amount) async {
     if (_quickAccessDrinkIds.contains(drinkId)) {
       _quickAccessDrinkAmounts[drinkId] = amount;

@@ -19,6 +19,7 @@ import '../widgets/tank/challenge_panel.dart';
 import '../widgets/tank/achievement_dialog.dart';
 import '../widgets/challenge_card.dart';
 import '../utils/challenge_logic_helper.dart';
+import '../utils/water_goal_helper.dart';
 import 'success_screen.dart';
 import 'drink_gallery_screen.dart';
 
@@ -211,13 +212,15 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                         // Sol: Günlük Seri/Challenge Butonu
-                    _StatusToggleButton(
+                    Consumer2<WaterProvider, UserProvider>(
+                      builder: (context, reactiveWaterProvider, reactiveUserProvider, child) {
+                        return _StatusToggleButton(
                           challengeProvider:
                               Provider.of<ChallengeProvider>(context, listen: false),
-                      userProvider: userProvider,
-                      waterProvider: waterProvider,
-                      progressPercentage: progressPercentage,
-                      onTap: () async {
+                          userProvider: reactiveUserProvider,
+                          waterProvider: reactiveWaterProvider,
+                          progressPercentage: progressPercentage,
+                          onTap: () async {
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -234,6 +237,8 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                             curve: Curves.easeOut,
                           );
                         }
+                      },
+                        );
                       },
                     ),
                     
@@ -478,10 +483,18 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
     }
   }
 
+  /// Check if today's goal is reached (daily-based, not volume-based).
+  bool _isTodayGoalReached() {
+    final currentIntake = widget.waterProvider.consumedAmount;
+    final dailyGoal = widget.waterProvider.dailyGoal;
+    return dailyGoal > 0 && currentIntake >= dailyGoal;
+  }
+
   @override
   Widget build(BuildContext context) {
     _checkActiveChallenge();
     final hasActiveChallenge = _firstActiveChallenge != null;
+    final isTodayComplete = _isTodayGoalReached();
 
     if (!hasActiveChallenge) {
       return GestureDetector(
@@ -499,8 +512,10 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
                   value: widget.progressPercentage / 100,
                   strokeWidth: AppConstants.progressIndicatorStrokeWidth,
                   backgroundColor: Colors.grey[300],
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.softPinkButton,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isTodayComplete 
+                        ? const Color(0xFFFF6B35) // Orange when complete
+                        : AppColors.softPinkButton,
                   ),
                 ),
               ),
@@ -522,8 +537,10 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.local_fire_department,
-                      color: AppColors.softPinkButton,
+                      isTodayComplete ? Icons.check_circle : Icons.local_fire_department,
+                      color: isTodayComplete 
+                          ? const Color(0xFFFF6B35) // Orange when complete
+                          : AppColors.softPinkButton,
                       size: AppConstants.statusButtonIconSize,
                     ),
                     const SizedBox(height: 2),
@@ -532,7 +549,9 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
                       style: TextStyle(
                         fontSize: AppConstants.statusButtonTextSize,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.softPinkButton,
+                        color: isTodayComplete 
+                            ? const Color(0xFFFF6B35) // Orange when complete
+                            : AppColors.softPinkButton,
                       ),
                     ),
                   ],
@@ -556,13 +575,18 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
               width: AppConstants.statusButtonSize,
               height: AppConstants.statusButtonSize,
               child: CircularProgressIndicator(
-                value: _showChallenge && _firstActiveChallenge != null
-                    ? _firstActiveChallenge!.progress.clamp(0.0, 1.0)
+                value: _showChallenge
+                    ? WaterGoalHelper.getProgressValue(
+                        currentIntake: widget.waterProvider.consumedAmount,
+                        dailyGoal: widget.waterProvider.dailyGoal,
+                      )
                     : widget.progressPercentage / 100,
                 strokeWidth: AppConstants.progressIndicatorStrokeWidth,
                 backgroundColor: Colors.grey[300],
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  _showChallenge ? Colors.orange : AppColors.softPinkButton,
+                  _showChallenge 
+                      ? const Color(0xFFFF6B35) // Orange for percentage
+                      : AppColors.softPinkButton,
                 ),
               ),
             ),
@@ -590,21 +614,25 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
                 },
                 child: _showChallenge
                     ? Column(
-                        key: const ValueKey('challenge'),
+                        key: const ValueKey('dailyGoal'),
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.emoji_events,
-                            color: Colors.orange,
+                            Icons.percent,
+                            color: const Color(0xFFFF6B35), // Orange color
                             size: AppConstants.statusButtonIconSize,
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${(_firstActiveChallenge!.progress * 100).toInt()}%',
+                            WaterGoalHelper.formatGoalPercentage(
+                              currentIntake: widget.waterProvider.consumedAmount,
+                              dailyGoal: widget.waterProvider.dailyGoal,
+                              decimalPlaces: 0,
+                            ),
                             style: const TextStyle(
                               fontSize: AppConstants.statusButtonTextSize,
                               fontWeight: FontWeight.w700,
-                              color: Colors.orange,
+                              color: Color(0xFFFF6B35), // Orange color
                             ),
                           ),
                         ],

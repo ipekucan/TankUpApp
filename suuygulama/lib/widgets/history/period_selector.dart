@@ -37,6 +37,7 @@ class PeriodSelector extends StatelessWidget {
           color: isActive ? Colors.black : Colors.grey[200],
           borderRadius: BorderRadius.circular(20),
         ),
+        alignment: Alignment.center, // Center alignment for text
         child: Text(
           label,
           style: TextStyle(
@@ -44,6 +45,7 @@ class PeriodSelector extends StatelessWidget {
             fontWeight: FontWeight.w600,
             fontSize: 17.0,
           ),
+          textAlign: TextAlign.center, // Center text alignment
         ),
       ),
     );

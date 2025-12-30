@@ -7,7 +7,6 @@ import '../utils/unit_converter.dart';
 import '../utils/date_helpers.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/success/statistics_tab.dart';
-import '../widgets/success/challenges_tab.dart';
 import '../widgets/success/achievements_tab.dart';
 import '../core/constants/app_constants.dart';
 
@@ -26,14 +25,15 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.index = 0; // Varsayılan olarak İstatistikler sekmesi (index 0)
     
-    // Ampul animasyon kontrolcüsü (1.5 saniye, sürekli döngü)
+    // Ampul animasyon kontrolcüsü (1.5 saniye, only runs when warning is active)
     _lightbulbAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+    );
+    // Don't start automatically - will be controlled by health warning state
   }
 
   @override
@@ -142,7 +142,6 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                   unselectedLabelStyle: AppTextStyles.tabLabelUnselected,
                   tabs: const [
                     Tab(text: 'İstatistikler'),
-                    Tab(text: 'Mücadeleler'),
                     Tab(text: 'Başarılar'),
                   ],
                 ),
@@ -155,7 +154,6 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                 controller: _tabController,
                 children: [
                   _buildStatisticsTab(),
-                  const ChallengesTab(),
                   const AchievementsTab(),
                 ],
               ),
@@ -173,7 +171,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
     );
   }
 
-  // Akıllı Ampul İkonu (İçgörüler)
+  // Akıllı Ampul İkonu (İçgörüler) - Smart Health Alert System
   Widget _buildInsightLightbulbButton(BuildContext context) {
     return Consumer2<WaterProvider, UserProvider>(
       builder: (context, waterProvider, userProvider, child) {
@@ -202,90 +200,87 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
           sugaryVolume += drinkAmounts[drinkId] ?? 0.0;
         }
         
-        // Su miktarı
-        final waterVolume = drinkAmounts['water'] ?? 0.0;
-        final totalVolume = drinkAmounts.values.fold(0.0, (sum, amount) => sum + amount);
+        // Health Threshold Calculation (Absolute thresholds)
+        const double caffeineThreshold = 500.0; // ml
+        const double sugarThreshold = 1000.0; // ml (1 Litre)
         
-        // Uyarı durumları
-        final hasHighCaffeine = caffeineVolume > waterVolume && caffeineVolume > 500;
-        final hasHighSugar = sugaryVolume > waterVolume && sugaryVolume > 500;
-        final hasLowWaterRatio = totalVolume > 0 && waterVolume < (totalVolume * 0.6);
-        final hasWarning = hasHighCaffeine || hasHighSugar || hasLowWaterRatio;
+        final hasHighCaffeine = caffeineVolume > caffeineThreshold;
+        final hasHighSugar = sugaryVolume > sugarThreshold;
+        final isHealthWarningActive = hasHighCaffeine || hasHighSugar;
+        
+        // Control animation based on warning state
+        if (isHealthWarningActive && !_lightbulbAnimationController.isAnimating) {
+          _lightbulbAnimationController.repeat(reverse: true);
+        } else if (!isHealthWarningActive && _lightbulbAnimationController.isAnimating) {
+          _lightbulbAnimationController.stop();
+          _lightbulbAnimationController.reset();
+        }
         
         return AnimatedBuilder(
           animation: _lightbulbAnimationController,
           builder: (context, child) {
-            // Uyarı varsa animasyonlu scale değeri (1.0 -> 1.2)
-            final scale = hasWarning 
-                ? 1.0 + (_lightbulbAnimationController.value * 0.2)
+            // Breathing animation: Scale pulse (1.0 -> 1.1x) when warning is active
+            final scale = isHealthWarningActive 
+                ? 1.0 + (_lightbulbAnimationController.value * 0.1)
                 : 1.0;
             
-            // Uyarı varsa animasyonlu glow değeri (blur radius)
-            final glowIntensity = hasWarning
-                ? 8.0 + (_lightbulbAnimationController.value * 12.0) // 8 -> 20 arası
+            // Glow shadow effect when warning is active
+            final glowIntensity = isHealthWarningActive
+                ? 8.0 + (_lightbulbAnimationController.value * 12.0) // 8 -> 20
                 : 0.0;
             
             return Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
-                  // Derinlik için gölge (küçültüldü)
+                  // Depth shadow
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 10, // Küçültüldü (15 -> 10)
-                    spreadRadius: 1, // Küçültüldü (2 -> 1)
-                    offset: const Offset(0, 2), // Küçültüldü (4 -> 2)
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 2),
                   ),
-                  // Glow efekti (sadece uyarı varsa)
-                  if (hasWarning)
+                  // Glow effect (only when warning is active)
+                  if (isHealthWarningActive)
                     BoxShadow(
                       color: Colors.amber.withValues(alpha: 0.6),
                       blurRadius: glowIntensity,
-                      spreadRadius: 2, // Küçültüldü (3 -> 2)
+                      spreadRadius: 2,
                     ),
                 ],
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => _showInsightDialog(context, waterProvider, userProvider),
+                  onTap: () => _showInsightDialog(
+                    context, 
+                    waterProvider, 
+                    userProvider,
+                    isHealthWarningActive,
+                    hasHighCaffeine,
+                    hasHighSugar,
+                    caffeineVolume,
+                    sugaryVolume,
+                  ),
                   borderRadius: BorderRadius.circular(50),
                   child: Transform.scale(
                     scale: scale,
-                      child: Container(
-                      padding: const EdgeInsets.all(10.0), // Küçültüldü (14 -> 10)
+                    child: Container(
+                      padding: const EdgeInsets.all(10.0),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        // Color coding: Yellow/Amber when warning, White when normal
+                        color: isHealthWarningActive 
+                            ? Colors.yellow[700] 
+                            : Colors.white,
                       ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          // İkon (küçültüldü)
-                          Icon(
-                            Icons.lightbulb,
-                            color: hasWarning ? Colors.amber : Colors.grey[400],
-                            size: 28.0, // Küçültüldü (40 -> 28)
-                          ),
-                          // Kırmızı badge (uyarı varsa)
-                          if (hasWarning)
-                            Positioned(
-                              right: -2,
-                              top: -2,
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                      child: Icon(
+                        Icons.lightbulb,
+                        // Icon color: White when warning, Grey when normal
+                        color: isHealthWarningActive 
+                            ? Colors.white 
+                            : Colors.grey[400],
+                        size: 28.0,
                       ),
                     ),
                   ),
@@ -298,8 +293,17 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
     );
   }
 
-  // İçgörüler Dialog'unu göster
-  void _showInsightDialog(BuildContext context, WaterProvider waterProvider, UserProvider userProvider) {
+  // İçgörüler Dialog'unu göster - Contextual Info Dialog
+  void _showInsightDialog(
+    BuildContext context,
+    WaterProvider waterProvider,
+    UserProvider userProvider,
+    bool isHealthWarningActive,
+    bool hasHighCaffeine,
+    bool hasHighSugar,
+    double caffeineVolume,
+    double sugaryVolume,
+  ) {
     // Bugünün verilerini al
     final today = DateTime.now();
     final todayKey = DateHelpers.toDateKey(today);
@@ -311,30 +315,26 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
       drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0.0) + entry.amount;
     }
     
-    // Kafeinli içecekler
-    final caffeineDrinks = ['coffee', 'tea', 'herbal_tea', 'green_tea', 'iced_coffee', 'cold_tea', 'energy_drink'];
-    double caffeineVolume = 0.0;
-    for (var drinkId in caffeineDrinks) {
-      caffeineVolume += drinkAmounts[drinkId] ?? 0.0;
-    }
-    
-    // Şekerli içecekler
-    final sugaryDrinks = ['juice', 'fresh_juice', 'soda', 'lemonade', 'cold_tea', 'smoothie'];
-    double sugaryVolume = 0.0;
-    for (var drinkId in sugaryDrinks) {
-      sugaryVolume += drinkAmounts[drinkId] ?? 0.0;
-    }
-    
     // Su miktarı
     final waterVolume = drinkAmounts['water'] ?? 0.0;
     final totalVolume = drinkAmounts.values.fold(0.0, (sum, amount) => sum + amount);
-    
-    // İçgörüler
-    final hasHighCaffeine = caffeineVolume > waterVolume && caffeineVolume > 500;
-    final hasHighSugar = sugaryVolume > waterVolume && sugaryVolume > 500;
     final hasGoodBalance = waterVolume >= (totalVolume * 0.6) && totalVolume > 0;
     final hasAnyData = totalVolume > 0;
     
+    // If warning is active, show specific alert dialog
+    if (isHealthWarningActive) {
+      _showHealthWarningDialog(
+        context,
+        hasHighCaffeine,
+        hasHighSugar,
+        caffeineVolume,
+        sugaryVolume,
+        userProvider,
+      );
+      return;
+    }
+    
+    // Normal state: Show standard daily health summary
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -364,12 +364,8 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                           iconColor: Colors.brown,
                           title: 'Kafein Kotası',
                           subtitle: UnitConverter.formatVolume(caffeineVolume, userProvider.isMetric),
-                          message: hasHighCaffeine
-                              ? '☕ Kafeinli içecekler suyunu geçti. Bir bardak suyla dengeleyin!'
-                              : 'Kafein alımınız dengeli görünüyor.',
-                          backgroundColor: hasHighCaffeine
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.green.withValues(alpha: 0.1),
+                          message: 'Kafein alımınız dengeli görünüyor.',
+                          backgroundColor: Colors.green.withValues(alpha: 0.1),
                         ),
                       ),
                     
@@ -382,12 +378,8 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                           iconColor: Colors.pink,
                           title: 'Şeker Kotası',
                           subtitle: UnitConverter.formatVolume(sugaryVolume, userProvider.isMetric),
-                          message: hasHighSugar
-                              ? '🍰 Şekerli içecekler suyunu geçti. Bir bardak suyla dengeleyin!'
-                              : 'Şeker alımınız dengeli görünüyor.',
-                          backgroundColor: hasHighSugar
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.green.withValues(alpha: 0.1),
+                          message: 'Şeker alımınız dengeli görünüyor.',
+                          backgroundColor: Colors.green.withValues(alpha: 0.1),
                         ),
                       ),
                     
@@ -430,6 +422,87 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
               'Tamam',
               style: TextStyle(
                 color: Color(0xFF4A5568),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Health Warning Dialog - Shows specific alert when thresholds are exceeded
+  void _showHealthWarningDialog(
+    BuildContext context,
+    bool hasHighCaffeine,
+    bool hasHighSugar,
+    double caffeineVolume,
+    double sugaryVolume,
+    UserProvider userProvider,
+  ) {
+    // Determine which warnings to show
+    String header = 'Dikkat: Sağlık Sınırı Aşıldı!';
+    String body = '';
+    IconData warningIcon = Icons.warning;
+    
+    if (hasHighCaffeine && hasHighSugar) {
+      body = 'Bugün ${UnitConverter.formatVolume(caffeineVolume, userProvider.isMetric)} kafeinli içecek ve ${UnitConverter.formatVolume(sugaryVolume, userProvider.isMetric)} şekerli içecek tükettin. Bu miktarlar önerilen günlük limitleri aşıyor. Böbreklerini ve genel sağlığını korumak için daha fazla su içmeyi ve bu içecekleri azaltmayı düşün.';
+    } else if (hasHighCaffeine) {
+      header = 'Dikkat: Kafein Sınırı Aşıldı!';
+      body = 'Bugün ${UnitConverter.formatVolume(caffeineVolume, userProvider.isMetric)} kafeinli içecek tükettin. Bu miktar önerilen günlük limiti (500ml) aşıyor. Fazla kafein uyku kalitesini etkileyebilir ve dehidrasyona neden olabilir. Daha fazla su içmeyi unutma!';
+    } else if (hasHighSugar) {
+      header = 'Dikkat: Şeker Sınırı Aşıldı!';
+      body = 'Bugün ${UnitConverter.formatVolume(sugaryVolume, userProvider.isMetric)} şekerli içecek tükettin. Bu miktar önerilen günlük limiti (1 Litre) aşıyor. Fazla şeker böbreklerini yorabilir ve sağlık sorunlarına yol açabilir. Su tüketimini artırmayı ve şekerli içecekleri azaltmayı düşün.';
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              warningIcon,
+              color: Colors.amber[700],
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                header,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF4A5568),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          body,
+          style: const TextStyle(
+            fontSize: 16,
+            color: Color(0xFF4A5568),
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.amber[700],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Anladım',
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
               ),
             ),

@@ -145,6 +145,15 @@ class AppConstants {
   /// Add button badge icon size
   static const double addButtonBadgeIconSize = 12.0;
 
+  /// Menu button width for D-shaped button
+  static const double menuButtonWidth = 110.0;
+
+  /// Standard button gap (equivalent to one standard button spacing)
+  static const double standardButtonGap = 24.0;
+
+  /// Menu button to water button gap (reduced for closer proximity)
+  static const double menuToWaterButtonGap = 16.0;
+
   // ============================================
   // TANK VISUALIZATION
   // ============================================
@@ -406,6 +415,9 @@ class AppConstants {
   
   /// Challenge section title bottom padding
   static const double challengeSectionTitleBottomPadding = 12.0;
+
+  /// Challenge map node radius (for gamified map)
+  static const double challengeMapNodeRadius = 32.0;
 
   // ============================================
   // PROGRESS INDICATOR

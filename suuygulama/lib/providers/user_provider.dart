@@ -265,14 +265,14 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  // Ardışık gün sayısını güncelle
+  // Ardışık gün sayısını güncelle (Calendar-based, strict day integrity)
   Future<void> updateConsecutiveDays(bool goalReached) async {
     if (goalReached) {
-      // Bugünün tarihini al
+      // Bugünün tarihini al (calendar day, not 24-hour window)
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       
-      // Bugün streak zaten artırıldı mı kontrol et
+      // Bugün streak zaten artırıldı mı kontrol et (strict calendar day comparison)
       bool alreadyIncrementedToday = false;
       if (_lastStreakIncrementDate != null) {
         final lastIncrement = DateTime(
@@ -280,8 +280,10 @@ class UserProvider extends ChangeNotifier {
           _lastStreakIncrementDate!.month,
           _lastStreakIncrementDate!.day,
         );
-        // Eğer son artış bugün yapıldıysa, tekrar artırma
-        if (today.isAtSameMomentAs(lastIncrement)) {
+        // Calendar day comparison: same year, month, and day
+        if (today.year == lastIncrement.year &&
+            today.month == lastIncrement.month &&
+            today.day == lastIncrement.day) {
           alreadyIncrementedToday = true;
         }
       }
@@ -289,16 +291,39 @@ class UserProvider extends ChangeNotifier {
       // Eğer bugün henüz artırılmadıysa, artır ve tarihi kaydet
       if (!alreadyIncrementedToday) {
         _consecutiveDays++;
-        _lastStreakIncrementDate = now;
+        _lastStreakIncrementDate = today; // Store only the date, not the time
         await _saveUserData();
         notifyListeners();
       }
       // Eğer zaten artırıldıysa, hiçbir şey yapma (sessizce çık)
     } else {
-      _consecutiveDays = 0;
-      _lastStreakIncrementDate = null;
-      await _saveUserData();
-      notifyListeners();
+      // Goal not reached: reset streak only if we're checking a new day
+      // Don't reset if we're still on the same day
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // Only reset if we haven't incremented today (meaning goal was never met today)
+      bool shouldReset = true;
+      if (_lastStreakIncrementDate != null) {
+        final lastIncrement = DateTime(
+          _lastStreakIncrementDate!.year,
+          _lastStreakIncrementDate!.month,
+          _lastStreakIncrementDate!.day,
+        );
+        // If we incremented today, don't reset (goal was met today)
+        if (today.year == lastIncrement.year &&
+            today.month == lastIncrement.month &&
+            today.day == lastIncrement.day) {
+          shouldReset = false;
+        }
+      }
+      
+      if (shouldReset) {
+        _consecutiveDays = 0;
+        _lastStreakIncrementDate = null;
+        await _saveUserData();
+        notifyListeners();
+      }
     }
   }
 

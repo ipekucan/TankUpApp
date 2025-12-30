@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../providers/user_provider.dart';
 import '../../services/chart_data_service.dart' show ChartDataService, ChartDataPoint, ChartPeriod;
 import '../../utils/unit_converter.dart';
+import 'chart_theme.dart';
 
 /// Chart view widget for displaying bar chart.
 /// Handles the visual rendering of chart data.
@@ -40,13 +41,13 @@ class ChartView extends StatelessWidget {
 
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        // Ay modu için bar genişliği ve aralık ayarları
-        final isMonthMode = selectedPeriod == ChartPeriod.month;
-        final groupsSpace = isMonthMode ? 4.0 : 8.0;
+        // Unified groups space for all periods
+        final groupsSpace = ChartTheme.groupsSpace;
 
         // Aylık mod için normal görünüm (5 sütun, kaydırma gerekmez)
-        if (isMonthMode) {
+        if (selectedPeriod == ChartPeriod.month) {
           return AspectRatio(
+            key: ValueKey(selectedPeriod),
             aspectRatio: 1.6,
             child: BarChart(
               BarChartData(
@@ -55,7 +56,7 @@ class ChartView extends StatelessWidget {
                 groupsSpace: groupsSpace,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (group) => Colors.black87,
+                    getTooltipColor: (group) => ChartTheme.tooltipBackgroundColor,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
                       double totalValue = 0;
@@ -69,14 +70,10 @@ class ChartView extends StatelessWidget {
 
                       return BarTooltipItem(
                         formattedValue,
-                        const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16.0,
-                        ),
+                        ChartTheme.tooltipTextStyle,
                       );
                     },
-                    tooltipRoundedRadius: 8,
+                    tooltipRoundedRadius: ChartTheme.tooltipBorderRadius,
                   ),
                   touchCallback: (FlTouchEvent event, barTouchResponse) {
                     if (event.isInterestedForInteractions &&
@@ -105,21 +102,17 @@ class ChartView extends StatelessWidget {
                           if (label.isEmpty) return const Text('');
 
                           return Padding(
-                            padding: const EdgeInsets.only(top: 4),
+                            padding: ChartTheme.axisLabelPadding,
                             child: Text(
                               label,
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.normal,
-                              ),
+                              style: ChartTheme.axisLabelStyle,
                               textAlign: TextAlign.center,
                             ),
                           );
                         }
                         return const Text('');
                       },
-                      reservedSize: 32,
+                      reservedSize: ChartTheme.bottomAxisReservedSize,
                     ),
                   ),
                   leftTitles: const AxisTitles(
@@ -144,6 +137,7 @@ class ChartView extends StatelessWidget {
 
         // Gün ve Hafta modları için normal görünüm
         return AspectRatio(
+          key: ValueKey(selectedPeriod),
           aspectRatio: 1.6,
           child: BarChart(
             BarChartData(
@@ -152,7 +146,7 @@ class ChartView extends StatelessWidget {
               groupsSpace: groupsSpace,
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
-                  getTooltipColor: (group) => Colors.black87,
+                  getTooltipColor: (group) => ChartTheme.tooltipBackgroundColor,
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
                     double totalValue = 0;
@@ -166,14 +160,10 @@ class ChartView extends StatelessWidget {
 
                     return BarTooltipItem(
                       formattedValue,
-                      const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
-                      ),
+                      ChartTheme.tooltipTextStyle,
                     );
                   },
-                  tooltipRoundedRadius: 8,
+                  tooltipRoundedRadius: ChartTheme.tooltipBorderRadius,
                 ),
                 touchCallback: (FlTouchEvent event, barTouchResponse) {
                   if (event.isInterestedForInteractions &&
@@ -201,57 +191,19 @@ class ChartView extends StatelessWidget {
                         String label = _getBottomLabel(value.toInt(), selectedPeriod, chartData);
                         if (label.isEmpty) return const Text('');
 
-                        // Haftalık mod için büyük ve bold yazı
-                        if (selectedPeriod == ChartPeriod.week) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              label,
-                              style: const TextStyle(
-                                color: Color(0xFF2C3E50),
-                                fontSize: 12.0,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-
-                        // Gün modu için bold ve büyük yazı
-                        if (selectedPeriod == ChartPeriod.day) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 14.0,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-
-                        // Ay modu için normal stil
+                        // Unified styling for all periods
                         return Padding(
-                          padding: const EdgeInsets.only(top: 4),
+                          padding: ChartTheme.axisLabelPadding,
                           child: Text(
                             label,
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 11,
-                            ),
+                            style: ChartTheme.axisLabelStyle,
                             textAlign: TextAlign.center,
                           ),
                         );
                       }
                       return const Text('');
                     },
-                    reservedSize: selectedPeriod == ChartPeriod.day ||
-                            selectedPeriod == ChartPeriod.week
-                        ? 40
-                        : 32,
+                    reservedSize: ChartTheme.bottomAxisReservedSize,
                   ),
                 ),
                 leftTitles: const AxisTitles(
@@ -277,34 +229,16 @@ class ChartView extends StatelessWidget {
   }
 
   /// Gets the bottom label for a given index and period.
+  /// Uses the label from ChartDataPoint (which is dynamically calculated).
   static String _getBottomLabel(
     int index,
     ChartPeriod period,
     List<ChartDataPoint> chartData,
   ) {
     if (index < 0 || index >= chartData.length) return '';
-
-    if (period == ChartPeriod.day) {
-      // Gün modu: 'P', 'S', 'Ç', 'P', 'C', 'C', 'P' (Pazartesi'den Pazar'a)
-      const dayLabels = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
-      if (index < dayLabels.length) {
-        return dayLabels[index];
-      }
-    } else if (period == ChartPeriod.week) {
-      // Hafta modu: '1. Hafta', '2. Hafta', '3. Hafta', '4. Hafta'
-      final weekIndex = index + 1;
-      if (weekIndex >= 1 && weekIndex <= 4) {
-        return '$weekIndex. Hafta';
-      }
-    } else if (period == ChartPeriod.month) {
-      // Ay modu: 'Ara', 'Oca', 'Şub', 'Mar', 'Nis' (5 sütun, Aralık başta)
-      const monthLabels = ['Ara', 'Oca', 'Şub', 'Mar', 'Nis'];
-      if (index < monthLabels.length) {
-        return monthLabels[index];
-      }
-    }
-
-    return '';
+    
+    // Return the label from the data point (already calculated dynamically)
+    return chartData[index].label;
   }
 }
 

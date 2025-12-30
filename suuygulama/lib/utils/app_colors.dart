@@ -76,6 +76,10 @@ class AppColors {
   static const Color infoBlue = Color(0xFF2196F3);
   static const Color infoBlueLight = Color(0xFF64B5F6);
 
+  /// Subtle badge background color for less intrusive UI elements
+  /// Semi-transparent dark color for removal badges and similar indicators
+  static Color subtleBadgeBackground = Colors.black.withValues(alpha: 0.6);
+
   // ============================================
   // BUTON RENKLERİ (Button Colors)
   // ============================================
