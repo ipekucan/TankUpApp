@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../../providers/water_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/achievement_provider.dart';
+import '../../providers/challenge_provider.dart';
 import '../../widgets/challenge_card.dart';
-import '../../utils/unit_converter.dart';
+import '../../utils/challenge_logic_helper.dart';
 import '../../core/constants/app_constants.dart';
 import '../../theme/app_text_styles.dart';
 
@@ -67,10 +68,13 @@ class ChallengePanel extends StatelessWidget {
                       final userProvider = Provider.of<UserProvider>(context, listen: false);
                       final achievementProvider =
                           Provider.of<AchievementProvider>(context, listen: false);
+                      final challengeProvider =
+                          Provider.of<ChallengeProvider>(context, listen: false);
                       return _buildDailyChallengesContent(
                         waterProvider,
                         userProvider,
                         achievementProvider,
+                        challengeProvider,
                       );
                     },
                   ),
@@ -87,57 +91,39 @@ class ChallengePanel extends StatelessWidget {
     WaterProvider waterProvider,
     UserProvider userProvider,
     AchievementProvider achievementProvider,
+    ChallengeProvider challengeProvider,
   ) {
-    // 1. Tüm mücadeleleri al ve durumlarını hesapla
-    final allChallenges = ChallengeData.getChallenges()
-        .where((challenge) => challenge.id != 'first_cup')
-        .map((challenge) {
-      Challenge updatedChallenge = challenge;
-
-      if (challenge.id == 'deep_dive') {
-        // Derin Dalış: 3 gün üst üste %100 su hedefi
-        final isCompleted = userProvider.consecutiveDays >= 3 &&
-            waterProvider.hasReachedDailyGoal;
-        updatedChallenge = Challenge(
-          id: challenge.id,
-          name: challenge.name,
-          description: challenge.description,
-          coinReward: challenge.coinReward,
-          cardColor: challenge.cardColor,
-          icon: challenge.icon,
-          whyStart: challenge.whyStart,
-          healthBenefit: challenge.healthBenefit,
-          badgeEmoji: challenge.badgeEmoji,
-          isCompleted: isCompleted,
-          progress: (userProvider.consecutiveDays / 3).clamp(0.0, 1.0),
-          progressText: '${userProvider.consecutiveDays}/3 gün',
-        );
-      } else if (challenge.id == 'coral_guardian') {
-        // Mercan Koruyucu: Akşam 8'den sonra sadece su (basitleştirilmiş - bugün su hedefi)
-        final isCompleted = waterProvider.hasReachedDailyGoal;
-        updatedChallenge = Challenge(
-          id: challenge.id,
-          name: challenge.name,
-          description: challenge.description,
-          coinReward: challenge.coinReward,
-          cardColor: challenge.cardColor,
-          icon: challenge.icon,
-          whyStart: challenge.whyStart,
-          healthBenefit: challenge.healthBenefit,
-          badgeEmoji: challenge.badgeEmoji,
-          isCompleted: isCompleted,
-          progress: (waterProvider.consumedAmount / waterProvider.dailyGoal).clamp(0.0, 1.0),
-          progressText:
-              '${UnitConverter.formatVolume(waterProvider.consumedAmount, userProvider.isMetric)}/${UnitConverter.formatVolume(waterProvider.dailyGoal, userProvider.isMetric)}',
-        );
-      }
-
-      return updatedChallenge;
+    // CRITICAL: "Calculate First, Separate Later" approach
+    // This prevents challenges from disappearing into a "limbo" state
+    
+    // 1. Get all challenges from provider (both active and completed)
+    final providerChallenges = challengeProvider.activeChallenges;
+    
+    // 2. Calculate state for ALL challenges FIRST
+    // This ensures we have the final, calculated state before filtering
+    final allCalculatedChallenges = providerChallenges.map((challenge) {
+      // Get base challenge data from ChallengeData
+      final baseChallenge = ChallengeData.getChallenges()
+          .firstWhere((c) => c.id == challenge.id, orElse: () => challenge);
+      
+      // Calculate the final state (progress, isCompleted, etc.)
+      return ChallengeLogicHelper.calculateChallengeState(
+        baseChallenge,
+        waterProvider,
+        userProvider,
+        challengeProvider,
+      );
     }).toList();
-
-    // 2. Aktif ve tamamlanan mücadeleleri ayrı ayrı filtrele
-    final activeChallenges = allChallenges.where((c) => !c.isCompleted).toList();
-    final completedChallenges = allChallenges.where((c) => c.isCompleted).toList();
+    
+    // 3. NOW separate into active and completed based on CALCULATED state
+    // This ensures every challenge lands in exactly one list
+    final activeChallenges = allCalculatedChallenges
+        .where((challenge) => !challenge.isCompleted)
+        .toList();
+    
+    final completedChallenges = allCalculatedChallenges
+        .where((challenge) => challenge.isCompleted == true)
+        .toList();
 
     return SingleChildScrollView(
       child: Column(

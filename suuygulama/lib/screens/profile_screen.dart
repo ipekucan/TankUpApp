@@ -266,8 +266,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Text(
             title,
             style: AppTextStyles.heading3,
+            ),
           ),
-        ),
         AppCardContainer(
           padding: EdgeInsets.zero,
           child: Column(

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/challenge_provider.dart';
 import '../../providers/water_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../widgets/challenge_card.dart';
 import '../../widgets/empty_challenge_card.dart';
+import '../../utils/challenge_logic_helper.dart';
 import '../../core/constants/app_constants.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/app_card.dart';
@@ -14,9 +16,15 @@ class ChallengesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ChallengeProvider, WaterProvider>(
-      builder: (context, challengeProvider, waterProvider, child) {
-        final activeChallenges = challengeProvider.activeIncompleteChallenges;
+    return Consumer3<ChallengeProvider, WaterProvider, UserProvider>(
+      builder: (context, challengeProvider, waterProvider, userProvider, child) {
+        // Get only active challenges with calculated progress from centralized helper
+        // This ensures we only show challenges that are actually started
+        final activeChallenges = ChallengeLogicHelper.getActiveChallengesWithProgress(
+          waterProvider,
+          userProvider,
+          challengeProvider,
+        );
         final now = DateTime.now();
         final isBefore3PM = now.hour < 15;
 
@@ -154,62 +162,114 @@ class ChallengesTab extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(AppConstants.largeBorderRadius),
-            topRight: Radius.circular(AppConstants.largeBorderRadius),
-          ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Yeni Mücadeleler Keşfet',
-                    style: AppTextStyles.heading2,
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+      builder: (context) => Consumer3<ChallengeProvider, WaterProvider, UserProvider>(
+        builder: (context, currentChallengeProvider, waterProvider, userProvider, child) {
+          // Get all challenges (excluding first_cup)
+          final allChallenges = ChallengeData.getChallenges()
+              .where((challenge) => challenge.id != 'first_cup')
+              .toList();
+          
+          // Get active challenge IDs (both active and completed)
+          final activeChallengeIds = currentChallengeProvider.activeChallenges
+              .map((c) => c.id)
+              .toSet();
+          
+          // Calculate states for all challenges
+          final allChallengesWithState = allChallenges.map((challenge) {
+            return ChallengeLogicHelper.calculateChallengeState(
+              challenge,
+              waterProvider,
+              userProvider,
+              currentChallengeProvider,
+            );
+          }).toList();
+          
+          // Separate into available (not started) and started (active or completed)
+          final availableChallenges = allChallengesWithState
+              .where((challenge) => !activeChallengeIds.contains(challenge.id))
+              .toList();
+          
+          final startedChallenges = allChallengesWithState
+              .where((challenge) => activeChallengeIds.contains(challenge.id))
+              .toList();
+          
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(AppConstants.largeBorderRadius),
+                topRight: Radius.circular(AppConstants.largeBorderRadius),
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.defaultPadding,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Yeni Mücadeleler Keşfet',
+                        style: AppTextStyles.heading2,
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: ChallengeData.getChallenges()
-                      .where((challenge) =>
-                          !challengeProvider.hasActiveChallenge(challenge.id))
-                      .map((challenge) => Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppConstants.mediumSpacing,
-                            ),
-                            child: ChallengeCard(
-                              challenge: challenge,
-                              onTap: () async {
-                                await challengeProvider.startChallenge(challenge.id);
-                                if (context.mounted) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                            ),
-                          ))
-                      .toList(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConstants.defaultPadding,
+                    ),
+                    child: Column(
+                      children: [
+                        // Başlatılmamış mücadeleler (Yeni başlatılabilir)
+                        ...availableChallenges.map((challenge) => Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppConstants.challengeCardBottomPadding,
+                              ),
+                              child: ChallengeCard(
+                                challenge: challenge,
+                                onTap: () async {
+                                  await currentChallengeProvider.startChallenge(challenge.id);
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                              ),
+                            )),
+                        // Başlatılmış mücadeleler (Aktif veya Tamamlanmış)
+                        ...startedChallenges.map((challenge) => Opacity(
+                              opacity: challenge.isCompleted
+                                  ? AppConstants.challengeCompletedOpacity
+                                  : 1.0,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppConstants.challengeCardBottomPadding,
+                                ),
+                                child: ChallengeCard(
+                                  challenge: challenge,
+                                  onTap: challenge.isCompleted
+                                      ? null
+                                      : () {
+                                          // Active challenge - could show details or do nothing
+                                        },
+                                ),
+                              ),
+                            )),
+                        SizedBox(height: AppConstants.extraLargeSpacing),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

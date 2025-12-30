@@ -18,6 +18,7 @@ import '../widgets/tank/tank_controls.dart';
 import '../widgets/tank/challenge_panel.dart';
 import '../widgets/tank/achievement_dialog.dart';
 import '../widgets/challenge_card.dart';
+import '../utils/challenge_logic_helper.dart';
 import 'success_screen.dart';
 import 'drink_gallery_screen.dart';
 
@@ -38,7 +39,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late DraggableScrollableController _challengeSheetController;
   double _animatedFillPercentage = 0.0;
   final List<TankBubble> _bubbles = [];
-
+  
   @override
   void initState() {
     super.initState();
@@ -58,13 +59,13 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         curve: Curves.elasticOut,
       ),
     );
-
+    
     // Dalga animasyonu
     _waveController = AnimationController(
       duration: AppConstants.waveAnimationDuration,
       vsync: this,
     )..repeat();
-
+    
     // Su dolum animasyonu
     _fillController = AnimationController(
       duration: AppConstants.longAnimationDuration,
@@ -79,16 +80,16 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         curve: Curves.easeOut,
       ),
     );
-
+    
     // Bubble animasyonu
     _bubbleController = AnimationController(
       duration: AppConstants.bubbleAnimationDuration,
       vsync: this,
     )..repeat();
-
+    
     _generateBubbles();
   }
-
+  
   void _generateBubbles() {
     _bubbles.clear();
     final random = math.Random();
@@ -107,7 +108,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       ));
     }
   }
-
+  
   @override
   void dispose() {
     _coinAnimationController.dispose();
@@ -150,20 +151,20 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       builder: (context, waterProvider, aquariumProvider, userProvider, achievementProvider, child) {
         final currentIntake = waterProvider.consumedAmount;
         final dailyGoal = waterProvider.dailyGoal;
-        final fillPercentage = (dailyGoal > 0)
-            ? (currentIntake / dailyGoal).clamp(0.0, 1.0)
+        final fillPercentage = (dailyGoal > 0) 
+            ? (currentIntake / dailyGoal).clamp(0.0, 1.0) 
             : 0.0;
-        final progressPercentage = dailyGoal > 0
+        final progressPercentage = dailyGoal > 0 
             ? (currentIntake / dailyGoal * 100)
             : 0.0;
-
+        
         // Animasyonlu dolum: fillPercentage değiştiğinde animasyonu başlat
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-
+          
           final currentAnimatedFill = _animatedFillPercentage.clamp(0.0, 1.0);
           final targetFill = fillPercentage.clamp(0.0, 1.0);
-
+          
           if ((targetFill - currentAnimatedFill).abs() > AppConstants.minFillDifference) {
             _fillController.reset();
             _fillAnimation = Tween<double>(
@@ -175,15 +176,15 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 curve: Curves.easeOut,
               ),
             )..addListener(() {
-                if (mounted) {
-                  final newValue = _fillAnimation.value.clamp(0.0, 1.0);
+              if (mounted) {
+                final newValue = _fillAnimation.value.clamp(0.0, 1.0);
                   if ((newValue - _animatedFillPercentage).abs() >
                       AppConstants.minAnimationValueDifference) {
-                    _animatedFillPercentage = newValue;
-                    setState(() {});
-                  }
+                  _animatedFillPercentage = newValue;
+                  setState(() {});
                 }
-              });
+              }
+            });
             _fillController.forward();
           } else if (currentAnimatedFill == 0.0 && targetFill > 0.0) {
             _animatedFillPercentage = targetFill;
@@ -192,94 +193,95 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             }
           }
         });
-
+        
         return Stack(
           children: [
             // Ana içerik - ScrollView
             SingleChildScrollView(
               child: Column(
-                children: [
+              children: [
                   // Üst Bar: Sol - Günlük Seri Butonu, Sağ - Coin Butonu
-                  Padding(
+              Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppConstants.defaultHorizontalPadding,
                       vertical: AppConstants.defaultVerticalPadding,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                         // Sol: Günlük Seri/Challenge Butonu
-                        _StatusToggleButton(
+                    _StatusToggleButton(
                           challengeProvider:
                               Provider.of<ChallengeProvider>(context, listen: false),
-                          userProvider: userProvider,
-                          progressPercentage: progressPercentage,
-                          onTap: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SuccessScreen(),
-                              ),
-                            );
-
-                            if (!mounted) return;
-
-                            if (result == 'open_challenges_panel') {
-                              _challengeSheetController.animateTo(
+                      userProvider: userProvider,
+                      waterProvider: waterProvider,
+                      progressPercentage: progressPercentage,
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SuccessScreen(),
+                          ),
+                        );
+                        
+                        if (!mounted) return;
+                        
+                        if (result == 'open_challenges_panel') {
+                          _challengeSheetController.animateTo(
                                 AppConstants.challengeSheetOpenSize,
                                 duration: AppConstants.defaultAnimationDuration,
-                                curve: Curves.easeOut,
-                              );
-                            }
-                          },
-                        ),
-
-                        // Sağ: Dairesel Coin Butonu
-                        ScaleTransition(
-                          scale: _coinScaleAnimation,
-                          child: Container(
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
+                    ),
+                    
+                    // Sağ: Dairesel Coin Butonu
+                    ScaleTransition(
+                      scale: _coinScaleAnimation,
+                      child: Container(
                             width: AppConstants.coinButtonSize,
                             height: AppConstants.coinButtonSize,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
                                   color: Colors.black.withValues(
                                     alpha: AppConstants.defaultShadowAlpha,
                                   ),
                                   blurRadius: AppConstants.defaultShadowBlur,
                                   offset: AppConstants.defaultShadowOffset,
-                                ),
-                              ],
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.monetization_on,
-                                  color: AppColors.goldCoin,
-                                  size: AppConstants.coinButtonIconSize,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${waterProvider.tankCoins}',
-                                  style: TextStyle(
-                                    fontSize: AppConstants.coinButtonTextSize,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.goldCoin,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
+            child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.monetization_on,
+                              color: AppColors.goldCoin,
+                                  size: AppConstants.coinButtonIconSize,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${waterProvider.tankCoins}',
+                              style: TextStyle(
+                                    fontSize: AppConstants.coinButtonTextSize,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.goldCoin,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-
+                  ],
+                ),
+              ),
+              
                   SizedBox(height: AppConstants.extraLargeSpacing),
 
                   // Tank Görselleştirme
@@ -289,101 +291,101 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                     bubbleController: _bubbleController,
                     waveController: _waveController,
                     bubbles: _bubbles,
-                  ),
-
+              ),
+              
                   // Tank Altı: Günlük Hedef
-                  Padding(
+              Padding(
                     padding: EdgeInsets.only(top: AppConstants.largePadding),
-                    child: Center(
-                      child: Text(
-                        'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
+                child: Center(
+                  child: Text(
+                    'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
                         style: AppTextStyles.bodyLarge.copyWith(
                           fontSize: AppConstants.dailyGoalFontSize,
                           fontWeight: FontWeight.w500,
                           color: Colors.black45,
-                          letterSpacing: 0.3,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      letterSpacing: 0.3,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
 
             // Buton Paneli
             TankControls(
               onShowDrinkSelector: () {
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DrinkGalleryScreen(),
-                  ),
-                );
-              },
+                          if (!mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DrinkGalleryScreen(),
+                            ),
+                          );
+                        },
               onShowInteractiveCupModal: (
-                BuildContext context,
-                WaterProvider waterProvider,
-                UserProvider userProvider,
-                AchievementProvider achievementProvider,
-              ) async {
-                final previousConsumedAmount = waterProvider.consumedAmount;
-
-                final result = await showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.transparent,
-                  barrierColor: Colors.black.withValues(alpha: 0.5),
-                  isScrollControlled: true,
-                  builder: (context) => const InteractiveCupModal(),
-                );
-
-                if (result != null && result is double) {
-                  final currentConsumedAmount = waterProvider.consumedAmount;
-
-                  if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
-                    if (!context.mounted) return;
+    BuildContext context,
+    WaterProvider waterProvider,
+    UserProvider userProvider,
+    AchievementProvider achievementProvider,
+  ) async {
+    final previousConsumedAmount = waterProvider.consumedAmount;
+    
+    final result = await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      isScrollControlled: true,
+      builder: (context) => const InteractiveCupModal(),
+    );
+    
+    if (result != null && result is double) {
+      final currentConsumedAmount = waterProvider.consumedAmount;
+      
+      if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
+        if (!context.mounted) return;
                     final achievementProvider =
                         Provider.of<AchievementProvider>(context, listen: false);
                     final isAlreadyUnlocked =
                         achievementProvider.isAchievementUnlocked('first_cup');
-
-                    if (!isAlreadyUnlocked) {
-                      final coinReward = await achievementProvider.checkFirstCup();
-
-                      if (coinReward > 0) {
-                        await waterProvider.addCoins(coinReward);
-                        if (!mounted) return;
-                      }
-
-                      if (!mounted) return;
-
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          final achievement = achievementProvider.achievements.firstWhere(
+        
+        if (!isAlreadyUnlocked) {
+          final coinReward = await achievementProvider.checkFirstCup();
+          
+          if (coinReward > 0) {
+            await waterProvider.addCoins(coinReward);
+            if (!mounted) return;
+          }
+          
+          if (!mounted) return;
+          
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+    final achievement = achievementProvider.achievements.firstWhere(
                             (a) => a.id == 'first_cup',
-                            orElse: () => Achievement(
+      orElse: () => Achievement(
                               id: 'first_cup',
-                              name: 'İlk Bardak',
-                              description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
-                              coinReward: 20,
-                            ),
-                          );
-
+        name: 'İlk Bardak',
+        description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
+        coinReward: 20,
+      ),
+    );
+    
                           AchievementDialog.show(
                             context,
                             achievement,
                             cardColor: AppConstants.firstCupAchievementColor,
                             badgeEmoji: '💧',
-                          );
+        );
                         }
                       });
                     }
                   }
                 }
               },
-            ),
-
+          ),
+          
             // Mücadele Paneli
             ChallengePanel(
               controller: _challengeSheetController,
@@ -399,12 +401,14 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
 class _StatusToggleButton extends StatefulWidget {
   final ChallengeProvider challengeProvider;
   final UserProvider userProvider;
+  final WaterProvider waterProvider;
   final double progressPercentage;
   final VoidCallback onTap;
 
   const _StatusToggleButton({
     required this.challengeProvider,
     required this.userProvider,
+    required this.waterProvider,
     required this.progressPercentage,
     required this.onTap,
   });
@@ -422,7 +426,7 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
   void initState() {
     super.initState();
     _checkActiveChallenge();
-
+    
     if (_firstActiveChallenge != null) {
       _toggleTimer = Timer.periodic(AppConstants.statusToggleDuration, (timer) {
         if (mounted) {
@@ -441,9 +445,15 @@ class _StatusToggleButtonState extends State<_StatusToggleButton> {
   }
 
   void _checkActiveChallenge() {
-    final activeChallenges = widget.challengeProvider.activeIncompleteChallenges;
+    // Get only active challenges with calculated progress from centralized helper
+    final activeChallenges = ChallengeLogicHelper.getActiveChallengesWithProgress(
+      widget.waterProvider,
+      widget.userProvider,
+      widget.challengeProvider,
+    );
+    
     final hasActiveChallenge = activeChallenges.isNotEmpty;
-
+    
     if (hasActiveChallenge) {
       _firstActiveChallenge = activeChallenges.first;
       if (_toggleTimer == null || !_toggleTimer!.isActive) {
