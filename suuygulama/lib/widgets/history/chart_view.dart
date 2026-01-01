@@ -8,7 +8,8 @@ import 'chart_theme.dart';
 
 /// Chart view widget for displaying bar chart.
 /// Handles the visual rendering of chart data.
-class ChartView extends StatelessWidget {
+/// Implements tap-to-toggle tooltip interaction.
+class ChartView extends StatefulWidget {
   final List<ChartDataPoint> chartData;
   final ChartPeriod selectedPeriod;
   final int touchedBarIndex;
@@ -23,8 +24,24 @@ class ChartView extends StatelessWidget {
   });
 
   @override
+  State<ChartView> createState() => _ChartViewState();
+}
+
+class _ChartViewState extends State<ChartView> {
+  int _touchedIndex = -1;
+
+  @override
+  void didUpdateWidget(ChartView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset touched index when period changes
+    if (oldWidget.selectedPeriod != widget.selectedPeriod) {
+      _touchedIndex = -1;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (chartData.isEmpty) {
+    if (widget.chartData.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32.0),
@@ -41,190 +58,209 @@ class ChartView extends StatelessWidget {
 
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        // Unified groups space for all periods
-        final groupsSpace = ChartTheme.groupsSpace;
-
-        // Aylık mod için normal görünüm (5 sütun, kaydırma gerekmez)
-        if (selectedPeriod == ChartPeriod.month) {
-          return AspectRatio(
-            key: ValueKey(selectedPeriod),
-            aspectRatio: 1.6,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: ChartDataService.getMaxY(chartData),
-                groupsSpace: groupsSpace,
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (group) => ChartTheme.tooltipBackgroundColor,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
-                      double totalValue = 0;
-                      if (group.barRods.isNotEmpty) {
-                        // En üstteki rod'un toY değeri toplamı verir
-                        totalValue = group.barRods.last.toY;
-                      }
-
-                      // Birim formatını kullan
-                      final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
-
-                      return BarTooltipItem(
-                        formattedValue,
-                        ChartTheme.tooltipTextStyle,
-                      );
-                    },
-                    tooltipRoundedRadius: ChartTheme.tooltipBorderRadius,
-                  ),
-                  touchCallback: (FlTouchEvent event, barTouchResponse) {
-                    if (event.isInterestedForInteractions &&
-                        barTouchResponse != null &&
-                        barTouchResponse.spot != null) {
-                      onBarTouched(barTouchResponse.spot!.touchedBarGroupIndex);
-                    } else {
-                      onBarTouched(null);
-                    }
-                  },
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < chartData.length) {
-                          String label = _getBottomLabel(value.toInt(), selectedPeriod, chartData);
-                          if (label.isEmpty) return const Text('');
-
-                          return Padding(
-                            padding: ChartTheme.axisLabelPadding,
-                            child: Text(
-                              label,
-                              style: ChartTheme.axisLabelStyle,
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                      reservedSize: ChartTheme.bottomAxisReservedSize,
-                    ),
-                  ),
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                    ),
-                  ),
-                ),
-                gridData: const FlGridData(
-                  show: false,
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: ChartDataService.buildBarGroups(
-                  chartData,
-                  selectedPeriod,
-                  {},
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Gün ve Hafta modları için normal görünüm
         return AspectRatio(
-          key: ValueKey(selectedPeriod),
+          key: ValueKey(widget.selectedPeriod),
           aspectRatio: 1.6,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              maxY: ChartDataService.getMaxY(chartData),
-              groupsSpace: groupsSpace,
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipColor: (group) => ChartTheme.tooltipBackgroundColor,
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
-                    double totalValue = 0;
-                    if (group.barRods.isNotEmpty) {
-                      // En üstteki rod'un toY değeri toplamı verir
-                      totalValue = group.barRods.last.toY;
-                    }
-
-                    // Birim formatını kullan
-                    final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
-
-                    return BarTooltipItem(
-                      formattedValue,
-                      ChartTheme.tooltipTextStyle,
-                    );
-                  },
-                  tooltipRoundedRadius: ChartTheme.tooltipBorderRadius,
-                ),
-                touchCallback: (FlTouchEvent event, barTouchResponse) {
-                  if (event.isInterestedForInteractions &&
-                      barTouchResponse != null &&
-                      barTouchResponse.spot != null) {
-                    onBarTouched(barTouchResponse.spot!.touchedBarGroupIndex);
-                  } else {
-                    onBarTouched(null);
-                  }
-                },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              BarChart(
+                _buildBarChartData(userProvider),
               ),
-              titlesData: FlTitlesData(
-                show: true,
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      if (value.toInt() >= 0 && value.toInt() < chartData.length) {
-                        String label = _getBottomLabel(value.toInt(), selectedPeriod, chartData);
-                        if (label.isEmpty) return const Text('');
-
-                        // Unified styling for all periods
-                        return Padding(
-                          padding: ChartTheme.axisLabelPadding,
-                          child: Text(
-                            label,
-                            style: ChartTheme.axisLabelStyle,
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                    reservedSize: ChartTheme.bottomAxisReservedSize,
-                  ),
-                ),
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: false,
-                  ),
-                ),
-              ),
-              gridData: const FlGridData(
-                show: false,
-              ),
-              borderData: FlBorderData(show: false),
-              barGroups: ChartDataService.buildBarGroups(
-                chartData,
-                selectedPeriod,
-                {},
-              ),
-            ),
+              // Custom persistent tooltip overlay
+              if (_touchedIndex >= 0 && _touchedIndex < widget.chartData.length)
+                _buildPersistentTooltip(context, userProvider),
+            ],
           ),
         );
       },
+    );
+  }
+
+  /// Builds a persistent tooltip overlay that shows when a bar is selected.
+  Widget _buildPersistentTooltip(BuildContext context, UserProvider userProvider) {
+    // Safety checks
+    if (widget.chartData.isEmpty || _touchedIndex < 0 || _touchedIndex >= widget.chartData.length) {
+      return const SizedBox.shrink();
+    }
+
+    final barGroups = ChartDataService.buildBarGroups(
+      widget.chartData,
+      widget.selectedPeriod,
+      {},
+    );
+    
+    if (_touchedIndex >= barGroups.length || barGroups.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    final touchedGroup = barGroups[_touchedIndex];
+    double totalValue = 0;
+    if (touchedGroup.barRods.isNotEmpty) {
+      totalValue = touchedGroup.barRods.last.toY;
+    }
+
+    final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
+
+    // Calculate approximate position based on bar index
+    // This is a simplified approach - in production you might want to use
+    // a GlobalKey to get exact bar positions
+    final screenWidth = MediaQuery.of(context).size.width;
+    final chartWidth = screenWidth - 32; // Account for padding
+    final barCount = widget.chartData.length;
+    
+    // Prevent division by zero
+    if (barCount == 0) {
+      return const SizedBox.shrink();
+    }
+    
+    final barWidth = chartWidth / barCount;
+    final tooltipX = (_touchedIndex * barWidth) + (barWidth / 2) - 30; // Center of bar, offset for tooltip width
+
+    return Positioned(
+      left: tooltipX.clamp(0.0, screenWidth - 80),
+      top: 10,
+      child: Material(
+        color: Colors.transparent,
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: ChartTheme.tooltipBackgroundColor,
+            borderRadius: BorderRadius.circular(ChartTheme.tooltipBorderRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            formattedValue,
+            style: ChartTheme.tooltipTextStyle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds the BarChartData with proper X-axis alignment and tap-to-toggle interaction.
+  BarChartData _buildBarChartData(UserProvider userProvider) {
+    final groupsSpace = ChartTheme.groupsSpace;
+    final barGroups = ChartDataService.buildBarGroups(
+      widget.chartData,
+      widget.selectedPeriod,
+      {},
+    );
+
+    return BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: ChartDataService.getMaxY(widget.chartData),
+      groupsSpace: groupsSpace,
+      barTouchData: BarTouchData(
+        enabled: true,
+        handleBuiltInTouches: false, // Disable default "hold" behavior
+        touchTooltipData: BarTouchTooltipData(
+          getTooltipColor: (group) => ChartTheme.tooltipBackgroundColor,
+          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+            // Only show tooltip if this bar is the touched one and index is valid
+            if (groupIndex != _touchedIndex || 
+                _touchedIndex < 0 || 
+                _touchedIndex >= widget.chartData.length) {
+              // Return empty tooltip item instead of null to avoid crashes
+              return BarTooltipItem('', const TextStyle(fontSize: 0));
+            }
+
+            // Toplam değeri hesapla (stacked bar için tüm rod'ların toplamı)
+            double totalValue = 0;
+            if (group.barRods.isNotEmpty) {
+              // En üstteki rod'un toY değeri toplamı verir
+              totalValue = group.barRods.last.toY;
+            }
+
+            // Birim formatını kullan
+            final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
+
+            return BarTooltipItem(
+              formattedValue,
+              ChartTheme.tooltipTextStyle,
+            );
+          },
+          tooltipRoundedRadius: ChartTheme.tooltipBorderRadius,
+        ),
+        touchCallback: (FlTouchEvent event, barTouchResponse) {
+          if (event is FlTapUpEvent) {
+            // Tap to toggle behavior
+            if (barTouchResponse != null && 
+                barTouchResponse.spot != null &&
+                barTouchResponse.spot!.touchedBarGroupIndex >= 0 &&
+                barTouchResponse.spot!.touchedBarGroupIndex < widget.chartData.length) {
+              final tappedIndex = barTouchResponse.spot!.touchedBarGroupIndex;
+              if (mounted) {
+                setState(() {
+                  // Toggle: if same bar tapped again, deselect; otherwise select new bar
+                  _touchedIndex = (_touchedIndex == tappedIndex) ? -1 : tappedIndex;
+                });
+                // Notify parent about the touched bar
+                widget.onBarTouched(_touchedIndex >= 0 ? _touchedIndex : null);
+              }
+            } else {
+              // Tapped on empty space - deselect
+              if (mounted) {
+                setState(() {
+                  _touchedIndex = -1;
+                });
+                widget.onBarTouched(null);
+              }
+            }
+          }
+        },
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        topTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1, // Ensure every bar gets a label
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              // Only show labels for valid indices (0 to length-1)
+              if (index >= 0 && index < widget.chartData.length) {
+                String label = _getBottomLabel(index, widget.selectedPeriod, widget.chartData);
+                if (label.isEmpty) return const SizedBox.shrink();
+
+                return Padding(
+                  padding: ChartTheme.axisLabelPadding,
+                  child: Text(
+                    label,
+                    style: ChartTheme.axisLabelStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+            reservedSize: ChartTheme.bottomAxisReservedSize,
+          ),
+        ),
+        leftTitles: const AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: false,
+          ),
+        ),
+      ),
+      gridData: const FlGridData(
+        show: false,
+      ),
+      borderData: FlBorderData(show: false),
+      barGroups: barGroups,
     );
   }
 

@@ -32,20 +32,26 @@ class PeriodSelector extends StatelessWidget {
     return GestureDetector(
       onTap: () => onPeriodChanged(period),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        height: 38.0, // Fixed height for consistent button size
+        padding: const EdgeInsets.symmetric(horizontal: 24.0), // Only horizontal padding
         decoration: BoxDecoration(
           color: isActive ? Colors.black : Colors.grey[200],
           borderRadius: BorderRadius.circular(20),
         ),
-        alignment: Alignment.center, // Center alignment for text
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.grey[800],
-            fontWeight: FontWeight.w600,
-            fontSize: 17.0,
+        alignment: Alignment.center, // Center alignment for container
+        child: Center(
+          // Center widget wrapper to guarantee absolute middle positioning
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.grey[800],
+              fontWeight: FontWeight.w600,
+              fontSize: 17.0,
+              height: 1.0, // Tight line height to remove default font padding
+              leadingDistribution: TextLeadingDistribution.even, // Force glyphs to be centered within line height
+            ),
+            textAlign: TextAlign.center, // Center text alignment
           ),
-          textAlign: TextAlign.center, // Center text alignment
         ),
       ),
     );

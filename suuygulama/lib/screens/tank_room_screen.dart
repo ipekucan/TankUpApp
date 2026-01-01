@@ -120,7 +120,7 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.backgroundLight,
       body: Consumer2<WaterProvider, AquariumProvider>(
         builder: (context, waterProvider, aquariumProvider, child) {
           final isDirty = waterProvider.isTankDirty;
@@ -369,6 +369,7 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                 bottom: 30,
                 right: 30,
                 child: FloatingActionButton(
+                  heroTag: 'tank_room_shop_fab',
                   onPressed: () {
                     Navigator.push(
                       context,

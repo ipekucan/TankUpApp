@@ -25,55 +25,50 @@ class TankControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      bottom: MediaQuery.of(context).size.height * AppConstants.controlPanelBottomPosition + 30,
-      left: 0,
-      right: 0,
-      child: Consumer4<DrinkProvider, WaterProvider, UserProvider, AchievementProvider>(
-        builder: (context, drinkProvider, waterProvider, userProvider, achievementProvider, child) {
-          final quickAccessDrinks = drinkProvider.quickAccessDrinks;
-          
-          // Calculate the height needed for the controls (based on the largest button)
-          final controlHeight = AppConstants.mainControlButtonRadius * 2;
-          
-          final screenWidth = MediaQuery.of(context).size.width;
-          final menuButtonWidth = AppConstants.menuButtonWidth;
-          final waterButtonRadius = AppConstants.mainControlButtonRadius;
-          
-          // Calculate initial padding to center the Water Button (index 0)
-          // Formula: (ScreenWidth / 2) - MenuWidth - WaterButtonRadius
-          final initialPadding = (screenWidth / 2) - menuButtonWidth - waterButtonRadius;
-          
-          return SizedBox(
-            height: controlHeight,
-            child: Padding(
-              padding: EdgeInsets.only(
-                right: AppConstants.defaultPadding,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Left: Fixed Menu Button
-                  _buildDShapedMenuButton(context),
-                  
-                  // Right: Unified Scrollable List (Water Button + Drinks)
-                  Expanded(
-                    child: _buildUnifiedScrollableList(
-                      context,
-                      quickAccessDrinks,
-                      drinkProvider,
-                      waterProvider,
-                      userProvider,
-                      achievementProvider,
-                      initialPadding,
-                    ),
-                  ),
-                ],
-              ),
+    return Consumer4<DrinkProvider, WaterProvider, UserProvider, AchievementProvider>(
+      builder: (context, drinkProvider, waterProvider, userProvider, achievementProvider, child) {
+        final quickAccessDrinks = drinkProvider.quickAccessDrinks;
+        
+        // Calculate the height needed for the controls (based on the largest button)
+        final controlHeight = AppConstants.mainControlButtonRadius * 2;
+        
+        final screenWidth = MediaQuery.of(context).size.width;
+        final menuButtonWidth = AppConstants.menuButtonWidth;
+        final waterButtonRadius = AppConstants.mainControlButtonRadius;
+        
+        // Calculate initial padding to center the Water Button (index 0)
+        // Formula: (ScreenWidth / 2) - MenuWidth - WaterButtonRadius
+        final initialPadding = (screenWidth / 2) - menuButtonWidth - waterButtonRadius;
+        
+        return SizedBox(
+          height: controlHeight,
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: AppConstants.defaultPadding,
             ),
-          );
-        },
-      ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Left: Fixed Menu Button
+                _buildDShapedMenuButton(context),
+                
+                // Right: Unified Scrollable List (Water Button + Drinks)
+                Expanded(
+                  child: _buildUnifiedScrollableList(
+                    context,
+                    quickAccessDrinks,
+                    drinkProvider,
+                    waterProvider,
+                    userProvider,
+                    achievementProvider,
+                    initialPadding,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

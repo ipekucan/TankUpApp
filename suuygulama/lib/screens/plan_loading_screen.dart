@@ -64,12 +64,8 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     // Baloncukları oluştur (20-30 arası)
     _initializeBubbles();
     
-    // Zaman aşımı (Timeout) - 5 saniye sonra her halükarda yönlendir
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        _navigateToHome();
-      }
-    });
+    // Planı hesapla ve kaydet, sonra yönlendir
+    _calculateAndSavePlan();
   }
   
   void _initializeBubbles() {
@@ -87,13 +83,6 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     }
   }
   
-  void _navigateToHome() {
-    if (!mounted) return;
-    
-    // Önce planı kaydet
-    _calculateAndSavePlan();
-  }
-  
   @override
   void dispose() {
     _bubbleController.dispose();
@@ -101,50 +90,63 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   }
 
   Future<void> _calculateAndSavePlan() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
-    
-    if (!mounted) return;
-    
-    // Bilimsel hesaplama: VKE ve su hedefi
-    // VKE = Kilo / (Boy/100)² (UserProvider'da zaten var)
-    // Su hedefi = Kilo × 35ml + Aktivite bonusu (UserProvider'da zaten var)
-    // Eğer özel hedef varsa onu kullan, yoksa hesaplanan hedefi kullan
-    final idealGoal = widget.customGoal ?? userProvider.calculateIdealWaterGoal();
-    
-    // Su hedefini ayarla
-    await waterProvider.updateDailyGoal(idealGoal);
-    
-    // Coin'i sıfırla
-    await waterProvider.resetCoins();
-    
-    // Onboarding tamamlandı flag'ini kaydet
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('onboarding_completed', true);
-    } catch (e) {
-      // Hata durumunda sessizce devam et
-    }
-    
-    if (!mounted) return;
-    
-    // Bildirimleri varsayılan saatlerle ayarla
-    final notificationService = NotificationService();
-    notificationService.scheduleDailyNotifications().catchError((e) {
-      // Hata durumunda sessizce devam et
-    });
-    
-    if (!mounted) return;
-    
-    // Güvenli navigasyon - context hatası önleme
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+      
       if (!mounted) return;
       
-      // Ana sayfaya yönlendir (geri tuşuyla dönüşü engelle)
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
-      );
-    });
+      // Bilimsel hesaplama: VKE ve su hedefi
+      // VKE = Kilo / (Boy/100)² (UserProvider'da zaten var)
+      // Su hedefi = Kilo × 35ml + Aktivite bonusu (UserProvider'da zaten var)
+      // Eğer özel hedef varsa onu kullan, yoksa hesaplanan hedefi kullan
+      final idealGoal = widget.customGoal ?? userProvider.calculateIdealWaterGoal();
+      
+      // Su hedefini ayarla
+      await waterProvider.updateDailyGoal(idealGoal);
+      
+      if (!mounted) return;
+      
+      // Coin'i sıfırla
+      await waterProvider.resetCoins();
+      
+      if (!mounted) return;
+      
+      // Onboarding tamamlandı flag'ini kaydet
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('onboarding_completed', true);
+      } catch (e) {
+        // Hata durumunda sessizce devam et
+      }
+      
+      if (!mounted) return;
+      
+      // Bildirimleri varsayılan saatlerle ayarla (await etmeden devam et)
+      final notificationService = NotificationService();
+      notificationService.scheduleDailyNotifications().catchError((e) {
+        // Hata durumunda sessizce devam et
+      });
+      
+      // Kısa bir gecikme ekle (kullanıcıya loading animasyonunu göstermek için)
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (!mounted) return;
+      
+      // Güvenli navigasyon - context hatası önleme
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+        );
+      }
+    } catch (e) {
+      // Hata durumunda yine de navigasyon yap
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+        );
+      }
+    }
   }
 
   @override

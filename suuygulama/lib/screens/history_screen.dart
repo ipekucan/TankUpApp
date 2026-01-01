@@ -163,7 +163,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           borderRadius: BorderRadius.circular(20.0),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08), // More visible shadow
+                              color: Colors.black.withValues(alpha: 0.08), // More visible shadow
                               blurRadius: 20,
                               offset: const Offset(0, 4),
                               spreadRadius: 0,
@@ -440,7 +440,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 borderRadius: BorderRadius.circular(16.0),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08), // More visible shadow
+                    color: Colors.black.withValues(alpha: 0.08), // More visible shadow
                     blurRadius: 10,
                     offset: const Offset(0, 4), // Increased offset for better depth
                     spreadRadius: 0,

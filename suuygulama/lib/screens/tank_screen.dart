@@ -1,13 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:async';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/achievement_provider.dart';
-import '../providers/challenge_provider.dart';
 import '../models/achievement_model.dart';
 import '../widgets/interactive_cup_modal.dart';
 import '../utils/unit_converter.dart';
@@ -15,13 +13,9 @@ import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/tank/tank_visualization.dart';
 import '../widgets/tank/tank_controls.dart';
-import '../widgets/tank/challenge_panel.dart';
 import '../widgets/tank/achievement_dialog.dart';
-import '../widgets/challenge_card.dart';
-import '../utils/challenge_logic_helper.dart';
-import '../utils/water_goal_helper.dart';
-import 'success_screen.dart';
 import 'drink_gallery_screen.dart';
+import 'success_screen.dart';
 
 class TankScreen extends StatefulWidget {
   const TankScreen({super.key});
@@ -37,14 +31,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late AnimationController _fillController;
   late Animation<double> _fillAnimation;
   late AnimationController _bubbleController;
-  late DraggableScrollableController _challengeSheetController;
   double _animatedFillPercentage = 0.0;
   final List<TankBubble> _bubbles = [];
   
   @override
   void initState() {
     super.initState();
-    _challengeSheetController = DraggableScrollableController();
     
     // Coin animasyonu
     _coinAnimationController = AnimationController(
@@ -116,33 +108,40 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     _waveController.dispose();
     _fillController.dispose();
     _bubbleController.dispose();
-    _challengeSheetController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppConstants.backgroundGradientColor1,
-              AppConstants.backgroundGradientColor2,
-              AppConstants.backgroundGradientColor3,
-            ],
-            stops: [
-              AppConstants.backgroundGradientStop1,
-              AppConstants.backgroundGradientStop2,
-              AppConstants.backgroundGradientStop3,
-            ],
+      body: Stack(
+        children: [
+          // Layer 1: Background Gradient (FIRST child - fixes white screen)
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppConstants.backgroundGradientColor1,
+                    AppConstants.backgroundGradientColor2,
+                    AppConstants.backgroundGradientColor3,
+                  ],
+                  stops: [
+                    AppConstants.backgroundGradientStop1,
+                    AppConstants.backgroundGradientStop2,
+                    AppConstants.backgroundGradientStop3,
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: _buildTankView(),
-        ),
+          // Layer 2: Content
+          SafeArea(
+            child: _buildTankView(),
+          ),
+        ],
       ),
     );
   }
@@ -154,9 +153,6 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
         final dailyGoal = waterProvider.dailyGoal;
         final fillPercentage = (dailyGoal > 0) 
             ? (currentIntake / dailyGoal).clamp(0.0, 1.0) 
-            : 0.0;
-        final progressPercentage = dailyGoal > 0 
-            ? (currentIntake / dailyGoal * 100)
             : 0.0;
         
         // Animasyonlu dolum: fillPercentage değiştiğinde animasyonu başlat
@@ -195,205 +191,204 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           }
         });
         
+        final progressPercentage = dailyGoal > 0 
+            ? (currentIntake / dailyGoal).clamp(0.0, 1.0)
+            : 0.0;
+        
         return Stack(
           children: [
-            // Ana içerik - ScrollView
-            SingleChildScrollView(
+            // Layer 2: Main Content Column
+            SafeArea(
               child: Column(
-              children: [
-                  // Üst Bar: Sol - Günlük Seri Butonu, Sağ - Coin Butonu
-              Padding(
+                children: [
+                  // Header Row
+                  Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppConstants.defaultHorizontalPadding,
                       vertical: AppConstants.defaultVerticalPadding,
                     ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                        // Sol: Günlük Seri/Challenge Butonu
-                    Consumer2<WaterProvider, UserProvider>(
-                      builder: (context, reactiveWaterProvider, reactiveUserProvider, child) {
-                        return _StatusToggleButton(
-                          challengeProvider:
-                              Provider.of<ChallengeProvider>(context, listen: false),
-                          userProvider: reactiveUserProvider,
-                          waterProvider: reactiveWaterProvider,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Left: Status Toggle Button (Fire Icon with Progress Ring)
+                        _StatusToggleButton(
                           progressPercentage: progressPercentage,
-                          onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SuccessScreen(),
-                          ),
-                        );
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SuccessScreen(),
+                              ),
+                            );
+                          },
+                        ),
                         
-                        if (!mounted) return;
+                        const Spacer(),
                         
-                        if (result == 'open_challenges_panel') {
-                          _challengeSheetController.animateTo(
-                                AppConstants.challengeSheetOpenSize,
-                                duration: AppConstants.defaultAnimationDuration,
-                            curve: Curves.easeOut,
-                          );
-                        }
-                      },
-                        );
-                      },
-                    ),
-                    
-                    // Sağ: Dairesel Coin Butonu
-                    ScaleTransition(
-                      scale: _coinScaleAnimation,
-                      child: Container(
-                            width: AppConstants.coinButtonSize,
-                            height: AppConstants.coinButtonSize,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
+                        // Right: Coin Balance Button (matching Fire button size)
+                        ScaleTransition(
+                          scale: _coinScaleAnimation,
+                          child: Container(
+                            height: 56.0,
+                            constraints: const BoxConstraints(minWidth: 56.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
                                   color: Colors.black.withValues(
                                     alpha: AppConstants.defaultShadowAlpha,
                                   ),
                                   blurRadius: AppConstants.defaultShadowBlur,
                                   offset: AppConstants.defaultShadowOffset,
+                                ),
+                              ],
                             ),
-                          ],
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.monetization_on,
+                                  color: AppColors.goldCoin,
+                                  size: 24.0,
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  '${waterProvider.tankCoins}',
+                                  style: TextStyle(
+                                    fontSize: 18.0,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.goldCoin,
+                                    letterSpacing: 0.5,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-            child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.monetization_on,
-                              color: AppColors.goldCoin,
-                                  size: AppConstants.coinButtonIconSize,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${waterProvider.tankCoins}',
-                              style: TextStyle(
-                                    fontSize: AppConstants.coinButtonTextSize,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.goldCoin,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              
-                  SizedBox(height: AppConstants.extraLargeSpacing),
-
-                  // Tank Görselleştirme
+                  ),
+                  
+                  // Spacer (push tank down from larger header)
+                  const Spacer(flex: 3),
+                  
+                  // Water Tank Visualization
                   TankVisualization(
                     fillPercentage: _animatedFillPercentage,
                     fillAnimation: _fillAnimation,
                     bubbleController: _bubbleController,
                     waveController: _waveController,
                     bubbles: _bubbles,
-              ),
-              
-                  // Tank Altı: Günlük Hedef
-              Padding(
-                    padding: EdgeInsets.only(top: AppConstants.largePadding),
-                child: Center(
-                  child: Text(
-                    'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
-                        style: AppTextStyles.bodyLarge.copyWith(
-                          fontSize: AppConstants.dailyGoalFontSize,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black45,
-                      letterSpacing: 0.3,
-                    ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
+                  
+                  // Spacing between tank and text
+                  const SizedBox(height: 15),
+                  
+                  // Daily Goal Text
+                  Center(
+                    child: Text(
+                      'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        fontSize: AppConstants.dailyGoalFontSize,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black45,
+                        letterSpacing: 0.3,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  
+                  // Spacer (less space below, since Controls are floating over it)
+                  const Spacer(flex: 2),
+                  
+                  // Reserve space at bottom for raised controls
+                  const SizedBox(height: 180),
+                ],
               ),
-            ],
-          ),
-        ),
-
-            // Buton Paneli
-            TankControls(
+            ),
+            
+            // Layer 3: Floating Controls (Positioned significantly higher from bottom)
+            Positioned(
+              bottom: 130,
+              left: 0,
+              right: 0,
+              child: TankControls(
               onShowDrinkSelector: () {
-                          if (!mounted) return;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DrinkGalleryScreen(),
-                            ),
-                          );
-                        },
+                if (!mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DrinkGalleryScreen(),
+                  ),
+                );
+              },
               onShowInteractiveCupModal: (
-    BuildContext context,
-    WaterProvider waterProvider,
-    UserProvider userProvider,
-    AchievementProvider achievementProvider,
-  ) async {
-    final previousConsumedAmount = waterProvider.consumedAmount;
-    
-    final result = await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => const InteractiveCupModal(),
-    );
-    
-    if (result != null && result is double) {
-      final currentConsumedAmount = waterProvider.consumedAmount;
-      
-      if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
-        if (!context.mounted) return;
+                BuildContext context,
+                WaterProvider waterProvider,
+                UserProvider userProvider,
+                AchievementProvider achievementProvider,
+              ) async {
+                final previousConsumedAmount = waterProvider.consumedAmount;
+                
+                final result = await showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  barrierColor: Colors.black.withValues(alpha: 0.5),
+                  isScrollControlled: true,
+                  builder: (context) => const InteractiveCupModal(),
+                );
+                
+                if (result != null && result is double) {
+                  final currentConsumedAmount = waterProvider.consumedAmount;
+                  
+                  if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
+                    if (!context.mounted) return;
                     final achievementProvider =
                         Provider.of<AchievementProvider>(context, listen: false);
                     final isAlreadyUnlocked =
                         achievementProvider.isAchievementUnlocked('first_cup');
         
-        if (!isAlreadyUnlocked) {
-          final coinReward = await achievementProvider.checkFirstCup();
-          
-          if (coinReward > 0) {
-            await waterProvider.addCoins(coinReward);
-            if (!mounted) return;
-          }
-          
-          if (!mounted) return;
-          
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-    final achievement = achievementProvider.achievements.firstWhere(
+                    if (!isAlreadyUnlocked) {
+                      final coinReward = await achievementProvider.checkFirstCup();
+                      
+                      if (coinReward > 0) {
+                        await waterProvider.addCoins(coinReward);
+                        if (!mounted) return;
+                      }
+                      
+                      if (!mounted) return;
+                      
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          final achievement = achievementProvider.achievements.firstWhere(
                             (a) => a.id == 'first_cup',
-      orElse: () => Achievement(
+                            orElse: () => Achievement(
                               id: 'first_cup',
-        name: 'İlk Bardak',
-        description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
-        coinReward: 20,
-      ),
-    );
-    
+                              name: 'İlk Bardak',
+                              description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
+                              coinReward: 20,
+                            ),
+                          );
+                          
                           AchievementDialog.show(
                             context,
                             achievement,
                             cardColor: AppConstants.firstCupAchievementColor,
                             badgeEmoji: '💧',
-        );
+                          );
                         }
                       });
                     }
                   }
                 }
               },
-          ),
-          
-            // Mücadele Paneli
-            ChallengePanel(
-              controller: _challengeSheetController,
+              ),
             ),
           ],
         );
@@ -402,261 +397,65 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   }
 }
 
-// Akıllı ve Hareketli Durum Butonu
-class _StatusToggleButton extends StatefulWidget {
-  final ChallengeProvider challengeProvider;
-  final UserProvider userProvider;
-  final WaterProvider waterProvider;
+/// Status Toggle Button with Fire Icon and Progress Ring
+class _StatusToggleButton extends StatelessWidget {
   final double progressPercentage;
   final VoidCallback onTap;
 
   const _StatusToggleButton({
-    required this.challengeProvider,
-    required this.userProvider,
-    required this.waterProvider,
     required this.progressPercentage,
     required this.onTap,
   });
 
   @override
-  State<_StatusToggleButton> createState() => _StatusToggleButtonState();
-}
-
-class _StatusToggleButtonState extends State<_StatusToggleButton> {
-  Timer? _toggleTimer;
-  bool _showChallenge = false;
-  Challenge? _firstActiveChallenge;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkActiveChallenge();
-    
-    if (_firstActiveChallenge != null) {
-      _toggleTimer = Timer.periodic(AppConstants.statusToggleDuration, (timer) {
-        if (mounted) {
-          setState(() {
-            _showChallenge = !_showChallenge;
-          });
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _toggleTimer?.cancel();
-    super.dispose();
-  }
-
-  void _checkActiveChallenge() {
-    // Get only active challenges with calculated progress from centralized helper
-    final activeChallenges = ChallengeLogicHelper.getActiveChallengesWithProgress(
-      widget.waterProvider,
-      widget.userProvider,
-      widget.challengeProvider,
-    );
-    
-    final hasActiveChallenge = activeChallenges.isNotEmpty;
-    
-    if (hasActiveChallenge) {
-      _firstActiveChallenge = activeChallenges.first;
-      if (_toggleTimer == null || !_toggleTimer!.isActive) {
-        _toggleTimer?.cancel();
-        _toggleTimer = Timer.periodic(AppConstants.statusToggleDuration, (timer) {
-          if (mounted) {
-            setState(() {
-              _showChallenge = !_showChallenge;
-            });
-          }
-        });
-      }
-    } else {
-      _firstActiveChallenge = null;
-      _toggleTimer?.cancel();
-      _toggleTimer = null;
-      if (mounted && _showChallenge) {
-        setState(() {
-          _showChallenge = false;
-        });
-      }
-    }
-  }
-
-  /// Check if today's goal is reached (daily-based, not volume-based).
-  bool _isTodayGoalReached() {
-    final currentIntake = widget.waterProvider.consumedAmount;
-    final dailyGoal = widget.waterProvider.dailyGoal;
-    return dailyGoal > 0 && currentIntake >= dailyGoal;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    _checkActiveChallenge();
-    final hasActiveChallenge = _firstActiveChallenge != null;
-    final isTodayComplete = _isTodayGoalReached();
-
-    if (!hasActiveChallenge) {
-      return GestureDetector(
-        onTap: widget.onTap,
-        child: SizedBox(
-          width: AppConstants.statusButtonSize,
-          height: AppConstants.statusButtonSize,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: AppConstants.statusButtonSize,
-                height: AppConstants.statusButtonSize,
-                child: CircularProgressIndicator(
-                  value: widget.progressPercentage / 100,
-                  strokeWidth: AppConstants.progressIndicatorStrokeWidth,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    isTodayComplete 
-                        ? const Color(0xFFFF6B35) // Orange when complete
-                        : AppColors.softPinkButton,
-                  ),
-                ),
-              ),
-              Container(
-                width: AppConstants.statusButtonInnerSize,
-                height: AppConstants.statusButtonInnerSize,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: AppConstants.defaultShadowAlpha),
-                      blurRadius: AppConstants.smallShadowBlur,
-                      offset: AppConstants.smallShadowOffset,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isTodayComplete ? Icons.check_circle : Icons.local_fire_department,
-                      color: isTodayComplete 
-                          ? const Color(0xFFFF6B35) // Orange when complete
-                          : AppColors.softPinkButton,
-                      size: AppConstants.statusButtonIconSize,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${widget.userProvider.consecutiveDays}',
-                      style: TextStyle(
-                        fontSize: AppConstants.statusButtonTextSize,
-                        fontWeight: FontWeight.w700,
-                        color: isTodayComplete 
-                            ? const Color(0xFFFF6B35) // Orange when complete
-                            : AppColors.softPinkButton,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+    const buttonSize = 56.0;
+    const innerSize = 46.0;
+    const iconSize = 30.0;
+    
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       child: SizedBox(
-        width: AppConstants.statusButtonSize,
-        height: AppConstants.statusButtonSize,
+        width: buttonSize,
+        height: buttonSize,
         child: Stack(
           alignment: Alignment.center,
           children: [
+            // Layer 1: CircularProgressIndicator (background ring)
             SizedBox(
-              width: AppConstants.statusButtonSize,
-              height: AppConstants.statusButtonSize,
+              width: buttonSize,
+              height: buttonSize,
               child: CircularProgressIndicator(
-                value: _showChallenge
-                    ? WaterGoalHelper.getProgressValue(
-                        currentIntake: widget.waterProvider.consumedAmount,
-                        dailyGoal: widget.waterProvider.dailyGoal,
-                      )
-                    : widget.progressPercentage / 100,
+                value: progressPercentage,
                 strokeWidth: AppConstants.progressIndicatorStrokeWidth,
                 backgroundColor: Colors.grey[300],
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  _showChallenge 
-                      ? const Color(0xFFFF6B35) // Orange for percentage
-                      : AppColors.softPinkButton,
+                  AppColors.softPinkButton,
                 ),
               ),
             ),
+            // Layer 2: White circle container with shadow
             Container(
-              width: AppConstants.statusButtonInnerSize,
-              height: AppConstants.statusButtonInnerSize,
+              width: innerSize,
+              height: innerSize,
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: AppConstants.defaultShadowAlpha),
+                    color: Colors.black.withValues(
+                      alpha: AppConstants.defaultShadowAlpha,
+                    ),
                     blurRadius: AppConstants.smallShadowBlur,
                     offset: AppConstants.smallShadowOffset,
                   ),
                 ],
               ),
-              child: AnimatedSwitcher(
-                duration: AppConstants.animatedSwitcherDuration,
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  );
-                },
-                child: _showChallenge
-                    ? Column(
-                        key: const ValueKey('dailyGoal'),
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.percent,
-                            color: const Color(0xFFFF6B35), // Orange color
-                            size: AppConstants.statusButtonIconSize,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            WaterGoalHelper.formatGoalPercentage(
-                              currentIntake: widget.waterProvider.consumedAmount,
-                              dailyGoal: widget.waterProvider.dailyGoal,
-                              decimalPlaces: 0,
-                            ),
-                            style: const TextStyle(
-                              fontSize: AppConstants.statusButtonTextSize,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFFF6B35), // Orange color
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        key: const ValueKey('streak'),
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.local_fire_department,
-                            color: AppColors.softPinkButton,
-                            size: AppConstants.statusButtonIconSize,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${widget.userProvider.consecutiveDays}',
-                            style: TextStyle(
-                              fontSize: AppConstants.statusButtonTextSize,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.softPinkButton,
-                            ),
-                          ),
-                        ],
-                      ),
+              // Layer 3: Fire Icon (centered, matching coin icon size)
+              child: Icon(
+                Icons.local_fire_department,
+                color: AppColors.softPinkButton,
+                size: iconSize,
               ),
             ),
           ],
