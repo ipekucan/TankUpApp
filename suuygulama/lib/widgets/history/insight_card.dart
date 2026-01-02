@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/water_provider.dart';
+import '../../providers/history_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/date_helpers.dart';
 
@@ -40,12 +40,12 @@ class _InsightCardState extends State<InsightCard> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
+    return Consumer2<HistoryProvider, UserProvider>(
+      builder: (context, historyProvider, userProvider, child) {
         // Bugünün verilerini al
         final today = DateTime.now();
         final todayKey = DateHelpers.toDateKey(today);
-        final entries = waterProvider.getDrinkEntriesForDate(todayKey);
+        final entries = historyProvider.getDrinkEntriesForDate(todayKey);
 
         // İçecek miktarlarını hesapla
         final Map<String, double> drinkAmounts = {};

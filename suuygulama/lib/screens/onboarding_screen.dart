@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
-import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import 'plan_loading_screen.dart';
+import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/onboarding/steps/gender_step.dart';
 import '../widgets/onboarding/steps/weight_step.dart';
 import '../widgets/onboarding/steps/activity_step.dart';
@@ -168,7 +168,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+    final dailyHydrationProvider =
+        Provider.of<DailyHydrationProvider>(context, listen: false);
     
     // Kilo dönüşümü (Lbs ise Kg'ye çevir)
     final weightInKg = _weightUnit == 1 
@@ -199,7 +200,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       finalGoalMl = _calculatedWaterGoal;
     }
-    await waterProvider.updateDailyGoal(finalGoalMl);
+    await dailyHydrationProvider.updateDailyGoal(finalGoalMl);
     
     // Onboarding tamamlandı olarak işaretle
     final prefs = await SharedPreferences.getInstance();
@@ -235,7 +236,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return ShowCaseWidget(
       blurValue: 3.0,
       builder: (context) => Scaffold(
-        backgroundColor: AppColors.backgroundSubtle,
+        backgroundColor: OnboardingTheme.background,
         body: SafeArea(
           child: Column(
             children: [
@@ -363,46 +364,62 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Üst Kontrol Paneli - Progress Bar + Atla Butonu
   Widget _buildTopControlPanel() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: OnboardingTheme.pagePadding, vertical: 20),
       child: Row(
         children: [
-          // Progress Bar
+          // Progress Bar - Animated with soft styling
           Expanded(
             child: Container(
-              height: 6,
+              height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(3),
+                color: OnboardingTheme.progressTrackColor,
+                borderRadius: BorderRadius.circular(2.5),
               ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: ((_currentPage + 1) * 0.20).clamp(0.0, 1.0), // Her adımda %20 artış
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.softPinkButton,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Stack(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOutCubic,
+                        width: constraints.maxWidth * ((_currentPage + 1) * 0.20).clamp(0.0, 1.0),
+                        decoration: BoxDecoration(
+                          gradient: OnboardingTheme.progressGradient,
+                          borderRadius: BorderRadius.circular(2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: OnboardingTheme.primaryAccent.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
           
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           
-          // Atla Butonu
-          TextButton(
-            onPressed: _skipCurrentStep,
-            style: TextButton.styleFrom(
+          // Atla Butonu - Soft styling
+          GestureDetector(
+            onTap: _skipCurrentStep,
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              'Atla',
-              style: TextStyle(
-                fontSize: 14,
-                color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-                fontWeight: FontWeight.w500,
+              decoration: BoxDecoration(
+                color: OnboardingTheme.primaryAccentLight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Atla',
+                style: OnboardingTheme.subtitleStyle.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: OnboardingTheme.primaryAccent,
+                ),
               ),
             ),
           ),

@@ -1,5 +1,5 @@
 import '../widgets/challenge_card.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/challenge_provider.dart';
 import '../utils/unit_converter.dart';
@@ -17,7 +17,7 @@ class ChallengeLogicHelper {
   /// progress = 0.0 and isCompleted = false.
   static Challenge calculateChallengeState(
     Challenge challenge,
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     UserProvider userProvider,
     ChallengeProvider challengeProvider,
   ) {
@@ -74,7 +74,8 @@ class ChallengeLogicHelper {
     // Calculate live progress based on current water/user data
     if (challenge.id == 'deep_dive') {
       // Derin Dalış: 3 gün üst üste %100 su hedefi
-      final isCompleted = userProvider.consecutiveDays >= 3 && waterProvider.hasReachedDailyGoal;
+      final isCompleted =
+          userProvider.consecutiveDays >= 3 && dailyHydrationProvider.hasReachedDailyGoal;
       updatedChallenge = Challenge(
         id: challenge.id,
         name: challenge.name,
@@ -91,7 +92,7 @@ class ChallengeLogicHelper {
       );
     } else if (challenge.id == 'coral_guardian') {
       // Mercan Koruyucu: Akşam 8'den sonra sadece su (basitleştirilmiş - bugün su hedefi)
-      final isCompleted = waterProvider.hasReachedDailyGoal;
+      final isCompleted = dailyHydrationProvider.hasReachedDailyGoal;
       updatedChallenge = Challenge(
         id: challenge.id,
         name: challenge.name,
@@ -103,17 +104,20 @@ class ChallengeLogicHelper {
         healthBenefit: challenge.healthBenefit,
         badgeEmoji: challenge.badgeEmoji,
         isCompleted: isCompleted,
-        progress: isCompleted ? 1.0 : (waterProvider.consumedAmount / waterProvider.dailyGoal).clamp(0.0, 1.0),
+        progress: isCompleted
+            ? 1.0
+            : (dailyHydrationProvider.consumedAmount / dailyHydrationProvider.dailyGoal)
+                .clamp(0.0, 1.0),
         progressText: isCompleted 
             ? 'Tamamlandı! 🎉'
-            : '${UnitConverter.formatVolume(waterProvider.consumedAmount, userProvider.isMetric)}/${UnitConverter.formatVolume(waterProvider.dailyGoal, userProvider.isMetric)}',
+            : '${UnitConverter.formatVolume(dailyHydrationProvider.consumedAmount, userProvider.isMetric)}/${UnitConverter.formatVolume(dailyHydrationProvider.dailyGoal, userProvider.isMetric)}',
       );
     } else if (challenge.id == 'caffeine_hunter') {
       // Kafein Avcısı: Bugün 2 kahve yerine 2 büyük bardak su
       // 1 büyük bardak = 250ml (standart büyük bardak boyutu)
       const double largeCupSizeMl = 250.0;
       final double targetMl = challenge.targetValue * largeCupSizeMl; // 2.0 * 250 = 500ml
-      final double currentProgress = waterProvider.consumedAmount;
+      final double currentProgress = dailyHydrationProvider.consumedAmount;
       final isCompleted = currentProgress >= targetMl;
       final progress = isCompleted ? 1.0 : (currentProgress / targetMl).clamp(0.0, 1.0);
       
@@ -139,7 +143,7 @@ class ChallengeLogicHelper {
       // Basitleştirilmiş: Günlük hedefe ulaşıldıysa ve sadece su içildiyse ilerleme sayılır
       // Şimdilik: Günlük hedefe ulaşıldıysa 1/7 gün olarak sayılır (basitleştirilmiş)
       final daysCompleted = userProvider.consecutiveDays.clamp(0, 7);
-      final isCompleted = daysCompleted >= 7 && waterProvider.hasReachedDailyGoal;
+      final isCompleted = daysCompleted >= 7 && dailyHydrationProvider.hasReachedDailyGoal;
       final progress = isCompleted ? 1.0 : (daysCompleted / 7).clamp(0.0, 1.0);
       
       updatedChallenge = Challenge(
@@ -160,7 +164,7 @@ class ChallengeLogicHelper {
       // Generic water-based challenge: Calculate progress based on consumedAmount vs target
       // This handles any challenge that tracks water consumption (e.g., "Drink X ml")
       final double targetMl = challenge.targetValue;
-      final double currentProgress = waterProvider.consumedAmount;
+      final double currentProgress = dailyHydrationProvider.consumedAmount;
       final isCompleted = currentProgress >= targetMl;
       final progress = isCompleted 
           ? 1.0
@@ -193,7 +197,7 @@ class ChallengeLogicHelper {
   /// Filters out 'first_cup' challenge and applies live calculations.
   /// Only calculates progress for challenges that are actually active.
   static List<Challenge> getUpdatedChallenges(
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     UserProvider userProvider,
     ChallengeProvider challengeProvider,
   ) {
@@ -201,7 +205,7 @@ class ChallengeLogicHelper {
         .where((challenge) => challenge.id != 'first_cup')
         .map((challenge) => calculateChallengeState(
               challenge,
-              waterProvider,
+              dailyHydrationProvider,
               userProvider,
               challengeProvider,
             ))
@@ -211,7 +215,7 @@ class ChallengeLogicHelper {
   /// Gets only active challenges with their calculated states.
   /// This is used for screens that should only display active challenges.
   static List<Challenge> getActiveChallengesWithProgress(
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     UserProvider userProvider,
     ChallengeProvider challengeProvider,
   ) {
@@ -227,7 +231,7 @@ class ChallengeLogicHelper {
       // Calculate live state (will always pass the active check since it's from activeIncompleteChallenges)
       return calculateChallengeState(
         baseChallenge,
-        waterProvider,
+        dailyHydrationProvider,
         userProvider,
         challengeProvider,
       );

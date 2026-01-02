@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../widgets/challenge_card.dart';
+import '../core/services/logger_service.dart';
 
 class ChallengeProvider extends ChangeNotifier {
   static const String _challengesKey = 'active_challenges';
@@ -60,8 +61,9 @@ class ChallengeProvider extends ChangeNotifier {
       }
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to load challenges', e, stackTrace);
     }
   }
   
@@ -105,8 +107,9 @@ class ChallengeProvider extends ChangeNotifier {
       await prefs.setString('challenge_${challengeId}_start_date', DateTime.now().toIso8601String());
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to load challenges', e, stackTrace);
     }
   }
   
@@ -155,8 +158,9 @@ class ChallengeProvider extends ChangeNotifier {
       if (isCompleted) {
         return challenge.coinReward;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to load challenges', e, stackTrace);
     }
     return 0;
   }
@@ -171,8 +175,9 @@ class ChallengeProvider extends ChangeNotifier {
         }).toList(),
       );
       await prefs.setString(_challengesKey, challengesJson);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to load challenges', e, stackTrace);
     }
   }
   
@@ -190,7 +195,8 @@ class ChallengeProvider extends ChangeNotifier {
   Challenge? getChallenge(String challengeId) {
     try {
       return _activeChallenges.firstWhere((c) => c.id == challengeId);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to get challenge by ID: $challengeId', e, stackTrace);
       return null;
     }
   }

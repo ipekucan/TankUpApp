@@ -1,19 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../utils/app_colors.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/achievement_provider.dart';
-import '../models/achievement_model.dart';
-import '../widgets/interactive_cup_modal.dart';
 import '../utils/unit_converter.dart';
 import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/tank/tank_visualization.dart';
-import '../widgets/tank/tank_controls.dart';
-import '../widgets/tank/achievement_dialog.dart';
 import 'drink_gallery_screen.dart';
 import 'success_screen.dart';
 
@@ -119,38 +113,38 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           // Layer 1: Background Gradient (FIRST child - fixes white screen)
           Positioned.fill(
             child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppConstants.backgroundGradientColor1,
-                    AppConstants.backgroundGradientColor2,
-                    AppConstants.backgroundGradientColor3,
-                  ],
-                  stops: [
-                    AppConstants.backgroundGradientStop1,
-                    AppConstants.backgroundGradientStop2,
-                    AppConstants.backgroundGradientStop3,
-                  ],
-                ),
-              ),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppConstants.backgroundGradientColor1,
+              AppConstants.backgroundGradientColor2,
+              AppConstants.backgroundGradientColor3,
+            ],
+            stops: [
+              AppConstants.backgroundGradientStop1,
+              AppConstants.backgroundGradientStop2,
+              AppConstants.backgroundGradientStop3,
+            ],
+          ),
+        ),
             ),
           ),
           // Layer 2: Content
           SafeArea(
-            child: _buildTankView(),
-          ),
+          child: _buildTankView(),
+        ),
         ],
       ),
     );
   }
 
   Widget _buildTankView() {
-    return Consumer4<WaterProvider, AquariumProvider, UserProvider, AchievementProvider>(
-      builder: (context, waterProvider, aquariumProvider, userProvider, achievementProvider, child) {
-        final currentIntake = waterProvider.consumedAmount;
-        final dailyGoal = waterProvider.dailyGoal;
+    return Consumer3<DailyHydrationProvider, AquariumProvider, UserProvider>(
+      builder: (context, dailyHydrationProvider, aquariumProvider, userProvider, child) {
+        final currentIntake = dailyHydrationProvider.consumedAmount;
+        final dailyGoal = dailyHydrationProvider.dailyGoal;
         final fillPercentage = (dailyGoal > 0) 
             ? (currentIntake / dailyGoal).clamp(0.0, 1.0) 
             : 0.0;
@@ -201,83 +195,77 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             SafeArea(
               child: Column(
                 children: [
-                  // Header Row
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppConstants.defaultHorizontalPadding,
-                      vertical: AppConstants.defaultVerticalPadding,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Left: Status Toggle Button (Fire Icon with Progress Ring)
-                        _StatusToggleButton(
+                  // Header Row - Clean design without labels
+                Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 16.0,
+                      ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                        // Left: Fire/Streak Button (no label)
+                        _CircleIconButton(
+                          icon: Icons.local_fire_department,
+                          iconColor: const Color(0xFFFF8A80),
                           progressPercentage: progressPercentage,
+                          size: 54,
+                          iconSize: 28,
+                          progressRingSpacing: 6, // More spacing from button
                           onTap: () {
                             Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SuccessScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        
-                        const Spacer(),
-                        
-                        // Right: Coin Balance Button (matching Fire button size)
-                        ScaleTransition(
-                          scale: _coinScaleAnimation,
-                          child: Container(
-                            height: 56.0,
-                            constraints: const BoxConstraints(minWidth: 56.0),
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(
-                                    alpha: AppConstants.defaultShadowAlpha,
-                                  ),
-                                  blurRadius: AppConstants.defaultShadowBlur,
-                                  offset: AppConstants.defaultShadowOffset,
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.monetization_on,
-                                  color: AppColors.goldCoin,
-                                  size: 24.0,
-                                ),
-                                const SizedBox(height: 1),
-                                Text(
-                                  '${waterProvider.tankCoins}',
-                                  style: TextStyle(
-                                    fontSize: 18.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.goldCoin,
-                                    letterSpacing: 0.5,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SuccessScreen(),
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                  
+                    
+                        const Spacer(),
+                    
+                        // Right: Coin Button + Menu Button (stacked vertically)
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Coin Button (same size as fire button)
+                    ScaleTransition(
+                      scale: _coinScaleAnimation,
+                              child: _CircleIconButton(
+                                icon: Icons.monetization_on,
+                                iconColor: const Color(0xFFFFD54F),
+                                size: 54,
+                                iconSize: 28,
+                                badgeText: '${dailyHydrationProvider.tankCoins}',
+                                onTap: () {
+                                  // Could open rewards/shop screen
+                                },
+                            ),
+                    ),
+                            const SizedBox(height: 12),
+                            // Menu Button (below coin, same size)
+                            _GradientMenuButton(
+                              size: 54,
+                              onTap: () {
+                                if (!mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const DrinkGalleryScreen(),
+                              ),
+                                );
+                              },
+                        ),
+                          ],
+                    ),
+                  ],
+                ),
+              ),
+              
                   // Spacer (push tank down from larger header)
                   const Spacer(flex: 3),
-                  
+
                   // Water Tank Visualization
                   TankVisualization(
                     fillPercentage: _animatedFillPercentage,
@@ -285,111 +273,33 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                     bubbleController: _bubbleController,
                     waveController: _waveController,
                     bubbles: _bubbles,
-                  ),
-                  
+              ),
+              
                   // Spacing between tank and text
                   const SizedBox(height: 15),
                   
                   // Daily Goal Text
                   Center(
-                    child: Text(
-                      'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontSize: AppConstants.dailyGoalFontSize,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black45,
-                        letterSpacing: 0.3,
-                      ),
-                      textAlign: TextAlign.center,
+                  child: Text(
+                    'Günlük Hedef: ${UnitConverter.formatVolume(dailyGoal, userProvider.isMetric)}',
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          fontSize: AppConstants.dailyGoalFontSize,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black45,
+                      letterSpacing: 0.3,
                     ),
+                    textAlign: TextAlign.center,
                   ),
+                ),
                   
-                  // Spacer (less space below, since Controls are floating over it)
-                  const Spacer(flex: 2),
+                  // Spacer (more space below since controls removed)
+                  const Spacer(flex: 3),
                   
-                  // Reserve space at bottom for raised controls
-                  const SizedBox(height: 180),
+                  // Reserve space at bottom for nav bar
+                  const SizedBox(height: 100),
                 ],
               ),
-            ),
-            
-            // Layer 3: Floating Controls (Positioned significantly higher from bottom)
-            Positioned(
-              bottom: 130,
-              left: 0,
-              right: 0,
-              child: TankControls(
-              onShowDrinkSelector: () {
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DrinkGalleryScreen(),
-                  ),
-                );
-              },
-              onShowInteractiveCupModal: (
-                BuildContext context,
-                WaterProvider waterProvider,
-                UserProvider userProvider,
-                AchievementProvider achievementProvider,
-              ) async {
-                final previousConsumedAmount = waterProvider.consumedAmount;
-                
-                final result = await showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.transparent,
-                  barrierColor: Colors.black.withValues(alpha: 0.5),
-                  isScrollControlled: true,
-                  builder: (context) => const InteractiveCupModal(),
-                );
-                
-                if (result != null && result is double) {
-                  final currentConsumedAmount = waterProvider.consumedAmount;
-                  
-                  if (previousConsumedAmount == 0.0 && currentConsumedAmount > 0.0) {
-                    if (!context.mounted) return;
-                    final achievementProvider =
-                        Provider.of<AchievementProvider>(context, listen: false);
-                    final isAlreadyUnlocked =
-                        achievementProvider.isAchievementUnlocked('first_cup');
-        
-                    if (!isAlreadyUnlocked) {
-                      final coinReward = await achievementProvider.checkFirstCup();
-                      
-                      if (coinReward > 0) {
-                        await waterProvider.addCoins(coinReward);
-                        if (!mounted) return;
-                      }
-                      
-                      if (!mounted) return;
-                      
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          final achievement = achievementProvider.achievements.firstWhere(
-                            (a) => a.id == 'first_cup',
-                            orElse: () => Achievement(
-                              id: 'first_cup',
-                              name: 'İlk Bardak',
-                              description: 'Uygulamadaki ilk suyunu iç ve macerayı başlat!',
-                              coinReward: 20,
-                            ),
-                          );
-                          
-                          AchievementDialog.show(
-                            context,
-                            achievement,
-                            cardColor: AppConstants.firstCupAchievementColor,
-                            badgeEmoji: '💧',
-                          );
-                        }
-                      });
-                    }
-                  }
-                }
-              },
-              ),
-            ),
+          ),
           ],
         );
       },
@@ -397,70 +307,223 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   }
 }
 
-/// Status Toggle Button with Fire Icon and Progress Ring
-class _StatusToggleButton extends StatelessWidget {
-  final double progressPercentage;
+/// Circle Icon Button - Clean design without label
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final double? progressPercentage;
+  final String? badgeText;
+  final double size;
+  final double iconSize;
+  final double progressRingSpacing;
   final VoidCallback onTap;
 
-  const _StatusToggleButton({
-    required this.progressPercentage,
+  const _CircleIconButton({
+    required this.icon,
+    required this.iconColor,
+    this.progressPercentage,
+    this.badgeText,
+    this.size = 52,
+    this.iconSize = 24,
+    this.progressRingSpacing = 4,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    const buttonSize = 56.0;
-    const innerSize = 46.0;
-    const iconSize = 30.0;
-    
-    return GestureDetector(
+    final ringSize = size + (progressRingSpacing * 2);
+    final innerSize = size - 8;
+
+      return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: buttonSize,
-        height: buttonSize,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Layer 1: CircularProgressIndicator (background ring)
-            SizedBox(
-              width: buttonSize,
-              height: buttonSize,
-              child: CircularProgressIndicator(
-                value: progressPercentage,
-                strokeWidth: AppConstants.progressIndicatorStrokeWidth,
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.softPinkButton,
+        child: SizedBox(
+        width: ringSize,
+        height: ringSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+            // Progress ring (if provided) - with more spacing
+            if (progressPercentage != null && progressPercentage! > 0)
+              SizedBox(
+                width: ringSize,
+                height: ringSize,
+                child: CustomPaint(
+                  painter: _SoftProgressPainter(
+                    progress: progressPercentage!,
+                    strokeWidth: 3.0,
+                    progressColor: iconColor.withValues(alpha: 0.6),
+                  ),
                 ),
               ),
-            ),
-            // Layer 2: White circle container with shadow
-            Container(
+            // Main icon container
+              Container(
               width: innerSize,
               height: innerSize,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                    color: iconColor.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 2),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              child: Stack(
+                alignment: Alignment.center,
+                  children: [
+                    Icon(
+                    icon,
+                    color: iconColor,
+                    size: iconSize,
+                  ),
+                  // Badge for reward count
+                  if (badgeText != null)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: iconColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          badgeText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+}
+
+/// Gradient Menu Button - With multi-color gradient icon
+class _GradientMenuButton extends StatelessWidget {
+  final double size;
+  final VoidCallback onTap;
+
+  const _GradientMenuButton({
+    required this.size,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final innerSize = size - 8;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: innerSize,
+        height: innerSize,
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: AppConstants.defaultShadowAlpha,
-                    ),
-                    blurRadius: AppConstants.smallShadowBlur,
-                    offset: AppConstants.smallShadowOffset,
-                  ),
-                ],
-              ),
-              // Layer 3: Fire Icon (centered, matching coin icon size)
-              child: Icon(
-                Icons.local_fire_department,
-                color: AppColors.softPinkButton,
-                size: iconSize,
-              ),
+              color: Colors.purple.withValues(alpha: 0.1),
+              blurRadius: 12,
+              spreadRadius: 2,
+              offset: const Offset(0, 2),
+                          ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
+        ),
+        child: Center(
+          child: ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFFF9A9E), // Soft pink
+                Color(0xFFFECFEF), // Light pink
+                Color(0xFFA18CD1), // Soft purple
+                Color(0xFF5FC3E4), // Soft blue
+              ],
+              stops: [0.0, 0.3, 0.6, 1.0],
+            ).createShader(bounds),
+            child: Icon(
+              Icons.grid_view_rounded,
+              color: Colors.white,
+              size: size * 0.45,
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
+/// Soft progress ring painter
+class _SoftProgressPainter extends CustomPainter {
+  final double progress;
+  final double strokeWidth;
+  final Color progressColor;
+
+  _SoftProgressPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.progressColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+    
+    // Background track
+    final bgPaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.1)
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    
+    canvas.drawCircle(center, radius, bgPaint);
+    
+    // Progress arc
+    if (progress > 0) {
+      final sweepAngle = 2 * math.pi * progress;
+      final progressPaint = Paint()
+        ..color = progressColor
+        ..strokeWidth = strokeWidth
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        sweepAngle,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SoftProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+

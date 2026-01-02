@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/challenge_provider.dart';
-import '../../providers/water_provider.dart';
+import '../../providers/daily_hydration_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/challenge_card.dart';
 import '../../widgets/empty_challenge_card.dart';
@@ -16,12 +16,12 @@ class ChallengesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<ChallengeProvider, WaterProvider, UserProvider>(
-      builder: (context, challengeProvider, waterProvider, userProvider, child) {
+    return Consumer3<ChallengeProvider, DailyHydrationProvider, UserProvider>(
+      builder: (context, challengeProvider, dailyHydrationProvider, userProvider, child) {
         // Get only active challenges with calculated progress from centralized helper
         // This ensures we only show challenges that are actually started
         final activeChallenges = ChallengeLogicHelper.getActiveChallengesWithProgress(
-          waterProvider,
+          dailyHydrationProvider,
           userProvider,
           challengeProvider,
         );
@@ -162,8 +162,9 @@ class ChallengesTab extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Consumer3<ChallengeProvider, WaterProvider, UserProvider>(
-        builder: (context, currentChallengeProvider, waterProvider, userProvider, child) {
+      builder: (context) =>
+          Consumer3<ChallengeProvider, DailyHydrationProvider, UserProvider>(
+        builder: (context, currentChallengeProvider, dailyHydrationProvider, userProvider, child) {
           // Get all challenges (excluding first_cup)
           final allChallenges = ChallengeData.getChallenges()
               .where((challenge) => challenge.id != 'first_cup')
@@ -178,7 +179,7 @@ class ChallengesTab extends StatelessWidget {
           final allChallengesWithState = allChallenges.map((challenge) {
             return ChallengeLogicHelper.calculateChallengeState(
               challenge,
-              waterProvider,
+              dailyHydrationProvider,
               userProvider,
               currentChallengeProvider,
             );

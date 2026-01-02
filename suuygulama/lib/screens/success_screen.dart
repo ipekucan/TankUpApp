@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../utils/app_colors.dart';
-import '../providers/water_provider.dart';
+import '../providers/history_provider.dart';
 import '../providers/user_provider.dart';
 import '../utils/unit_converter.dart';
 import '../utils/date_helpers.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/success/statistics_tab.dart';
-import '../widgets/success/achievements_tab.dart';
 
 class SuccessScreen extends StatefulWidget {
   const SuccessScreen({super.key});
@@ -17,15 +15,11 @@ class SuccessScreen extends StatefulWidget {
 }
 
 class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
-  final PageController _challengePageController = PageController();
   late AnimationController _lightbulbAnimationController; // Ampul animasyonu için
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.index = 0; // Varsayılan olarak İstatistikler sekmesi (index 0)
     
     // Ampul animasyon kontrolcüsü (1.5 saniye, only runs when warning is active)
     _lightbulbAnimationController = AnimationController(
@@ -37,26 +31,12 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _challengePageController.dispose();
     _lightbulbAnimationController.dispose();
     super.dispose();
   }
 
   String _getFormattedDate() {
-    final now = DateTime.now();
-    final months = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
-    final weekdays = [
-      'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 
-      'Cuma', 'Cumartesi', 'Pazar'
-    ];
-    final day = now.day;
-    final month = months[now.month - 1];
-    final weekday = weekdays[now.weekday - 1];
-    return '$day $month $weekday';
+    return DateHelpers.getFormattedTurkishDate();
   }
 
   @override
@@ -66,85 +46,44 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Column(
-            children: [
-              // Header Row: Toggle Bar (Left) + Close Button (Right)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Toggle Bar (Expanded to fill available space)
-                  Expanded(
-                    child: Container(
-                      height: 46.0,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicator: BoxDecoration(
-                          color: AppColors.softPinkButton,
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        dividerColor: Colors.transparent,
-                        labelColor: Colors.white,
-                        unselectedLabelColor: const Color(0xFF4A5568),
-                        labelStyle: AppTextStyles.tabLabelSelected,
-                        unselectedLabelStyle: AppTextStyles.tabLabelUnselected,
-                        tabs: const [
-                          Tab(text: 'İstatistikler'),
-                          Tab(text: 'Başarılar'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 12),
-                  
-                  // Close Button (Compact Circle)
-                  GestureDetector(
-                    onTap: () {
-                      if (mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Color(0xFF4A5568),
-                        size: 20.0,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              // İçerik
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 24.0, left: 0, right: 0, bottom: 0),
+            child: Column(
+              children: [
+                // Header Row: Only Close Button (Right-aligned)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _buildStatisticsTab(),
-                    const AchievementsTab(),
+                    // Close Button (Compact Circle)
+                    GestureDetector(
+                      onTap: () {
+                        if (mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Color(0xFF4A5568),
+                          size: 20.0,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                
+                // İçerik
+                Expanded(
+                  child: _buildStatisticsTab(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -161,12 +100,12 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
 
   // Akıllı Ampul İkonu (İçgörüler) - Smart Health Alert System
   Widget _buildInsightLightbulbButton(BuildContext context) {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
+    return Consumer2<HistoryProvider, UserProvider>(
+      builder: (context, historyProvider, userProvider, child) {
         // Bugünün verilerini al
         final today = DateTime.now();
         final todayKey = DateHelpers.toDateKey(today);
-        final entries = waterProvider.getDrinkEntriesForDate(todayKey);
+        final entries = historyProvider.getDrinkEntriesForDate(todayKey);
         
         // İçecek miktarlarını hesapla
         final Map<String, double> drinkAmounts = {};
@@ -242,7 +181,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                 child: InkWell(
                   onTap: () => _showInsightDialog(
                     context, 
-                    waterProvider, 
+                    historyProvider, 
                     userProvider,
                     isHealthWarningActive,
                     hasHighCaffeine,
@@ -284,7 +223,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   // İçgörüler Dialog'unu göster - Contextual Info Dialog
   void _showInsightDialog(
     BuildContext context,
-    WaterProvider waterProvider,
+    HistoryProvider historyProvider,
     UserProvider userProvider,
     bool isHealthWarningActive,
     bool hasHighCaffeine,
@@ -295,7 +234,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
     // Bugünün verilerini al
     final today = DateTime.now();
     final todayKey = DateHelpers.toDateKey(today);
-    final entries = waterProvider.getDrinkEntriesForDate(todayKey);
+    final entries = historyProvider.getDrinkEntriesForDate(todayKey);
     
     // İçecek miktarlarını hesapla
     final Map<String, double> drinkAmounts = {};
@@ -575,60 +514,4 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   // Removed - Now using ChallengesTab and AchievementsTab widgets
 }
 
-// Dots Indicator Widget (PageView için)
-class _ChallengeDotsIndicator extends StatefulWidget {
-  final PageController pageController;
-  final int itemCount;
-
-  const _ChallengeDotsIndicator({
-    required this.pageController,
-    required this.itemCount,
-  });
-
-  @override
-  State<_ChallengeDotsIndicator> createState() => _ChallengeDotsIndicatorState();
-}
-
-class _ChallengeDotsIndicatorState extends State<_ChallengeDotsIndicator> {
-  int _currentPage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.pageController.addListener(_onPageChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.pageController.removeListener(_onPageChanged);
-    super.dispose();
-  }
-
-  void _onPageChanged() {
-    if (widget.pageController.page != null) {
-      setState(() {
-        _currentPage = widget.pageController.page!.round();
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        widget.itemCount,
-        (index) => Container(
-          width: 8,
-          height: 8,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: index == _currentPage ? AppColors.softPinkButton : Colors.grey[300],
-          ),
-        ),
-      ),
-    );
-  }
-}
 

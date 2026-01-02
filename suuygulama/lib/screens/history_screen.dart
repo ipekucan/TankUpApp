@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
-import '../providers/water_provider.dart';
+import '../providers/history_provider.dart';
 import '../providers/user_provider.dart';
 import '../models/drink_model.dart';
 import '../utils/unit_converter.dart';
@@ -12,6 +12,7 @@ import '../services/chart_data_service.dart' show ChartDataService, ChartPeriod;
 import '../widgets/history/chart_view.dart';
 import '../widgets/history/period_selector.dart';
 import '../widgets/history/insight_card.dart';
+import '../services/chart_data_service.dart' show ChartDataPoint;
 
 class HistoryScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -31,6 +32,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   ChartPeriod _selectedPeriod = ChartPeriod.day;
   Set<String> _selectedDrinkFilters = {}; // Boş = Tümü
   int? _touchedBarIndex;
+  List<ChartDataPoint> _lastChartData = const <ChartDataPoint>[];
 
   @override
   void initState() {
@@ -55,12 +57,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               actions: [
                 // Akıllı Ampul İkonu (İçgörüler)
-                Consumer2<WaterProvider, UserProvider>(
-                  builder: (context, waterProvider, userProvider, child) {
+                Consumer2<HistoryProvider, UserProvider>(
+                  builder: (context, historyProvider, userProvider, child) {
                     return InsightCard(
                       onTap: () => _showInsightDialog(
                         context,
-                        waterProvider,
+                        historyProvider,
                         userProvider,
                       ),
                     );
@@ -221,20 +223,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
               // Chart (Fixed height)
               SizedBox(
                 height: 180.0,
-                child: Consumer<WaterProvider>(
-                  builder: (context, waterProvider, child) {
-                    final chartData = ChartDataService.buildChartData(
-                      waterProvider,
-                      _selectedPeriod,
-                      _selectedDrinkFilters,
-                    );
-                    return ChartView(
-                      chartData: chartData,
+                child: Selector<HistoryProvider, _ChartComputeKey>(
+                  selector: (context, historyProvider) => _ChartComputeKey(
+                    historyRevision: historyProvider.historyRevision,
+                    period: _selectedPeriod,
+                    filtersKey: _filtersKey(_selectedDrinkFilters),
+                  ),
+                  builder: (context, computeKey, child) {
+                    final historyProvider = context.read<HistoryProvider>();
+                    return _DeferredChartView(
+                      historyProvider: historyProvider,
+                      computeKey: computeKey,
                       selectedPeriod: _selectedPeriod,
+                      selectedDrinkFilters: _selectedDrinkFilters,
+                      initialChartData: _lastChartData,
                       touchedBarIndex: _touchedBarIndex ?? -1,
-                      onBarTouched: (index) {
+                      onBarTouched: (int? index) {
                         setState(() {
                           _touchedBarIndex = index;
+                        });
+                      },
+                      onChartDataComputed: (data) {
+                        if (!mounted) return;
+                        if (identical(_lastChartData, data)) return;
+                        setState(() {
+                          _lastChartData = data;
                         });
                       },
                     );
@@ -252,16 +265,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildHistoryListSliver(BuildContext context) {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: Consumer2<WaterProvider, UserProvider>(
-        builder: (context, waterProvider, userProvider, child) {
+      sliver: Consumer2<HistoryProvider, UserProvider>(
+        builder: (context, historyProvider, userProvider, child) {
           // Calculate date range
-          final dateRange = _calculateDateRange(waterProvider);
+          final dateRange = _calculateDateRange(historyProvider);
           if (dateRange == null) {
             return const SliverToBoxAdapter(child: SizedBox.shrink());
           }
 
           // Get entries for the date range
-          final entries = waterProvider.getDrinkEntriesForDateRange(
+          final entries = historyProvider.getDrinkEntriesForDateRange(
             dateRange.startDate,
             dateRange.endDate,
           );
@@ -381,18 +394,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// Helper: Calculate date range based on selected period and touched bar
-  _DateRange? _calculateDateRange(WaterProvider waterProvider) {
+  _DateRange? _calculateDateRange(HistoryProvider historyProvider) {
     DateTime? selectedStartDate;
     DateTime? selectedEndDate;
 
     if (_touchedBarIndex != null && _touchedBarIndex! >= 0) {
-      final chartData = ChartDataService.buildChartData(
-        waterProvider,
-        _selectedPeriod,
-        _selectedDrinkFilters,
-      );
-      if (_touchedBarIndex! < chartData.length) {
-        final dataPoint = chartData[_touchedBarIndex!];
+      if (_touchedBarIndex! < _lastChartData.length) {
+        final dataPoint = _lastChartData[_touchedBarIndex!];
         selectedStartDate = dataPoint.date;
         selectedEndDate = dataPoint.date;
       }
@@ -431,11 +439,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// Helper: Get formatted date string
   String _getFormattedDate() {
-    final now = DateTime.now();
-    final weekdays = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-    final months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-    
-    return '${now.day} ${months[now.month - 1]} ${weekdays[now.weekday - 1]}';
+    return DateHelpers.getFormattedTurkishDate();
   }
 
   /// Helper: Get range label based on selected period
@@ -541,13 +545,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // İçgörüler Dialog'unu göster
   void _showInsightDialog(
     BuildContext context,
-    WaterProvider waterProvider,
+    HistoryProvider historyProvider,
     UserProvider userProvider,
   ) {
     // Bugünün verilerini al
     final today = DateTime.now();
     final todayKey = DateHelpers.toDateKey(today);
-    final entries = waterProvider.getDrinkEntriesForDate(todayKey);
+    final entries = historyProvider.getDrinkEntriesForDate(todayKey);
 
     // İçecek miktarlarını hesapla
     final Map<String, double> drinkAmounts = {};
@@ -765,12 +769,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
         ),
-        child: Consumer<WaterProvider>(
-          builder: (context, waterProvider, child) {
+        child: Consumer<HistoryProvider>(
+          builder: (context, historyProvider, child) {
             // Bugünün içecek girişlerini al
             final today = DateTime.now();
             final todayKey = DateHelpers.toDateKey(today);
-            final todayEntries = waterProvider.getDrinkEntriesForDate(todayKey);
+            final todayEntries = historyProvider.getDrinkEntriesForDate(todayKey);
 
             // İçecek gruplama (ID -> toplam miktar)
             final Map<String, double> drinkAmounts = {};
@@ -786,13 +790,118 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   _selectedDrinkFilters = filters;
                 });
               },
-              waterProvider: waterProvider,
+              historyProvider: historyProvider,
               todayEntries: todayEntries,
               drinkAmounts: {},
             );
           },
         ),
       ),
+    );
+  }
+}
+
+String _filtersKey(Set<String> filters) {
+  if (filters.isEmpty) return '';
+  final list = filters.toList()..sort();
+  return list.join(',');
+}
+
+class _ChartComputeKey {
+  final int historyRevision;
+  final ChartPeriod period;
+  final String filtersKey;
+
+  const _ChartComputeKey({
+    required this.historyRevision,
+    required this.period,
+    required this.filtersKey,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ChartComputeKey &&
+        other.historyRevision == historyRevision &&
+        other.period == period &&
+        other.filtersKey == filtersKey;
+  }
+
+  @override
+  int get hashCode => Object.hash(historyRevision, period, filtersKey);
+}
+
+class _DeferredChartView extends StatefulWidget {
+  final HistoryProvider historyProvider;
+  final _ChartComputeKey computeKey;
+  final ChartPeriod selectedPeriod;
+  final Set<String> selectedDrinkFilters;
+  final List<ChartDataPoint> initialChartData;
+  final int touchedBarIndex;
+  final ValueChanged<int?> onBarTouched;
+  final ValueChanged<List<ChartDataPoint>>? onChartDataComputed;
+
+  const _DeferredChartView({
+    required this.historyProvider,
+    required this.computeKey,
+    required this.selectedPeriod,
+    required this.selectedDrinkFilters,
+    required this.initialChartData,
+    required this.touchedBarIndex,
+    required this.onBarTouched,
+    this.onChartDataComputed,
+  });
+
+  @override
+  State<_DeferredChartView> createState() => _DeferredChartViewState();
+}
+
+class _DeferredChartViewState extends State<_DeferredChartView> {
+  late List<ChartDataPoint> _chartData;
+
+  @override
+  void initState() {
+    super.initState();
+    _chartData = widget.initialChartData;
+    _scheduleRecompute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DeferredChartView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.computeKey != widget.computeKey) {
+      _scheduleRecompute();
+    }
+  }
+
+  void _scheduleRecompute() {
+    final scheduledKey = widget.computeKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (scheduledKey != widget.computeKey) return;
+
+      final data = ChartDataService.buildChartData(
+        widget.historyProvider,
+        widget.selectedPeriod,
+        widget.selectedDrinkFilters,
+      );
+
+      if (!mounted) return;
+      if (scheduledKey != widget.computeKey) return;
+
+      setState(() {
+        _chartData = data;
+      });
+      widget.onChartDataComputed?.call(data);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChartView(
+      chartData: _chartData,
+      selectedPeriod: widget.selectedPeriod,
+      touchedBarIndex: widget.touchedBarIndex,
+      onBarTouched: widget.onBarTouched,
     );
   }
 }
@@ -809,14 +918,14 @@ class _DateRange {
 class _FilterBottomSheetContent extends StatefulWidget {
   final Set<String> initialFilters;
   final Function(Set<String>) onApply;
-  final WaterProvider waterProvider;
+  final HistoryProvider historyProvider;
   final List todayEntries;
   final Map<String, double> drinkAmounts;
 
   const _FilterBottomSheetContent({
     required this.initialFilters,
     required this.onApply,
-    required this.waterProvider,
+    required this.historyProvider,
     required this.todayEntries,
     required this.drinkAmounts,
   });

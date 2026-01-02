@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/services/logger_service.dart';
 
 /// Boş mücadele slot kartı - Kullanıcıya yeni mücadele ekleyebileceğini gösterir
 class EmptyChallengeSlot extends StatelessWidget {
@@ -14,7 +15,7 @@ class EmptyChallengeSlot extends StatelessWidget {
     return InkWell(
       onTap: onTap ?? () {
         // Şimdilik boş - ileride mücadele keşfet ekranına yönlendirilebilir
-        debugPrint('Yeni Mücadele Ekle tıklandı');
+        LoggerService.logInfo('Yeni Mücadele Ekle tıklandı');
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(

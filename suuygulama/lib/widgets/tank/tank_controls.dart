@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../providers/drink_provider.dart';
-import '../../providers/water_provider.dart';
+import '../../providers/daily_hydration_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/achievement_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../utils/drink_helpers.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/app_card.dart';
 import '../../models/drink_model.dart';
+import '../../core/services/logger_service.dart';
 
 /// Widget that displays the control buttons (menu, water, add drink) at the bottom of the tank screen.
 class TankControls extends StatelessWidget {
   final VoidCallback onShowDrinkSelector;
-  final Function(BuildContext, WaterProvider, UserProvider, AchievementProvider)
+  final Function(BuildContext, DailyHydrationProvider, UserProvider)
       onShowInteractiveCupModal;
 
   const TankControls({
@@ -25,50 +25,49 @@ class TankControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<DrinkProvider, WaterProvider, UserProvider, AchievementProvider>(
-      builder: (context, drinkProvider, waterProvider, userProvider, achievementProvider, child) {
-        final quickAccessDrinks = drinkProvider.quickAccessDrinks;
-        
-        // Calculate the height needed for the controls (based on the largest button)
-        final controlHeight = AppConstants.mainControlButtonRadius * 2;
-        
-        final screenWidth = MediaQuery.of(context).size.width;
-        final menuButtonWidth = AppConstants.menuButtonWidth;
-        final waterButtonRadius = AppConstants.mainControlButtonRadius;
-        
-        // Calculate initial padding to center the Water Button (index 0)
-        // Formula: (ScreenWidth / 2) - MenuWidth - WaterButtonRadius
-        final initialPadding = (screenWidth / 2) - menuButtonWidth - waterButtonRadius;
-        
-        return SizedBox(
-          height: controlHeight,
-          child: Padding(
-            padding: EdgeInsets.only(
-              right: AppConstants.defaultPadding,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Left: Fixed Menu Button
-                _buildDShapedMenuButton(context),
-                
-                // Right: Unified Scrollable List (Water Button + Drinks)
-                Expanded(
-                  child: _buildUnifiedScrollableList(
-                    context,
-                    quickAccessDrinks,
-                    drinkProvider,
-                    waterProvider,
-                    userProvider,
-                    achievementProvider,
-                    initialPadding,
+    return Consumer3<DrinkProvider, DailyHydrationProvider, UserProvider>(
+      builder: (context, drinkProvider, dailyHydrationProvider, userProvider, child) {
+          final quickAccessDrinks = drinkProvider.quickAccessDrinks;
+          
+          // Calculate the height needed for the controls (based on the largest button)
+          final controlHeight = AppConstants.mainControlButtonRadius * 2;
+          
+          final screenWidth = MediaQuery.of(context).size.width;
+          final menuButtonWidth = AppConstants.menuButtonWidth;
+          final waterButtonRadius = AppConstants.mainControlButtonRadius;
+          
+          // Calculate initial padding to center the Water Button (index 0)
+          // Formula: (ScreenWidth / 2) - MenuWidth - WaterButtonRadius
+          final initialPadding = (screenWidth / 2) - menuButtonWidth - waterButtonRadius;
+          
+          return SizedBox(
+            height: controlHeight,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: AppConstants.defaultPadding,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Left: Fixed Menu Button
+                  _buildDShapedMenuButton(context),
+                  
+                  // Right: Unified Scrollable List (Water Button + Drinks)
+                  Expanded(
+                    child: _buildUnifiedScrollableList(
+                      context,
+                      quickAccessDrinks,
+                      drinkProvider,
+                    dailyHydrationProvider,
+                      userProvider,
+                      initialPadding,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
     );
   }
 
@@ -78,9 +77,8 @@ class TankControls extends StatelessWidget {
     BuildContext context,
     List<Drink> quickAccessDrinks,
     DrinkProvider drinkProvider,
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     UserProvider userProvider,
-    AchievementProvider achievementProvider,
     double initialPadding,
   ) {
     return ShaderMask(
@@ -103,7 +101,7 @@ class TankControls extends StatelessWidget {
         padding: EdgeInsets.only(left: initialPadding),
         itemCount: 1 + quickAccessDrinks.length, // Water Button + Drinks
         itemBuilder: (context, index) {
-          // Index 0: Water Button
+          // Index 0: Water Button - Soft pill design like reference
           if (index == 0) {
             return Padding(
               padding: EdgeInsets.only(
@@ -114,19 +112,44 @@ class TankControls extends StatelessWidget {
                   if (!context.mounted) return;
                   onShowInteractiveCupModal(
                     context,
-                    waterProvider,
+                    dailyHydrationProvider,
                     userProvider,
-                    achievementProvider,
                   );
                 },
                 behavior: HitTestBehavior.opaque,
-                child: CircleAvatar(
-                  radius: AppConstants.mainControlButtonRadius,
-                  backgroundColor: AppColors.waterColor,
-                  child: const Icon(
-                    Icons.local_drink,
-                    color: Colors.white,
-                    size: AppConstants.mainControlButtonIconSize,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9), // Soft mint green
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF81C784).withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.water_drop_rounded,
+                        color: const Color(0xFF66BB6A),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Su Ekle',
+                        style: TextStyle(
+                          color: const Color(0xFF4CAF50),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -152,7 +175,7 @@ class TankControls extends StatelessWidget {
                 GestureDetector(
                   onTap: () async {
                     // Quick access içeceği direkt ekle
-                    await waterProvider.drink(drink, amount);
+                    await dailyHydrationProvider.drink(drink, amount);
                     
                     if (!context.mounted) return;
                     
@@ -234,7 +257,7 @@ class TankControls extends StatelessWidget {
       onTap: () {
         if (!context.mounted) return;
         // Debug: Menü butonunun çalıştığını doğrula
-        debugPrint('Menu button tapped - opening drink selector');
+        LoggerService.logInfo('Menu button tapped - opening drink selector');
         onShowDrinkSelector();
       },
       behavior: HitTestBehavior.opaque, // Tüm alanı dokunmatik yap

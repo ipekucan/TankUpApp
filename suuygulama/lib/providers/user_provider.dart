@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/user_model.dart';
+import '../utils/date_helpers.dart';
+import '../core/services/logger_service.dart';
 
 class UserProvider extends ChangeNotifier {
   static const String _userDataKey = 'user_data';
@@ -50,7 +52,8 @@ class UserProvider extends ChangeNotifier {
       if (lastStreakIncrementDateString != null) {
         try {
           _lastStreakIncrementDate = DateTime.parse(lastStreakIncrementDateString);
-        } catch (e) {
+        } catch (e, stackTrace) {
+          LoggerService.logError('Failed to parse last streak increment date', e, stackTrace);
           _lastStreakIncrementDate = null;
         }
       } else {
@@ -64,8 +67,9 @@ class UserProvider extends ChangeNotifier {
       _checkAndResetDay();
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda varsayılan değerlerle devam et
+      LoggerService.logError('Failed to load user data', e, stackTrace);
       _userData = UserModel.initial();
       notifyListeners();
     }
@@ -74,7 +78,7 @@ class UserProvider extends ChangeNotifier {
   // Gün kontrolü ve sıfırlama
   Future<void> _checkAndResetDay() async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = DateHelpers.normalizeDate(now);
     
     if (_lastResetDate == null) {
       _lastResetDate = today;
@@ -82,11 +86,7 @@ class UserProvider extends ChangeNotifier {
       return;
     }
     
-    final lastReset = DateTime(
-      _lastResetDate!.year,
-      _lastResetDate!.month,
-      _lastResetDate!.day,
-    );
+    final lastReset = DateHelpers.normalizeDate(_lastResetDate!);
     
     // Yeni gün başladıysa
     if (today.isAfter(lastReset)) {
@@ -124,8 +124,9 @@ class UserProvider extends ChangeNotifier {
       
       // Birim sistemini kaydet
       await prefs.setBool(_isMetricKey, _isMetric);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save user data', e, stackTrace);
     }
   }
 
@@ -270,7 +271,7 @@ class UserProvider extends ChangeNotifier {
     if (goalReached) {
       // Bugünün tarihini al (calendar day, not 24-hour window)
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final today = DateHelpers.normalizeDate(now);
       
       // Bugün streak zaten artırıldı mı kontrol et (strict calendar day comparison)
       bool alreadyIncrementedToday = false;
@@ -300,7 +301,7 @@ class UserProvider extends ChangeNotifier {
       // Goal not reached: reset streak only if we're checking a new day
       // Don't reset if we're still on the same day
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final today = DateHelpers.normalizeDate(now);
       
       // Only reset if we haven't incremented today (meaning goal was never met today)
       bool shouldReset = true;
@@ -331,12 +332,8 @@ class UserProvider extends ChangeNotifier {
   bool get isNewDay {
     if (_lastResetDate == null) return true;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final lastReset = DateTime(
-      _lastResetDate!.year,
-      _lastResetDate!.month,
-      _lastResetDate!.day,
-    );
+    final today = DateHelpers.normalizeDate(now);
+    final lastReset = DateHelpers.normalizeDate(_lastResetDate!);
     return today.isAfter(lastReset);
   }
 }

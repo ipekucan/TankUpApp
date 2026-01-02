@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/decoration_item.dart';
+import '../core/services/logger_service.dart';
 
 class AquariumProvider extends ChangeNotifier {
   List<DecorationItem> _ownedDecorations = []; // Satın alınan tüm dekorasyonlar
@@ -63,8 +64,9 @@ class AquariumProvider extends ChangeNotifier {
 
       await _saveAquariumData();
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Dekorasyon bulunamadı - sessizce devam et
+      LoggerService.logError('Failed to load active decorations', e, stackTrace);
     }
   }
 
@@ -96,8 +98,9 @@ class AquariumProvider extends ChangeNotifier {
       
       // Aktif dekorasyonları kaydet
       await prefs.setString('activeDecorations', jsonEncode(_activeDecorations));
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save active decorations', e, stackTrace);
     }
   }
 
@@ -123,8 +126,9 @@ class AquariumProvider extends ChangeNotifier {
       }
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda varsayılan değerler
+      LoggerService.logError('Failed to load owned decorations', e, stackTrace);
       _ownedDecorations = [];
       _activeDecorations = {};
     }

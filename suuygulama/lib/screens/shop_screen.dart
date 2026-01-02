@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../models/decoration_item.dart';
 
@@ -151,8 +151,8 @@ class _ShopScreenState extends State<ShopScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Consumer2<WaterProvider, AquariumProvider>(
-        builder: (context, waterProvider, aquariumProvider, child) {
+      body: Consumer2<DailyHydrationProvider, AquariumProvider>(
+        builder: (context, dailyHydrationProvider, aquariumProvider, child) {
           final filteredItems = _getFilteredItems();
           
           return Column(
@@ -185,7 +185,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${waterProvider.tankCoins} TankCoin',
+                      '${dailyHydrationProvider.tankCoins} TankCoin',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -265,7 +265,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     return _buildShopCard(
                       context,
                       item,
-                      waterProvider,
+                      dailyHydrationProvider,
                       aquariumProvider,
                       isOwned,
                       isActive,
@@ -284,12 +284,12 @@ class _ShopScreenState extends State<ShopScreen> {
   Widget _buildShopCard(
     BuildContext context,
     DecorationItem item,
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     AquariumProvider aquariumProvider,
     bool isOwned,
     bool isActive,
   ) {
-    final canAfford = waterProvider.tankCoins >= item.price;
+    final canAfford = dailyHydrationProvider.tankCoins >= item.price;
     
     return Material(
       color: Colors.transparent,
@@ -305,7 +305,7 @@ class _ShopScreenState extends State<ShopScreen> {
               }
             : canAfford
                 ? () async {
-                    await _purchaseItem(context, item, waterProvider, aquariumProvider);
+                    await _purchaseItem(context, item, dailyHydrationProvider, aquariumProvider);
                   }
                 : null,
         borderRadius: BorderRadius.circular(30),
@@ -536,11 +536,11 @@ class _ShopScreenState extends State<ShopScreen> {
   Future<void> _purchaseItem(
     BuildContext context,
     DecorationItem item,
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     AquariumProvider aquariumProvider,
   ) async {
     // Coin kontrolü ve düşürme
-    if (!(await waterProvider.spendCoins(item.price))) {
+    if (!(await dailyHydrationProvider.spendCoins(item.price))) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

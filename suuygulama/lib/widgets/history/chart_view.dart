@@ -78,6 +78,7 @@ class _ChartViewState extends State<ChartView> {
   }
 
   /// Builds a persistent tooltip overlay that shows when a bar is selected.
+  /// Premium design with shadow and smooth animation.
   Widget _buildPersistentTooltip(BuildContext context, UserProvider userProvider) {
     // Safety checks
     if (widget.chartData.isEmpty || _touchedIndex < 0 || _touchedIndex >= widget.chartData.length) {
@@ -101,10 +102,9 @@ class _ChartViewState extends State<ChartView> {
     }
 
     final formattedValue = UnitConverter.formatVolume(totalValue, userProvider.isMetric);
+    final dataLabel = widget.chartData[_touchedIndex].label;
 
     // Calculate approximate position based on bar index
-    // This is a simplified approach - in production you might want to use
-    // a GlobalKey to get exact bar positions
     final screenWidth = MediaQuery.of(context).size.width;
     final chartWidth = screenWidth - 32; // Account for padding
     final barCount = widget.chartData.length;
@@ -115,30 +115,40 @@ class _ChartViewState extends State<ChartView> {
     }
     
     final barWidth = chartWidth / barCount;
-    final tooltipX = (_touchedIndex * barWidth) + (barWidth / 2) - 30; // Center of bar, offset for tooltip width
+    final tooltipX = (_touchedIndex * barWidth) + (barWidth / 2) - 45; // Center of bar
 
-    return Positioned(
-      left: tooltipX.clamp(0.0, screenWidth - 80),
-      top: 10,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 4,
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      left: tooltipX.clamp(0.0, screenWidth - 100),
+      top: 0,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: 1.0,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: ChartTheme.tooltipBackgroundColor,
             borderRadius: BorderRadius.circular(ChartTheme.tooltipBorderRadius),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+            boxShadow: ChartTheme.tooltipShadow,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                formattedValue,
+                style: ChartTheme.tooltipTextStyle,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                dataLabel,
+                style: ChartTheme.tooltipTextStyle.copyWith(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
               ),
             ],
-          ),
-          child: Text(
-            formattedValue,
-            style: ChartTheme.tooltipTextStyle,
           ),
         ),
       ),

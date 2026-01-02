@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
+import '../onboarding_theme.dart';
 
 /// Gender selection step for onboarding flow.
 /// 
-/// Displays two circular buttons for selecting gender (Male/Female).
-/// Uses AppTextStyles for consistent styling.
+/// Clean, airy design with soft pastel tones and gentle animations.
 class GenderStep extends StatelessWidget {
   final String? selectedGender;
   final ValueChanged<String> onGenderSelected;
@@ -21,92 +19,73 @@ class GenderStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(OnboardingTheme.pagePadding),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            'Cinsiyet Seçiniz',
-            style: AppTextStyles.heading1,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Kişisel hidrasyon planınızı oluşturmak için cinsiyetinizi seçin',
-            style: AppTextStyles.subtitle,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 60),
+          const Spacer(flex: 2),
           
-          // Yan yana iki dairesel buton
+          // Header
+          const OnboardingHeader(
+            title: 'Cinsiyetinizi Seçin',
+            subtitle: 'Kişiselleştirilmiş hidrasyon planınızı oluşturmak için bu bilgiye ihtiyacımız var',
+          ),
+          
+          const Spacer(flex: 3),
+          
+          // Gender Selection Circles
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Erkek Butonu
-              _GenderButton(
+              // Male
+              _GenderCircle(
                 isSelected: selectedGender == 'male',
-                icon: Icons.person,
+                icon: Icons.male_rounded,
                 label: 'Erkek',
+                color: const Color(0xFF7EC8E3), // Soft blue
                 onTap: () => onGenderSelected('male'),
               ),
               
               const SizedBox(width: 32),
               
-              // Kadın Butonu
-              _GenderButton(
+              // Female
+              _GenderCircle(
                 isSelected: selectedGender == 'female',
-                icon: Icons.person_outline,
+                icon: Icons.female_rounded,
                 label: 'Kadın',
+                color: const Color(0xFFE8A0BF), // Soft pink
                 onTap: () => onGenderSelected('female'),
               ),
             ],
           ),
           
-          const SizedBox(height: 60),
+          const Spacer(flex: 4),
           
-          // İleri Butonu
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: selectedGender != null ? onNext : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[300],
-                disabledForegroundColor: Colors.grey[500],
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 22,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                'İleri',
-                style: AppTextStyles.buttonTextLarge.copyWith(
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
+          // Continue Button
+          OnboardingPrimaryButton(
+            label: 'Devam Et',
+            onPressed: selectedGender != null ? onNext : null,
           ),
+          
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
 
-/// Circular gender selection button widget.
-class _GenderButton extends StatelessWidget {
+/// Custom gender selection circle with unique styling
+class _GenderCircle extends StatelessWidget {
   final bool isSelected;
   final IconData icon;
   final String label;
+  final Color color;
   final VoidCallback onTap;
 
-  const _GenderButton({
+  const _GenderCircle({
     required this.isSelected,
     required this.icon,
     required this.label,
+    required this.color,
     required this.onTap,
   });
 
@@ -115,54 +94,72 @@ class _GenderButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: 140,
-        height: 140,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        width: 130,
+        height: 130,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isSelected 
-              ? AppColors.softPinkButton 
-              : Colors.white,
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color,
+                    color.withValues(alpha: 0.8),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : Colors.white,
           border: Border.all(
-            color: isSelected 
-                ? AppColors.softPinkButton 
-                : Colors.grey[300]!,
-            width: isSelected ? 3 : 2,
+            color: isSelected ? Colors.transparent : color.withValues(alpha: 0.3),
+            width: 2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.softPinkButton.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    spreadRadius: 5,
+                    color: color.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.15),
+                    blurRadius: 40,
+                    spreadRadius: 8,
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
+                    color: color.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 6),
                   ),
                 ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 60,
-              color: isSelected 
-                  ? Colors.white 
-                  : AppColors.softPinkButton,
+            AnimatedScale(
+              scale: isSelected ? 1.15 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              child: Icon(
+                icon,
+                size: 52,
+                color: isSelected ? Colors.white : color,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              label,
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: isSelected 
-                    ? Colors.white 
-                    : const Color(0xFF4A5568),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: OnboardingTheme.optionLabelStyle.copyWith(
+                color: isSelected ? Colors.white : OnboardingTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
               ),
+              child: Text(label),
             ),
           ],
         ),
@@ -170,4 +167,3 @@ class _GenderButton extends StatelessWidget {
     );
   }
 }
-

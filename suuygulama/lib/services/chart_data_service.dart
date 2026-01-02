@@ -1,4 +1,5 @@
-import '../providers/water_provider.dart';
+import '../providers/history_provider.dart';
+import '../core/services/logger_service.dart';
 import '../utils/date_helpers.dart';
 import '../utils/chart_date_utils.dart';
 import '../widgets/history/chart_theme.dart';
@@ -23,29 +24,30 @@ class ChartDataPoint {
 class ChartDataService {
   ChartDataService._(); // Private constructor to prevent instantiation
 
-  // İçecek renkleri
+  // İçecek renkleri - Premium modern palette
+  // Each drink has a carefully selected vibrant color for visual appeal
   static const Map<String, Color> drinkColors = {
-    'water': Colors.blue,
-    'coffee': Colors.brown,
-    'tea': Colors.green,
-    'soda': Colors.orange,
-    'mineral_water': Colors.lightBlue,
-    'herbal_tea': Colors.lightGreen,
-    'green_tea': Colors.teal,
-    'cold_tea': Colors.cyan,
-    'lemonade': Colors.yellow,
-    'iced_coffee': Colors.deepOrange,
-    'ayran': Colors.blueGrey,
-    'kefir': Colors.grey,
-    'milk': Colors.white,
-    'juice': Colors.redAccent,
-    'smoothie': Colors.purpleAccent,
-    'fresh_juice': Colors.lime,
-    'sports': Colors.indigo,
-    'protein_shake': Colors.deepPurple,
-    'coconut_water': Colors.lightGreenAccent,
-    'energy_drink': Colors.red,
-    'detox_water': Colors.cyanAccent,
+    'water': Color(0xFF4F8EF7),        // Vibrant blue
+    'coffee': Color(0xFF8B5A2B),       // Rich brown
+    'tea': Color(0xFF6B9E6B),          // Sage green
+    'soda': Color(0xFFF59E0B),         // Amber orange
+    'mineral_water': Color(0xFF60A5FA), // Sky blue
+    'herbal_tea': Color(0xFF84CC16),   // Lime green
+    'green_tea': Color(0xFF10B981),    // Emerald
+    'cold_tea': Color(0xFF22D3EE),     // Cyan
+    'lemonade': Color(0xFFFBBF24),     // Golden yellow
+    'iced_coffee': Color(0xFFEA580C),  // Burnt orange
+    'ayran': Color(0xFF64748B),        // Slate
+    'kefir': Color(0xFF94A3B8),        // Cool gray
+    'milk': Color(0xFFF1F5F9),         // Off-white
+    'juice': Color(0xFFEF4444),        // Red
+    'smoothie': Color(0xFFA855F7),     // Purple
+    'fresh_juice': Color(0xFF84CC16),  // Lime
+    'sports': Color(0xFF6366F1),       // Indigo
+    'protein_shake': Color(0xFF7C3AED), // Violet
+    'coconut_water': Color(0xFF4ADE80), // Green
+    'energy_drink': Color(0xFFDC2626), // Bright red
+    'detox_water': Color(0xFF06B6D4),  // Teal
   };
 
   /// Builds chart data points based on the selected period.
@@ -56,21 +58,27 @@ class ChartDataService {
   ///
   /// Returns a list of [ChartDataPoint] objects ready for chart rendering.
   static List<ChartDataPoint> buildChartData(
-    WaterProvider waterProvider,
+    HistoryProvider historyProvider,
     ChartPeriod selectedPeriod,
     Set<String> selectedDrinkFilters,
   ) {
     final List<ChartDataPoint> data = [];
-    final now = DateTime.now();
+    final now = DateHelpers.normalizeDate(DateTime.now());
+
+    LoggerService.logInfo(
+      'ChartDataService.buildChartData start: period=$selectedPeriod filters=${selectedDrinkFilters.length} now=${DateHelpers.toDateKey(now)}',
+    );
+
+    int iterationCounter = 0;
 
     if (selectedPeriod == ChartPeriod.day) {
       // GÜN Modu: Current week (Monday to Sunday)
-      final weekStart = ChartDateUtils.getStartOfWeek(now);
+      final weekStart = DateHelpers.normalizeDate(ChartDateUtils.getStartOfWeek(now));
       
       for (int i = 0; i < 7; i++) {
-        final date = weekStart.add(Duration(days: i));
+        final date = DateHelpers.normalizeDate(weekStart.add(Duration(days: i)));
         final dateKey = DateHelpers.toDateKey(date);
-        final entries = waterProvider.getDrinkEntriesForDate(dateKey);
+        final entries = historyProvider.getDrinkEntriesForDate(dateKey);
 
         // Filtre uygula
         final filteredEntries = selectedDrinkFilters.isEmpty
@@ -86,6 +94,13 @@ class ChartDataService {
         // Etiket: Haftanın günleri (single letter abbreviations: P, S, Ç, P, C, C, P)
         final dayLabel = ChartDateUtils.getDaySingleLetter(date);
 
+        iterationCounter++;
+        if (iterationCounter % 7 == 0) {
+          LoggerService.logInfo(
+            'ChartDataService.buildChartData loop: i=$iterationCounter dateKey=$dateKey entries=${filteredEntries.length}',
+          );
+        }
+
         data.add(ChartDataPoint(
           label: dayLabel,
           drinkAmounts: drinkAmounts,
@@ -95,13 +110,15 @@ class ChartDataService {
     } else if (selectedPeriod == ChartPeriod.week) {
       // HAFTA Modu: Last 4 weeks ending with the current week
       // Each week is Monday to Sunday
-      final currentWeekStart = ChartDateUtils.getStartOfWeek(now);
+      final currentWeekStart = DateHelpers.normalizeDate(ChartDateUtils.getStartOfWeek(now));
       
       // Generate exactly 4 weeks (strictly limit to 4 columns)
       for (int i = 3; i >= 0; i--) {
-        final weekStart = currentWeekStart.subtract(Duration(days: i * 7));
-        final weekEnd = weekStart.add(const Duration(days: 6));
-        final entries = waterProvider.getDrinkEntriesForDateRange(weekStart, weekEnd);
+        final weekStart = DateHelpers.normalizeDate(
+          currentWeekStart.subtract(Duration(days: i * 7)),
+        );
+        final weekEnd = DateHelpers.normalizeDate(weekStart.add(const Duration(days: 6)));
+        final entries = historyProvider.getDrinkEntriesForDateRange(weekStart, weekEnd);
 
         // Filtre uygula
         final filteredEntries = selectedDrinkFilters.isEmpty
@@ -118,6 +135,13 @@ class ChartDataService {
         final weekNumber = 4 - i;
         final label = '$weekNumber. Hafta';
 
+        iterationCounter++;
+        if (iterationCounter % 7 == 0) {
+          LoggerService.logInfo(
+            'ChartDataService.buildChartData loop: i=$iterationCounter weekStart=${DateHelpers.toDateKey(weekStart)} entries=${filteredEntries.length}',
+          );
+        }
+
         data.add(ChartDataPoint(
           label: label,
           drinkAmounts: drinkAmounts,
@@ -125,27 +149,43 @@ class ChartDataService {
         ));
       }
     } else {
-      // AY Modu: Last 5-6 months ending with the current month
-      // Dynamic calculation based on DateTime.now()
-      final monthLabels = ChartDateUtils.getLastMonthsLabels(5);
+      // AY Modu: Last 6 months ending with the current month
+      // Labels: Abbreviated Turkish month names (Oca, Şub, Mar, Nis, May, Haz, etc.)
+      const monthAbbreviations = [
+        'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+        'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'
+      ];
+      
       final currentMonth = now.month;
       final currentYear = now.year;
 
-      // Generate data for the last 5 months
-      for (int i = 0; i < 5; i++) {
+      // Generate data for the last 6 months
+      for (int i = 0; i < 6; i++) {
         // Calculate target month (going back from current month)
-        int targetMonth = currentMonth - (4 - i);
+        int targetMonth = currentMonth - (5 - i);
         int targetYear = currentYear;
 
         // Handle year rollover
+        int rolloverSafetyCounter = 0;
         while (targetMonth <= 0) {
+          rolloverSafetyCounter++;
+          if (rolloverSafetyCounter > 24) {
+            LoggerService.logError(
+              'Infinite loop detected in ChartDataService month rollover',
+              'targetMonth=$targetMonth targetYear=$targetYear currentMonth=$currentMonth currentYear=$currentYear',
+              null,
+            );
+            break;
+          }
           targetMonth += 12;
           targetYear -= 1;
         }
 
-        final monthStart = ChartDateUtils.getMonthStart(targetYear, targetMonth);
-        final monthEnd = ChartDateUtils.getMonthEnd(targetYear, targetMonth);
-        final entries = waterProvider.getDrinkEntriesForDateRange(monthStart, monthEnd);
+        final monthStart =
+            DateHelpers.normalizeDate(ChartDateUtils.getMonthStart(targetYear, targetMonth));
+        final monthEnd =
+            DateHelpers.normalizeDate(ChartDateUtils.getMonthEnd(targetYear, targetMonth));
+        final entries = historyProvider.getDrinkEntriesForDateRange(monthStart, monthEnd);
 
         // Filtre uygula
         final filteredEntries = selectedDrinkFilters.isEmpty
@@ -158,8 +198,15 @@ class ChartDataService {
           drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
         }
 
-        // Dynamic label from ChartDateUtils
-        final label = monthLabels[i];
+        // Use abbreviated month name (Oca, Şub, Mar, etc.)
+        final label = monthAbbreviations[targetMonth - 1];
+
+        iterationCounter++;
+        if (iterationCounter % 7 == 0) {
+          LoggerService.logInfo(
+            'ChartDataService.buildChartData loop: i=$iterationCounter monthStart=${DateHelpers.toDateKey(monthStart)} entries=${filteredEntries.length}',
+          );
+        }
 
         data.add(ChartDataPoint(
           label: label,
@@ -244,16 +291,32 @@ class ChartDataService {
 
       // Tek bir BarChartRodData ile stacked bar oluştur
       // Note: Bar width and radius are now handled by ChartTheme for consistency
+      // Premium styling: Gradient for single-color bars, solid for stacked
       return BarChartGroupData(
         x: index,
         barRods: [
           BarChartRodData(
             toY: totalAmount,
             width: ChartTheme.barWidth,
-            borderRadius: ChartTheme.barBorderRadius, // Premium rounded top (8.0)
+            borderRadius: ChartTheme.barBorderRadius,
             rodStackItems: rodStackItems.isNotEmpty ? rodStackItems : null,
-            // For empty bars, use solid color
-            color: rodStackItems.isEmpty ? Colors.grey[300] : null,
+            // For empty bars, use subtle gray; for filled use gradient
+            gradient: rodStackItems.isEmpty 
+                ? null
+                : rodStackItems.length == 1
+                    ? LinearGradient(
+                        colors: [
+                          rodStackItems.first.color,
+                          rodStackItems.first.color.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      )
+                    : null,
+            color: rodStackItems.isEmpty 
+                ? ChartTheme.emptyBarColor 
+                : (rodStackItems.length > 1 ? null : null),
+            // Removed background bar to prevent ghost column effect during transitions
           ),
         ],
         barsSpace: 0,

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
+import '../onboarding_theme.dart';
 
 /// Climate selection step for onboarding flow.
 /// 
-/// Displays four horizontal buttons for climate types (Very Hot, Hot, Warm, Cold).
-/// Uses AppTextStyles for consistent styling.
+/// Displays four climate options with weather-themed icons and colors.
 class ClimateStep extends StatelessWidget {
   final String? selectedClimate;
   final ValueChanged<String> onClimateSelected;
@@ -21,113 +19,98 @@ class ClimateStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(OnboardingTheme.pagePadding),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            'İklim Seçiniz',
-            style: AppTextStyles.heading1,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Yaşadığınız bölgenin iklim tipini seçin',
-            style: AppTextStyles.subtitle,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 60),
+          const Spacer(flex: 2),
           
-          // 4 Yatay Dikdörtgen Buton
-          Column(
+          // Header
+          const OnboardingHeader(
+            title: 'İkliminizi Seçin',
+            subtitle: 'Yaşadığınız bölgenin iklimi su ihtiyacınızı etkiler',
+          ),
+          
+          const Spacer(flex: 2),
+          
+          // Climate Options - 2x2 Grid
+          Row(
             children: [
-              // Çok Sıcak
-              _ClimateButton(
-                title: 'Çok Sıcak',
-                icon: Icons.wb_sunny,
-                isSelected: selectedClimate == 'very_hot',
-                onTap: () => onClimateSelected('very_hot'),
+              Expanded(
+                child: _ClimateCard(
+                  title: 'Çok Sıcak',
+                  icon: Icons.wb_sunny_rounded,
+                  isSelected: selectedClimate == 'very_hot',
+                  color: const Color(0xFFF7A072), // Warm coral
+                  onTap: () => onClimateSelected('very_hot'),
+                ),
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Sıcak
-              _ClimateButton(
-                title: 'Sıcak',
-                icon: Icons.wb_twilight,
-                isSelected: selectedClimate == 'hot',
-                onTap: () => onClimateSelected('hot'),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Ilıman
-              _ClimateButton(
-                title: 'Ilıman',
-                icon: Icons.wb_cloudy,
-                isSelected: selectedClimate == 'warm',
-                onTap: () => onClimateSelected('warm'),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Soğuk
-              _ClimateButton(
-                title: 'Soğuk',
-                icon: Icons.ac_unit,
-                isSelected: selectedClimate == 'cold',
-                onTap: () => onClimateSelected('cold'),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _ClimateCard(
+                  title: 'Sıcak',
+                  icon: Icons.wb_twilight_rounded,
+                  isSelected: selectedClimate == 'hot',
+                  color: const Color(0xFFFFB347), // Soft orange
+                  onTap: () => onClimateSelected('hot'),
+                ),
               ),
             ],
           ),
           
-          const SizedBox(height: 40),
+          const SizedBox(height: 14),
           
-          // İleri Butonu
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: selectedClimate != null ? onNext : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[300],
-                disabledForegroundColor: Colors.grey[500],
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 22,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                'İleri',
-                style: AppTextStyles.buttonTextLarge.copyWith(
-                  letterSpacing: 0.8,
+          Row(
+            children: [
+              Expanded(
+                child: _ClimateCard(
+                  title: 'Ilıman',
+                  icon: Icons.cloud_outlined,
+                  isSelected: selectedClimate == 'warm',
+                  color: const Color(0xFF7EC8E3), // Soft blue
+                  onTap: () => onClimateSelected('warm'),
                 ),
               ),
-            ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _ClimateCard(
+                  title: 'Soğuk',
+                  icon: Icons.ac_unit_rounded,
+                  isSelected: selectedClimate == 'cold',
+                  color: const Color(0xFFB8D4E3), // Cool blue
+                  onTap: () => onClimateSelected('cold'),
+                ),
+              ),
+            ],
           ),
           
-          const SizedBox(height: 20),
+          const Spacer(flex: 3),
+          
+          // Continue Button
+          OnboardingPrimaryButton(
+            label: 'Devam Et',
+            onPressed: selectedClimate != null ? onNext : null,
+          ),
+          
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
 
-/// Climate selection button widget.
-class _ClimateButton extends StatelessWidget {
+/// Square climate selection card with icon and soft styling
+class _ClimateCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final bool isSelected;
+  final Color color;
   final VoidCallback onTap;
 
-  const _ClimateButton({
+  const _ClimateCard({
     required this.title,
     required this.icon,
     required this.isSelected,
+    required this.color,
     required this.onTap,
   });
 
@@ -136,57 +119,95 @@ class _ClimateButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        height: 130,
         decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.softPinkButton.withValues(alpha: 0.1)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color,
+                    color.withValues(alpha: 0.85),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : Colors.white,
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected 
-                ? AppColors.softPinkButton 
-                : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
+            color: isSelected ? Colors.transparent : color.withValues(alpha: 0.25),
+            width: 2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.softPinkButton.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    spreadRadius: 2,
+                    color: color.withValues(alpha: 0.35),
+                    blurRadius: 20,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.15),
+                    blurRadius: 40,
+                    spreadRadius: 4,
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 5,
-                    spreadRadius: 1,
+                    color: color.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Sol: Metin
-            Text(
-              title,
-              style: AppTextStyles.heading3.copyWith(
-                fontSize: 20,
-                color: isSelected 
-                    ? AppColors.softPinkButton 
-                    : const Color(0xFF4A5568),
+            // Icon with animation
+            AnimatedScale(
+              scale: isSelected ? 1.15 : 1.0,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutBack,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isSelected 
+                      ? Colors.white.withValues(alpha: 0.25) 
+                      : color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: isSelected ? Colors.white : color,
+                ),
               ),
             ),
             
-            // Sağ: İkon
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected 
-                  ? AppColors.softPinkButton 
-                  : Colors.grey[400],
+            const SizedBox(height: 12),
+            
+            // Title
+            Text(
+              title,
+              style: OnboardingTheme.optionLabelStyle.copyWith(
+                color: isSelected ? Colors.white : OnboardingTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+              ),
+            ),
+            
+            // Checkmark indicator
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: isSelected ? 4 : 0,
+              width: isSelected ? 24 : 0,
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ],
         ),
@@ -194,4 +215,3 @@ class _ClimateButton extends StatelessWidget {
     );
   }
 }
-

@@ -341,6 +341,40 @@ class AppConstants {
   
   /// Maximum daily goal (ml)
   static const double maxDailyGoal = 5000.0;
+
+  // ============================================
+  // HYDRATION / COIN / HISTORY LOGIC CONSTANTS
+  // ============================================
+
+  /// Daily hydration hard limit (ml). Used to prevent consuming beyond a safe cap.
+  static const double dailyHydrationLimitMl = 5000.0;
+
+  /// Daily coin reward granted on day reset.
+  static const int dailyResetCoinReward = 10;
+
+  /// Lucky drink chance configuration.
+  /// Current implementation uses `now.millisecondsSinceEpoch % luckyDrinkModuloBase < luckyDrinkChanceThreshold`.
+  static const int luckyDrinkModuloBase = 100;
+  static const int luckyDrinkChanceThreshold = 5; // 5% chance
+  static const int luckyDrinkRewardCoins = 10;
+
+  /// Early bird bonus configuration.
+  static const int earlyBirdCutoffHour = 9;
+  static const double earlyBirdMaxConsumedMl = 500.0;
+  static const int earlyBirdRewardCoins = 5;
+
+  /// Night owl bonus configuration.
+  static const int nightOwlStartHour = 20;
+  static const int nightOwlRewardCoins = 5;
+
+  /// Daily goal completion bonus configuration.
+  static const int dailyGoalBonusCoins = 15;
+
+  /// Challenge tracking: minimum ml for a "big cup" water drink.
+  static const double challengeBigCupMinMl = 330.0;
+
+  /// History retention window (days) for local storage.
+  static const int historyRetentionDays = 30;
   
   /// Default weight for calculations (kg)
   static const double defaultWeightKg = 70.0;
@@ -495,14 +529,14 @@ class AppConstants {
   /// Secondary water color
   static const Color waterColorSecondary = Color(0xFF0288D1);
   
-  /// Background gradient color 1
-  static const Color backgroundGradientColor1 = Color(0xFF87CEEB);
+  /// Background gradient color 1 (Soft mint/aqua top)
+  static const Color backgroundGradientColor1 = Color(0xFFE0F5F1);
   
-  /// Background gradient color 2
-  static const Color backgroundGradientColor2 = Color(0xFFB0E0E6);
+  /// Background gradient color 2 (Light cream middle)
+  static const Color backgroundGradientColor2 = Color(0xFFF5F0E8);
   
-  /// Background gradient color 3
-  static const Color backgroundGradientColor3 = Color(0xFFE0F6FF);
+  /// Background gradient color 3 (Warm cream bottom)
+  static const Color backgroundGradientColor3 = Color(0xFFFDF8F3);
   
   /// Background gradient stop 1
   static const double backgroundGradientStop1 = 0.0;

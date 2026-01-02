@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:showcaseview/showcaseview.dart';
-import 'providers/water_provider.dart';
+import 'providers/daily_hydration_provider.dart';
+import 'providers/history_provider.dart';
 import 'providers/aquarium_provider.dart';
 import 'providers/user_provider.dart';
-import 'providers/achievement_provider.dart';
 import 'providers/drink_provider.dart';
 import 'providers/challenge_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_colors.dart';
 import 'services/notification_service.dart';
+import 'core/services/logger_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +31,9 @@ void main() async {
       // Günlük bildirimleri ayarla (varsayılan saatlerle)
       // Profil tamamlandığında güncellenecek
       await notificationService.scheduleDailyNotifications();
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Bildirim hatası uygulama başlatmayı engellemesin - sessizce devam et
+      LoggerService.logError('Failed to initialize notification service', e, stackTrace);
     }
   });
   
@@ -46,8 +48,17 @@ class TankUpApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => WaterProvider(),
+          create: (_) => HistoryProvider(),
           lazy: true, // İhtiyaç duyulduğunda yükle
+        ),
+        ChangeNotifierProxyProvider<HistoryProvider, DailyHydrationProvider>(
+          create: (_) => DailyHydrationProvider(),
+          update: (context, historyProvider, dailyProvider) {
+            dailyProvider ??= DailyHydrationProvider();
+            dailyProvider.updateHistoryProvider(historyProvider);
+            return dailyProvider;
+          },
+          lazy: true,
         ),
         ChangeNotifierProvider(
           create: (_) => AquariumProvider(),
@@ -55,10 +66,6 @@ class TankUpApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => UserProvider(),
-          lazy: true,
-        ),
-        ChangeNotifierProvider(
-          create: (_) => AchievementProvider(),
           lazy: true,
         ),
         ChangeNotifierProvider(

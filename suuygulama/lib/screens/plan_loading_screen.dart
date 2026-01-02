@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../services/notification_service.dart';
 import 'main_navigation_screen.dart';
+import '../core/services/logger_service.dart';
 
 // Baloncuk Modeli
 class Bubble {
@@ -92,7 +93,8 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   Future<void> _calculateAndSavePlan() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+      final dailyHydrationProvider =
+          Provider.of<DailyHydrationProvider>(context, listen: false);
       
       if (!mounted) return;
       
@@ -103,12 +105,12 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
       final idealGoal = widget.customGoal ?? userProvider.calculateIdealWaterGoal();
       
       // Su hedefini ayarla
-      await waterProvider.updateDailyGoal(idealGoal);
+      await dailyHydrationProvider.updateDailyGoal(idealGoal);
       
       if (!mounted) return;
       
       // Coin'i sıfırla
-      await waterProvider.resetCoins();
+      await dailyHydrationProvider.resetCoins();
       
       if (!mounted) return;
       
@@ -116,8 +118,9 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('onboarding_completed', true);
-      } catch (e) {
+      } catch (e, stackTrace) {
         // Hata durumunda sessizce devam et
+        LoggerService.logError('Failed to calculate hydration plan', e, stackTrace);
       }
       
       if (!mounted) return;
@@ -139,8 +142,9 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda yine de navigasyon yap
+      LoggerService.logError('Failed to initialize hydration plan', e, stackTrace);
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),

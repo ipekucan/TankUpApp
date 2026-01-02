@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:showcaseview/showcaseview.dart';
-import '../../../utils/app_colors.dart';
 import '../../../providers/user_provider.dart';
-import '../../../theme/app_text_styles.dart';
+import '../onboarding_theme.dart';
 
 /// Goal selection step for onboarding flow.
 /// 
-/// Displays amount adjustment bar, unit toggle, and smart goal suggestion.
-/// Uses AppTextStyles for consistent styling.
+/// Allows users to set their daily water intake goal with a beautiful UI.
 class GoalStep extends StatefulWidget {
   final double customGoal;
   final int selectedWeight;
@@ -41,253 +39,172 @@ class _GoalStepState extends State<GoalStep> {
     final userProvider = Provider.of<UserProvider>(context);
     final isMetric = userProvider.isMetric;
 
-    // Controller'ı güncel değerle senkronize et
-    String text;
-    if (isMetric) {
-      text = widget.customGoal.toStringAsFixed(0);
-    } else {
-      text = widget.customGoal.toStringAsFixed(1);
-    }
+    // Sync controller with current value
+    String text = isMetric 
+        ? widget.customGoal.toStringAsFixed(0)
+        : widget.customGoal.toStringAsFixed(1);
     if (widget.amountController.text != text) {
       widget.amountController.text = text;
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(OnboardingTheme.pagePadding),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 40),
+          const Spacer(flex: 2),
           
-          // Başlık - Ortalanmış
-          Text(
-            'Günlük Hedef',
-            style: AppTextStyles.heading1,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          
-          // Alt açıklama metni
-          Text(
-            'Günlük su hedefinizi belirleyin',
-            style: AppTextStyles.subtitle,
-            textAlign: TextAlign.center,
+          // Header
+          const OnboardingHeader(
+            title: 'Günlük Hedefiniz',
+            subtitle: 'Her gün içmek istediğiniz su miktarını belirleyin',
           ),
           
-          const SizedBox(height: 80),
+          const Spacer(flex: 2),
           
-          // Miktar Ayarlama Barı ve Birim Toggle - Showcase ile sarmalanmış
+          // Goal adjustment card with showcase
           if (widget.showcaseKey != null)
             Showcase(
               key: widget.showcaseKey!,
               title: 'Hedefini Belirle',
-              description: 'Günlük su hedefini buradaki butonlarla veya birim değiştiriciyle ayarlayabilirsin.',
+              description: 'Butonlarla veya direkt yazarak günlük su hedefini ayarla.',
               overlayColor: Colors.black.withValues(alpha: 0.5),
               overlayOpacity: 0.5,
-              titleTextStyle: const TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-              descTextStyle: const TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-              tooltipBackgroundColor: const Color(0xFFFFF59D), // Soft Sarı
-              textColor: Colors.black,
-              tooltipPadding: const EdgeInsets.all(12),
-              targetBorderRadius: BorderRadius.circular(16),
-              targetShapeBorder: RoundedRectangleBorder(
-                side: const BorderSide(color: Colors.black, width: 1.5),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  // Miktar Ayarlama Barı
-                  _buildAmountAdjustmentBar(isMetric),
-                  
-                  // Birim Seçim Toggle
-                  const SizedBox(height: 24),
-                  _buildUnitToggle(isMetric),
-                ],
-              ),
+              titleTextStyle: OnboardingTheme.optionLabelStyle,
+              descTextStyle: OnboardingTheme.subtitleStyle.copyWith(color: Colors.black87),
+              tooltipBackgroundColor: Colors.white,
+              textColor: OnboardingTheme.textPrimary,
+              tooltipPadding: const EdgeInsets.all(16),
+              targetBorderRadius: BorderRadius.circular(28),
+              child: _buildGoalAdjustmentCard(isMetric),
             )
           else
-            Column(
-              children: [
-                _buildAmountAdjustmentBar(isMetric),
-                const SizedBox(height: 24),
-                _buildUnitToggle(isMetric),
-              ],
-            ),
-          
-          // Akıllı Hedef Önerisi
-          if (widget.selectedWeight > 0 && widget.calculatedWaterGoal > 0) ...[
-            const SizedBox(height: 24),
-            _buildSmartGoalSuggestion(isMetric),
-          ],
-          
-          const Spacer(),
-          
-          // Planı Oluştur Butonu
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: widget.onComplete,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 22,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                'Planı Oluştur',
-                style: AppTextStyles.buttonTextLarge.copyWith(
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
-          ),
+            _buildGoalAdjustmentCard(isMetric),
           
           const SizedBox(height: 20),
+          
+          // Unit toggle
+          _buildUnitToggle(isMetric),
+          
+          // Smart suggestion
+          if (widget.selectedWeight > 0 && widget.calculatedWaterGoal > 0) ...[
+            const SizedBox(height: 24),
+            _buildSmartSuggestion(isMetric),
+          ],
+          
+          const Spacer(flex: 3),
+          
+          // Complete Button
+          OnboardingPrimaryButton(
+            label: 'Planı Oluştur',
+            onPressed: widget.onComplete,
+          ),
+          
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildAmountAdjustmentBar(bool isMetric) {
-    String getDisplayUnit() {
-      return isMetric ? 'ml' : 'oz';
-    }
+  Widget _buildGoalAdjustmentCard(bool isMetric) {
+    String unit = isMetric ? 'ml' : 'oz';
 
-    void incrementAmount() {
-      double newGoal = widget.customGoal;
-      if (isMetric) {
-        newGoal += 10.0; // 10 ml artır
-      } else {
-        newGoal += 10.0; // 10 oz artır
-      }
+    void increment() {
+      double newGoal = widget.customGoal + (isMetric ? 50.0 : 2.0);
       widget.onGoalChanged(newGoal);
     }
 
-    void decrementAmount() {
-      double newGoal = widget.customGoal;
-      if (isMetric) {
-        newGoal -= 10.0; // 10 ml azalt
-      } else {
-        newGoal -= 10.0; // 10 oz azalt
-      }
-      if (newGoal < 0) newGoal = 0.0;
+    void decrement() {
+      double newGoal = widget.customGoal - (isMetric ? 50.0 : 2.0);
+      if (newGoal < 0) newGoal = 0;
       widget.onGoalChanged(newGoal);
     }
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: AppColors.softPinkButton.withValues(alpha: 0.3),
+          color: OnboardingTheme.primaryAccent.withValues(alpha: 0.2),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.softPinkButton.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: OnboardingTheme.primaryAccent.withValues(alpha: 0.1),
+            blurRadius: 30,
+            spreadRadius: 0,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // AZALT BUTONU
-          GestureDetector(
-            onTap: decrementAmount,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.softPinkButton.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.remove,
-                color: AppColors.softPinkButton,
-                size: 28,
-              ),
+          // Decrement button
+          _CircleButton(
+            icon: Icons.remove_rounded,
+            onTap: decrement,
+            isPrimary: false,
+          ),
+          
+          // Value display
+          Expanded(
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Text field for value
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        controller: widget.amountController,
+                        keyboardType: TextInputType.numberWithOptions(decimal: !isMetric),
+                        textAlign: TextAlign.center,
+                        style: OnboardingTheme.valueDisplayStyle.copyWith(
+                          color: OnboardingTheme.primaryAccent,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
+                        ),
+                        onChanged: (value) {
+                          final numValue = double.tryParse(value);
+                          if (numValue != null && numValue >= 0) {
+                            widget.onGoalChanged(numValue);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        unit,
+                        style: OnboardingTheme.unitStyle.copyWith(
+                          color: OnboardingTheme.primaryAccent,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           
-          // TEXTFIELD VE BİRİM
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 120,
-                child: TextField(
-                  controller: widget.amountController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: !isMetric),
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.dateText.copyWith(
-                    fontSize: 32,
-                    letterSpacing: 0.5,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                  ),
-                  onChanged: (value) {
-                    final numValue = double.tryParse(value);
-                    if (numValue != null && numValue >= 0) {
-                      widget.onGoalChanged(numValue);
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                getDisplayUnit(),
-                style: AppTextStyles.dateText.copyWith(
-                  fontSize: 32,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          
-          // ARTIR BUTONU
-          GestureDetector(
-            onTap: incrementAmount,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.softPinkButton,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.softPinkButton.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
+          // Increment button
+          _CircleButton(
+            icon: Icons.add_rounded,
+            onTap: increment,
+            isPrimary: true,
           ),
         ],
       ),
@@ -300,87 +217,38 @@ class _GoalStepState extends State<GoalStep> {
         return Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: AppColors.softPinkButton.withValues(alpha: 0.3),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.softPinkButton.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: OnboardingTheme.primaryAccentLight,
+            borderRadius: BorderRadius.circular(24),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ml Butonu
-              GestureDetector(
+              // ml button
+              _UnitToggleButton(
+                label: 'ml',
+                isSelected: isMetric,
                 onTap: () async {
-                  if (isMetric) return; // Zaten ml seçili
-                  
-                  // Oz'dan ml'ye dönüştür
+                  if (isMetric) return;
                   final currentOz = widget.customGoal;
-                  final newMl = currentOz / 0.033814; // oz'dan ml'ye çevir
-                  
+                  final newMl = currentOz / 0.033814;
                   widget.onGoalChanged(newMl.roundToDouble());
-                  
-                  // UserProvider'ı güncelle
                   await userProvider.setIsMetric(true);
-                  
-                  // Controller'ı güncelle
                   widget.amountController.text = newMl.roundToDouble().toStringAsFixed(0);
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isMetric ? AppColors.softPinkButton : Colors.transparent,
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                  child: Text(
-                    'ml',
-                    style: AppTextStyles.buttonText.copyWith(
-                      color: isMetric ? Colors.white : Colors.grey[600],
-                    ),
-                  ),
-                ),
               ),
-              
-              // oz Butonu
-              GestureDetector(
+              const SizedBox(width: 4),
+              // oz button
+              _UnitToggleButton(
+                label: 'oz',
+                isSelected: !isMetric,
                 onTap: () async {
-                  if (!isMetric) return; // Zaten oz seçili
-                  
-                  // Ml'den oz'a dönüştür
+                  if (!isMetric) return;
                   final currentMl = widget.customGoal;
-                  final newOz = currentMl * 0.033814; // ml'den oz'a çevir
-                  
+                  final newOz = currentMl * 0.033814;
                   widget.onGoalChanged(double.parse(newOz.toStringAsFixed(1)));
-                  
-                  // UserProvider'ı güncelle
                   await userProvider.setIsMetric(false);
-                  
-                  // Controller'ı güncelle
                   widget.amountController.text = newOz.toStringAsFixed(1);
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: !isMetric ? AppColors.softPinkButton : Colors.transparent,
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                  child: Text(
-                    'oz',
-                    style: AppTextStyles.buttonText.copyWith(
-                      color: !isMetric ? Colors.white : Colors.grey[600],
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -389,63 +257,106 @@ class _GoalStepState extends State<GoalStep> {
     );
   }
 
-  Widget _buildSmartGoalSuggestion(bool isMetric) {
-    // Kilo girilene kadar 0 döndür
-    if (widget.selectedWeight == 0) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildSmartSuggestion(bool isMetric) {
+    if (widget.selectedWeight == 0) return const SizedBox.shrink();
     
-    // Kilo dönüşümü (Lbs ise Kg'ye çevir)
     final weightInKg = widget.weightUnit == 1 
         ? widget.selectedWeight * 0.453592 
         : widget.selectedWeight.toDouble();
     
-    // Temel formül: kilo * 35 (ml cinsinden)
     final idealMl = (weightInKg * 35).round();
     
-    // Birime göre dönüştür
     double calculatedValue;
     String unit;
     String displayValue;
     
     if (isMetric) {
-      // ml: ideal değerini olduğu gibi kullan
       calculatedValue = idealMl.toDouble();
       unit = 'ml';
       displayValue = calculatedValue.toStringAsFixed(0);
     } else {
-      // oz: (ideal * 0.033814).round() işlemini yap
-      calculatedValue = (idealMl * 0.033814);
+      calculatedValue = idealMl * 0.033814;
       unit = 'oz';
       displayValue = calculatedValue.toStringAsFixed(1);
     }
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.softPinkButton.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            OnboardingTheme.primaryAccentLight,
+            OnboardingTheme.primaryAccent.withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.softPinkButton.withValues(alpha: 0.3),
-          width: 1,
+          color: OnboardingTheme.primaryAccent.withValues(alpha: 0.15),
+          width: 1.5,
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.lightbulb_outline,
-            color: AppColors.softPinkButton,
-            size: 20,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: OnboardingTheme.primaryAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.lightbulb_outline_rounded,
+              color: OnboardingTheme.primaryAccent,
+              size: 24,
+            ),
           ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              'Kilonuza ve bilgilerinize göre günlük su ihtiyacınız: $displayValue $unit',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: const Color(0xFF4A5568),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Önerilen Miktar',
+                  style: OnboardingTheme.optionLabelStyle.copyWith(
+                    fontSize: 14,
+                    color: OnboardingTheme.primaryAccentDark,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$displayValue $unit / gün',
+                  style: OnboardingTheme.subtitleStyle.copyWith(
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Apply suggestion button
+          GestureDetector(
+            onTap: () {
+              widget.onGoalChanged(calculatedValue);
+              widget.amountController.text = displayValue;
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: OnboardingTheme.primaryAccent,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: OnboardingTheme.primaryAccent.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                'Uygula',
+                style: OnboardingTheme.buttonTextStyle.copyWith(fontSize: 13),
+              ),
             ),
           ),
         ],
@@ -454,3 +365,98 @@ class _GoalStepState extends State<GoalStep> {
   }
 }
 
+/// Circle button for increment/decrement
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const _CircleButton({
+    required this.icon,
+    required this.onTap,
+    required this.isPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: isPrimary
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    OnboardingTheme.primaryAccent,
+                    OnboardingTheme.primaryAccentDark,
+                  ],
+                )
+              : null,
+          color: isPrimary ? null : OnboardingTheme.primaryAccent.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          boxShadow: isPrimary
+              ? [
+                  BoxShadow(
+                    color: OnboardingTheme.primaryAccent.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          color: isPrimary ? Colors.white : OnboardingTheme.primaryAccent,
+          size: 28,
+        ),
+      ),
+    );
+  }
+}
+
+/// Unit toggle button
+class _UnitToggleButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _UnitToggleButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? OnboardingTheme.primaryAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: OnboardingTheme.primaryAccent.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: OnboardingTheme.buttonTextStyle.copyWith(
+            color: isSelected ? Colors.white : OnboardingTheme.textSecondary,
+            fontSize: 15,
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import '../utils/app_colors.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../models/decoration_item.dart';
 import 'shop_screen.dart';
@@ -121,9 +121,9 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: Consumer2<WaterProvider, AquariumProvider>(
-        builder: (context, waterProvider, aquariumProvider, child) {
-          final isDirty = waterProvider.isTankDirty;
+      body: Consumer2<DailyHydrationProvider, AquariumProvider>(
+        builder: (context, dailyHydrationProvider, aquariumProvider, child) {
+          final isDirty = dailyHydrationProvider.isTankDirty;
           final screenSize = MediaQuery.of(context).size;
           
           // Tank boyutları ve pozisyonu

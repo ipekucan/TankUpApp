@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';
 import '../../../providers/user_provider.dart';
-import '../../../theme/app_text_styles.dart';
+import '../onboarding_theme.dart';
 
 /// Activity level selection step for onboarding flow.
 /// 
-/// Displays three horizontal buttons for activity levels (Low, Medium, High).
-/// Uses AppTextStyles for consistent styling.
+/// Displays three beautiful option cards for activity levels.
 class ActivityStep extends StatelessWidget {
   final String? selectedActivityLevel;
   final ValueChanged<String> onActivityLevelSelected;
@@ -23,111 +21,87 @@ class ActivityStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(OnboardingTheme.pagePadding),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            'Aktivite Seviyeniz',
-            style: AppTextStyles.heading1,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Günlük aktivite seviyenizi seçin',
-            style: AppTextStyles.subtitle,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 60),
+          const Spacer(flex: 2),
           
-          // 3 Yatay Dikdörtgen Buton
-          Column(
-            children: [
-              // Düşük Aktivite
-              _ActivityButton(
-                title: 'Düşük',
-                icon: Icons.directions_walk,
-                isSelected: selectedActivityLevel == 'low',
-                onTap: () => onActivityLevelSelected('low'),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Orta Aktivite
-              _ActivityButton(
-                title: 'Orta',
-                icon: Icons.directions_run,
-                isSelected: selectedActivityLevel == 'medium',
-                onTap: () => onActivityLevelSelected('medium'),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Yüksek Aktivite
-              _ActivityButton(
-                title: 'Yüksek',
-                icon: Icons.sports_gymnastics,
-                isSelected: selectedActivityLevel == 'high',
-                onTap: () => onActivityLevelSelected('high'),
-              ),
-            ],
+          // Header
+          const OnboardingHeader(
+            title: 'Aktivite Seviyeniz',
+            subtitle: 'Günlük aktivite düzeyinize göre su ihtiyacınızı ayarlayacağız',
           ),
           
-          const SizedBox(height: 40),
+          const Spacer(flex: 2),
           
-          // İleri Butonu
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: selectedActivityLevel != null
-                  ? () async {
-                      // Provider'a kaydet
-                      final userProvider = Provider.of<UserProvider>(context, listen: false);
-                      await userProvider.updateProfile(activityLevel: selectedActivityLevel);
-                      // Sonraki sayfaya geç
-                      onNext?.call();
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPinkButton,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[300],
-                disabledForegroundColor: Colors.grey[500],
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 22,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                'İleri',
-                style: AppTextStyles.buttonTextLarge.copyWith(
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
+          // Activity Options
+          _ActivityOptionCard(
+            title: 'Düşük Aktivite',
+            subtitle: 'Masa başı iş, az hareket',
+            icon: Icons.weekend_outlined,
+            isSelected: selectedActivityLevel == 'low',
+            color: const Color(0xFF98D4BB), // Soft mint
+            onTap: () => onActivityLevelSelected('low'),
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          
+          _ActivityOptionCard(
+            title: 'Orta Aktivite',
+            subtitle: 'Hafif egzersiz, günlük yürüyüş',
+            icon: Icons.directions_walk_rounded,
+            isSelected: selectedActivityLevel == 'medium',
+            color: const Color(0xFF7EC8E3), // Soft blue
+            onTap: () => onActivityLevelSelected('medium'),
+          ),
+          
+          const SizedBox(height: 14),
+          
+          _ActivityOptionCard(
+            title: 'Yüksek Aktivite',
+            subtitle: 'Yoğun spor, ağır fiziksel iş',
+            icon: Icons.fitness_center_rounded,
+            isSelected: selectedActivityLevel == 'high',
+            color: const Color(0xFFE8A0BF), // Soft pink
+            onTap: () => onActivityLevelSelected('high'),
+          ),
+          
+          const Spacer(flex: 3),
+          
+          // Continue Button
+          OnboardingPrimaryButton(
+            label: 'Devam Et',
+            onPressed: selectedActivityLevel != null
+                ? () async {
+                    final userProvider = Provider.of<UserProvider>(context, listen: false);
+                    await userProvider.updateProfile(activityLevel: selectedActivityLevel);
+                    onNext?.call();
+                  }
+                : null,
+          ),
+          
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
 
-/// Activity level selection button widget.
-class _ActivityButton extends StatelessWidget {
+/// Custom activity option card with unique color accent
+class _ActivityOptionCard extends StatelessWidget {
   final String title;
+  final String subtitle;
   final IconData icon;
   final bool isSelected;
+  final Color color;
   final VoidCallback onTap;
 
-  const _ActivityButton({
+  const _ActivityOptionCard({
     required this.title,
+    required this.subtitle,
     required this.icon,
     required this.isSelected,
+    required this.color,
     required this.onTap,
   });
 
@@ -136,57 +110,112 @@ class _ActivityButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.softPinkButton.withValues(alpha: 0.1)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isSelected 
-                ? AppColors.softPinkButton 
-                : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
+            color: isSelected ? color : OnboardingTheme.borderColor,
+            width: isSelected ? 2 : 1.5,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.softPinkButton.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    spreadRadius: 2,
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 16,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 6),
                   ),
                 ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 5,
-                    spreadRadius: 1,
-                  ),
-                ],
+              : OnboardingTheme.softShadow,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Sol: Metin
-            Text(
-              title,
-              style: AppTextStyles.heading3.copyWith(
-                fontSize: 20,
-                color: isSelected 
-                    ? AppColors.softPinkButton 
-                    : const Color(0xFF4A5568),
+            // Icon Container
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                gradient: isSelected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [color, color.withValues(alpha: 0.8)],
+                      )
+                    : null,
+                color: isSelected ? null : color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                icon,
+                size: 28,
+                color: isSelected ? Colors.white : color,
               ),
             ),
             
-            // Sağ: İkon
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected 
-                  ? AppColors.softPinkButton 
-                  : Colors.grey[400],
+            const SizedBox(width: 16),
+            
+            // Text Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: OnboardingTheme.optionLabelStyle.copyWith(
+                      color: isSelected ? color : OnboardingTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: OnboardingTheme.subtitleStyle.copyWith(
+                      fontSize: 13,
+                      color: OnboardingTheme.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Checkmark
+            AnimatedScale(
+              scale: isSelected ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutBack,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -194,4 +223,3 @@ class _ActivityButton extends StatelessWidget {
     );
   }
 }
-

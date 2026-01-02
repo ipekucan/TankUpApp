@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/water_provider.dart';
+import '../../providers/daily_hydration_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/achievement_provider.dart';
 import '../../providers/challenge_provider.dart';
 import '../../utils/challenge_logic_helper.dart';
 import '../../core/constants/app_constants.dart';
@@ -66,17 +65,15 @@ class ChallengePanel extends StatelessWidget {
                   padding: AppConstants.challengePanelContentPadding,
                   child: Builder(
                     builder: (context) {
-                      return Consumer4<WaterProvider, UserProvider, AchievementProvider,
-                          ChallengeProvider>(
-                        builder: (context, waterProvider, userProvider, achievementProvider,
+                      return Consumer3<DailyHydrationProvider, UserProvider, ChallengeProvider>(
+                        builder: (context, dailyHydrationProvider, userProvider,
                             challengeProvider, child) {
                           return Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               _buildGamifiedMapContent(
-                                waterProvider,
+                                dailyHydrationProvider,
                                 userProvider,
-                                achievementProvider,
                                 challengeProvider,
                               ),
                               
@@ -110,9 +107,8 @@ class ChallengePanel extends StatelessWidget {
 
   /// Build the gamified map content with S-shaped path and nodes.
   Widget _buildGamifiedMapContent(
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     UserProvider userProvider,
-    AchievementProvider achievementProvider,
     ChallengeProvider challengeProvider,
   ) {
     // Get daily challenges (only daily tasks for the map)
@@ -125,7 +121,7 @@ class ChallengePanel extends StatelessWidget {
               .firstWhere((c) => c.id == challenge.id, orElse: () => challenge);
           return ChallengeLogicHelper.calculateChallengeState(
             baseChallenge,
-            waterProvider,
+            dailyHydrationProvider,
             userProvider,
             challengeProvider,
           );

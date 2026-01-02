@@ -5,9 +5,8 @@ import 'package:wave/wave.dart';
 import 'package:wave/config.dart';
 import '../utils/app_colors.dart';
 import '../utils/unit_converter.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/achievement_provider.dart';
 import '../models/drink_model.dart';
 import 'package:provider/provider.dart';
 
@@ -303,12 +302,13 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
   Future<void> _addDrink() async {
     if (_currentAmount <= 0) return;
 
-    final waterProvider = Provider.of<WaterProvider>(context, listen: false);
+    final dailyHydrationProvider =
+        Provider.of<DailyHydrationProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final achievementProvider = Provider.of<AchievementProvider>(context, listen: false);
 
     final water = DrinkData.getDrinks().firstWhere((d) => d.id == 'water');
-    final result = await waterProvider.drink(water, _currentAmount, context: context);
+    final result =
+        await dailyHydrationProvider.drink(water, _currentAmount, context: context);
 
     if (!mounted) return;
 
@@ -347,55 +347,8 @@ class _InteractiveCupModalState extends State<InteractiveCupModal>
         ),
       );
 
-      if (result.isFirstDrink) {
-        final coins = await achievementProvider.checkFirstStep();
-        if (coins > 0) {
-          await waterProvider.addCoins(coins);
-          await userProvider.addAchievement('first_step');
-        }
-      }
-
-      if (!mounted) return;
-
-      final wasGoalReachedBefore = achievementProvider.isAchievementUnlocked('daily_goal');
-      if (waterProvider.hasReachedDailyGoal && !wasGoalReachedBefore) {
-        final coins = await achievementProvider.checkDailyGoal();
-        if (coins > 0) {
-          await waterProvider.addCoins(coins);
-          await userProvider.addAchievement('daily_goal');
-          await userProvider.updateConsecutiveDays(true);
-        }
-      } else if (waterProvider.hasReachedDailyGoal) {
+      if (dailyHydrationProvider.hasReachedDailyGoal) {
         await userProvider.updateConsecutiveDays(true);
-      }
-
-      if (!mounted) return;
-
-      final totalWater = userProvider.userData.totalWaterConsumed;
-      final wasWaterMasterUnlocked = achievementProvider.isAchievementUnlocked('water_master');
-      final waterMasterCoins = await achievementProvider.checkWaterMaster(totalWater);
-      if (waterMasterCoins > 0 && !wasWaterMasterUnlocked) {
-        await waterProvider.addCoins(waterMasterCoins);
-        await userProvider.addAchievement('water_master');
-      }
-
-      if (!mounted) return;
-
-      final consecutiveDays = userProvider.consecutiveDays;
-      final wasStreak3Unlocked = achievementProvider.isAchievementUnlocked('streak_3');
-      final streak3Coins = await achievementProvider.checkStreak3(consecutiveDays);
-      if (streak3Coins > 0 && !wasStreak3Unlocked) {
-        await waterProvider.addCoins(streak3Coins);
-        await userProvider.addAchievement('streak_3');
-      }
-
-      if (!mounted) return;
-
-      final wasStreak7Unlocked = achievementProvider.isAchievementUnlocked('streak_7');
-      final streak7Coins = await achievementProvider.checkStreak7(consecutiveDays);
-      if (streak7Coins > 0 && !wasStreak7Unlocked) {
-        await waterProvider.addCoins(streak7Coins);
-        await userProvider.addAchievement('streak_7');
       }
 
       if (!mounted) return;

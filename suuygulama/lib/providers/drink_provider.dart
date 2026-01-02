@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/drink_model.dart';
+import '../core/services/logger_service.dart';
 
 class DrinkProvider extends ChangeNotifier {
   static const String _customDrinksKey = 'custom_drinks';
@@ -69,7 +70,8 @@ class DrinkProvider extends ChangeNotifier {
             .toList();
         notifyListeners();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to load custom drinks', e, stackTrace);
       _customDrinks = [];
     }
   }
@@ -91,7 +93,8 @@ class DrinkProvider extends ChangeNotifier {
       }
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to load favorite drinks', e, stackTrace);
       _favoriteDrinkIds = [];
       _favoriteDrinkAmounts = {};
     }
@@ -104,8 +107,9 @@ class DrinkProvider extends ChangeNotifier {
       final favoriteAmountsJson = jsonEncode(_favoriteDrinkAmounts);
       await prefs.setString(_favoriteDrinksKey, favoriteIdsJson);
       await prefs.setString('${_favoriteDrinksKey}_amounts', favoriteAmountsJson);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save custom drinks', e, stackTrace);
     }
   }
 
@@ -169,7 +173,8 @@ class DrinkProvider extends ChangeNotifier {
       }
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to load quick access drinks', e, stackTrace);
       _quickAccessDrinkIds = [];
       _quickAccessDrinkAmounts = {};
     }
@@ -182,8 +187,9 @@ class DrinkProvider extends ChangeNotifier {
       final quickAccessAmountsJson = jsonEncode(_quickAccessDrinkAmounts);
       await prefs.setString(_quickAccessDrinksKey, quickAccessIdsJson);
       await prefs.setString('${_quickAccessDrinksKey}_amounts', quickAccessAmountsJson);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save custom drinks', e, stackTrace);
     }
   }
 
@@ -238,8 +244,9 @@ class DrinkProvider extends ChangeNotifier {
         _customDrinks.map((d) => d.toJson()).toList(),
       );
       await prefs.setString(_customDrinksKey, customDrinksJson);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save custom drinks', e, stackTrace);
     }
   }
 
@@ -272,7 +279,8 @@ class DrinkProvider extends ChangeNotifier {
   Drink? getDrinkById(String id) {
     try {
       return allDrinks.firstWhere((d) => d.id == id);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to get drink by ID: $id', e, stackTrace);
       return null;
     }
   }

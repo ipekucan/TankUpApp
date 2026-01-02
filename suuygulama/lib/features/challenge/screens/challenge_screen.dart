@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/water_provider.dart';
+import '../../../providers/daily_hydration_provider.dart';
 import '../../../utils/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
@@ -76,8 +76,8 @@ class ChallengeScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          Consumer<WaterProvider>(
-            builder: (context, waterProvider, _) {
+          Consumer<DailyHydrationProvider>(
+            builder: (context, dailyHydrationProvider, _) {
               return Padding(
                 padding: EdgeInsets.only(right: AppConstants.defaultPadding),
                 child: Center(
@@ -100,7 +100,7 @@ class ChallengeScreen extends StatelessWidget {
                         ),
                         SizedBox(width: AppConstants.mediumPadding),
                         Text(
-                          '${waterProvider.tankCoins}',
+                          '${dailyHydrationProvider.tankCoins}',
                           style: AppTextStyles.bodyLarge.copyWith(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,

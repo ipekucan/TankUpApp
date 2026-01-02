@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
+import '../core/services/logger_service.dart';
 import 'onboarding_screen.dart';
 import 'main_navigation_screen.dart';
 
@@ -96,8 +97,9 @@ class _SplashScreenState extends State<SplashScreen>
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda onboarding göster
+      LoggerService.logError('Failed to check onboarding status', e, stackTrace);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),

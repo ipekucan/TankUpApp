@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
 import '../utils/unit_converter.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../providers/user_provider.dart';
 import 'reset_time_screen.dart';
 import '../theme/app_text_styles.dart';
@@ -13,6 +13,7 @@ import '../widgets/profile/weight_dialog.dart';
 import '../widgets/profile/activity_dialog.dart';
 import '../widgets/profile/climate_dialog.dart';
 import '../core/constants/app_constants.dart';
+import '../core/services/logger_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -41,8 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Consumer2<WaterProvider, UserProvider>(
-          builder: (context, waterProvider, userProvider, child) {
+        child: Consumer2<DailyHydrationProvider, UserProvider>(
+          builder: (context, dailyHydrationProvider, userProvider, child) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -88,19 +89,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Consumer<UserProvider>(
                       builder: (context, userProvider, child) {
                         return FutureBuilder<bool>(
-                          future: _isGoalCustomSet(waterProvider),
+                          future: _isGoalCustomSet(dailyHydrationProvider),
                           builder: (context, snapshot) {
                             final isCustomGoal = snapshot.data ?? false;
                             String goalValue = 'Belirtilmemiş';
                             if (isCustomGoal) {
-                              goalValue = UnitConverter.formatVolume(waterProvider.dailyGoal, userProvider.isMetric);
+                              goalValue = UnitConverter.formatVolume(
+                                dailyHydrationProvider.dailyGoal,
+                                userProvider.isMetric,
+                              );
                             }
                             return _buildProfileButton(
                               icon: Icons.flag,
                               label: 'Hedef',
                               value: goalValue,
                               isPlaceholder: !isCustomGoal,
-                              onTap: () => _showCustomGoalDialog(context, waterProvider),
+                              onTap: () => _showCustomGoalDialog(context, dailyHydrationProvider),
                             );
                           },
                         );
@@ -387,7 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // Hedefin kullanıcı tarafından özelleştirilip özelleştirilmediğini kontrol et
-  Future<bool> _isGoalCustomSet(WaterProvider waterProvider) async {
+  Future<bool> _isGoalCustomSet(DailyHydrationProvider dailyHydrationProvider) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       // Eğer 'custom_goal_set' flag'i varsa, kullanıcı manuel olarak ayarlamıştır
@@ -396,13 +400,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Eğer flag yoksa, dailyGoal'un varsayılan değerlerden farklı olup olmadığını kontrol et
       if (!isCustomSet) {
         // Varsayılan değerler: 5000.0 (5L) veya 2000.0 (2L - skip onboarding)
-        final currentGoal = waterProvider.dailyGoal;
+        final currentGoal = dailyHydrationProvider.dailyGoal;
         // Eğer varsayılan değerlerden biri değilse, kullanıcı ayarlamış olabilir
         return currentGoal != 5000.0 && currentGoal != 2000.0;
       }
       
       return isCustomSet;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.logError('Failed to check if daily goal is custom set', e, stackTrace);
       return false;
     }
   }
@@ -438,9 +443,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
 
-  void _showCustomGoalDialog(BuildContext context, WaterProvider waterProvider) {
+  void _showCustomGoalDialog(BuildContext context, DailyHydrationProvider dailyHydrationProvider) {
     final controller = TextEditingController(
-      text: (waterProvider.dailyGoal / 1000).toStringAsFixed(1),
+      text: (dailyHydrationProvider.dailyGoal / 1000).toStringAsFixed(1),
     );
     
     showDialog(
@@ -486,7 +491,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (!mounted) return;
               final goal = double.tryParse(controller.text);
               if (goal != null && goal > 0 && goal <= 10) {
-                await waterProvider.updateDailyGoal(goal * 1000); // ml'ye çevir
+                await dailyHydrationProvider.updateDailyGoal(goal * 1000); // ml'ye çevir
                 
                 // Kullanıcı hedef belirledi olarak işaretle
                 final prefs = await SharedPreferences.getInstance();

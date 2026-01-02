@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/water_provider.dart';
+import '../../providers/history_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../services/chart_data_service.dart' show ChartDataService, ChartPeriod;
+import '../../services/chart_data_service.dart'
+    show ChartDataService, ChartDataPoint, ChartPeriod;
 import '../../utils/drink_helpers.dart';
 import '../../utils/unit_converter.dart';
 import '../../utils/date_helpers.dart';
@@ -31,6 +32,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
   ChartPeriod _selectedPeriod = ChartPeriod.day;
   Set<String> _selectedDrinkFilters = {}; // Boş = Tümü
   int? _touchedBarIndex;
+  List<ChartDataPoint> _lastChartData = const <ChartDataPoint>[];
 
   @override
   void initState() {
@@ -60,18 +62,17 @@ class _StatisticsTabState extends State<StatisticsTab> {
         
         // Scrollable Content
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              children: [
-                // Unified Statistics Card
-                _buildUnifiedStatisticsCard(),
-                const SizedBox(height: 20),
-                
-                // Drink History List
-                _buildDrinkHistoryList(),
-              ],
-            ),
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                sliver: SliverToBoxAdapter(
+                  child: _buildUnifiedStatisticsCard(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              _buildDrinkHistorySliver(),
+            ],
           ),
         ),
       ],
@@ -79,20 +80,37 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 
   /// Unified Statistics Card with filter button, period selector, and chart
+  /// Premium design with subtle gradient background and enhanced shadows
   Widget _buildUnifiedStatisticsCard() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F6FA),
-        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFF5F9FF), // Very light blue tint
+            Color(0xFFF0F7FE), // Slightly more blue but still light
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: const Color(0xFFE3EEF9),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           // Row 1: Filter Button (Left) + Period Selector (Right)
@@ -101,7 +119,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
             children: [
               // Circular Beverage Filter Button
               _buildFilterButton(context),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               // Time Segment Control (Period Selector) - Expanded to fill space
               Expanded(
                 child: _buildCompactPeriodSelector(),
@@ -109,39 +127,52 @@ class _StatisticsTabState extends State<StatisticsTab> {
             ],
           ),
           
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           
-          // Dynamic Range Label (Centered, Bold)
+          // Dynamic Range Label (Centered, No background)
           Center(
             child: Text(
               _getRangeLabel(),
               style: const TextStyle(
-                color: Color(0xFF4A5568),
-                fontSize: 14.0,
-                fontWeight: FontWeight.bold,
+                color: Color(0xFF475569),
+                fontSize: 13.0,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
               ),
             ),
           ),
           
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           
           // Row 2: Chart (compact height, without title)
           SizedBox(
             height: 180.0,
-            child: Consumer<WaterProvider>(
-              builder: (context, waterProvider, child) {
-                final chartData = ChartDataService.buildChartData(
-                  waterProvider,
-                  _selectedPeriod,
-                  _selectedDrinkFilters,
-                );
-                return ChartView(
-                  chartData: chartData,
+            child: Selector<HistoryProvider, _ChartComputeKey>(
+              selector: (context, historyProvider) => _ChartComputeKey(
+                historyRevision: historyProvider.historyRevision,
+                period: _selectedPeriod,
+                filtersKey: _filtersKey(_selectedDrinkFilters),
+              ),
+              builder: (context, computeKey, child) {
+                final historyProvider = context.read<HistoryProvider>();
+                return _DeferredChartView(
+                  historyProvider: historyProvider,
+                  computeKey: computeKey,
                   selectedPeriod: _selectedPeriod,
+                  selectedDrinkFilters: _selectedDrinkFilters,
+                  initialChartData: _lastChartData,
                   touchedBarIndex: _touchedBarIndex ?? -1,
-                  onBarTouched: (index) {
+                  onBarTouched: (int? index) {
                     setState(() {
                       _touchedBarIndex = index;
+                    });
+                  },
+                  onChartDataComputed: (data) {
+                    if (!mounted) return;
+                    // Avoid unnecessary setState loops.
+                    if (identical(_lastChartData, data)) return;
+                    setState(() {
+                      _lastChartData = data;
                     });
                   },
                 );
@@ -154,16 +185,24 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 
   /// Compact Period Selector with short labels (Gün, Hafta, Ay)
+  /// Wrapped in a visible light gray container
   Widget _buildCompactPeriodSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(child: _buildCompactPeriodButton('Gün', ChartPeriod.day)),
-        const SizedBox(width: 8),
-        Expanded(child: _buildCompactPeriodButton('Hafta', ChartPeriod.week)),
-        const SizedBox(width: 8),
-        Expanded(child: _buildCompactPeriodButton('Ay', ChartPeriod.month)),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8E8), // More visible light gray
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(child: _buildCompactPeriodButton('Gün', ChartPeriod.day)),
+          const SizedBox(width: 4),
+          Expanded(child: _buildCompactPeriodButton('Hafta', ChartPeriod.week)),
+          const SizedBox(width: 4),
+          Expanded(child: _buildCompactPeriodButton('Ay', ChartPeriod.month)),
+        ],
+      ),
     );
   }
 
@@ -176,21 +215,31 @@ class _StatisticsTabState extends State<StatisticsTab> {
           _touchedBarIndex = null;
         });
       },
-      child: Container(
-        height: 38.0,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        height: 34.0,
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
         decoration: BoxDecoration(
-          color: isActive ? Colors.black : Colors.white,
-          borderRadius: BorderRadius.circular(19),
-          border: isActive ? null : Border.all(color: Colors.grey[300]!, width: 1),
+          color: isActive ? const Color(0xFF2D3748) : Colors.transparent,
+          borderRadius: BorderRadius.circular(17),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? Colors.white : Colors.grey[800],
-            fontWeight: FontWeight.w600,
-            fontSize: 14.0,
+            color: isActive ? Colors.white : const Color(0xFF4B5563), // Darker gray when inactive
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+            fontSize: 13.0,
             height: 1.0,
           ),
           textAlign: TextAlign.center,
@@ -209,200 +258,80 @@ class _StatisticsTabState extends State<StatisticsTab> {
       case ChartPeriod.week:
         return 'Son 4 Hafta';
       case ChartPeriod.month:
-        return 'Son 12 Ay';
+        return 'Son 6 Ay';
     }
   }
 
-  /// Drink History List (Vertical ListView)
-  Widget _buildDrinkHistoryList() {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
-        // Get date range based on selected period and touched bar
-        DateTime? selectedStartDate;
-        DateTime? selectedEndDate;
-
-        if (_touchedBarIndex != null && _touchedBarIndex! >= 0) {
-          final chartData = ChartDataService.buildChartData(
-            waterProvider,
-            _selectedPeriod,
-            _selectedDrinkFilters,
-          );
-          if (_touchedBarIndex! < chartData.length) {
-            final dataPoint = chartData[_touchedBarIndex!];
-            selectedStartDate = dataPoint.date;
-            selectedEndDate = dataPoint.date;
-          }
-        } else {
-          // Default to current period
-          switch (_selectedPeriod) {
-            case ChartPeriod.day:
-              selectedStartDate = DateTime.now();
-              selectedEndDate = selectedStartDate;
-              break;
-            case ChartPeriod.week:
-              final today = DateTime.now();
-              final weekStart = today.subtract(
-                Duration(days: today.weekday - 1),
-              );
-              selectedStartDate = weekStart;
-              selectedEndDate = weekStart.add(const Duration(days: 6));
-              break;
-            case ChartPeriod.month:
-              final today = DateTime.now();
-              selectedStartDate = DateTime(today.year, today.month, 1);
-              selectedEndDate = DateTime(today.year, today.month + 1, 0);
-              break;
-          }
-        }
-
-        if (selectedStartDate == null || selectedEndDate == null) {
-          return const SizedBox.shrink();
-        }
-
-        final entries = waterProvider.getDrinkEntriesForDateRange(
-          selectedStartDate,
-          selectedEndDate,
-        );
-
-        // Apply filters
-        final filteredEntries = _selectedDrinkFilters.isEmpty
-            ? entries
-            : entries
-                .where((e) => _selectedDrinkFilters.contains(e.drinkId))
-                .toList();
-
-        if (filteredEntries.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Text(
-                'Henüz sıvı alımı yapılmadı.',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 18.0,
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Sort entries by timestamp (newest first)
-        final sortedEntries = List.from(filteredEntries)
-          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...sortedEntries.map((entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: _buildDrinkHistoryItem(
-                    entry,
-                    userProvider.isMetric,
-                  ),
-                )),
-          ],
+  /// Drink History list as a SliverList (lazy rendering) to prevent UI freezes on resume.
+  Widget _buildDrinkHistorySliver() {
+    return Selector<HistoryProvider, _HistoryListComputeKey>(
+      selector: (context, historyProvider) => _HistoryListComputeKey(
+        historyRevision: historyProvider.historyRevision,
+        period: _selectedPeriod,
+        filtersKey: _filtersKey(_selectedDrinkFilters),
+        touchedBarIndex: _touchedBarIndex,
+        chartKey: _ChartComputeKey(
+          historyRevision: historyProvider.historyRevision,
+          period: _selectedPeriod,
+          filtersKey: _filtersKey(_selectedDrinkFilters),
+        ),
+      ),
+      builder: (context, computeKey, child) {
+        final historyProvider = context.read<HistoryProvider>();
+        return _DeferredHistoryListSliver(
+          historyProvider: historyProvider,
+          computeKey: computeKey,
+          selectedPeriod: _selectedPeriod,
+          selectedDrinkFilters: _selectedDrinkFilters,
+          touchedBarIndex: _touchedBarIndex,
+          chartData: _lastChartData,
         );
       },
     );
   }
 
-  /// Individual Drink History List Item (ListTile style)
-  Widget _buildDrinkHistoryItem(dynamic entry, bool isMetric) {
-    final drinkId = entry.drinkId;
-    final amount = entry.amount;
-    final timestamp = entry.timestamp;
-    final emoji = DrinkHelpers.getEmoji(drinkId);
-    final color = ChartDataService.drinkColors[drinkId] ?? Colors.grey;
-    final drinkName = DrinkHelpers.getName(drinkId);
-
-    // Format time from timestamp (timestamp is already a DateTime)
-    final timeString = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              emoji,
-              style: const TextStyle(fontSize: 20),
-            ),
-          ),
-        ),
-        title: Text(
-          drinkName,
-          style: AppTextStyles.bodyLarge.copyWith(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Text(
-          UnitConverter.formatVolume(amount, isMetric),
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: color,
-            fontSize: 12,
-          ),
-        ),
-        trailing: Text(
-          timeString,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: Colors.grey[600],
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
+  // Note: history item UI is implemented as a top-level helper to allow reuse from slivers.
 
   /// Filter Button (Circular Beverage Filter)
   Widget _buildFilterButton(BuildContext context) {
+    final hasFilters = _selectedDrinkFilters.isNotEmpty;
     return GestureDetector(
       onTap: () => _showFilterBottomSheet(context),
-      child: Container(
-        width: 48,
-        height: 48,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 46,
+        height: 46,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _selectedDrinkFilters.isEmpty
-              ? Colors.grey[200]
-              : AppColors.softPinkButton.withValues(alpha: 0.2),
+          color: hasFilters
+              ? const Color(0xFF4F8EF7).withValues(alpha: 0.15)
+              : Colors.white,
           border: Border.all(
-            color: _selectedDrinkFilters.isEmpty
-                ? Colors.grey[400]!
-                : AppColors.softPinkButton,
-            width: 2,
+            color: hasFilters
+                ? const Color(0xFF4F8EF7)
+                : const Color(0xFFE2E8F0),
+            width: 1.5,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
             _buildCustomDrinkIcon(),
             Positioned(
-              bottom: 4,
+              bottom: 2,
               child: Icon(
-                Icons.keyboard_arrow_down,
-                size: 18,
-                color: _selectedDrinkFilters.isEmpty
-                    ? Colors.grey[600]
-                    : AppColors.softPinkButton,
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: hasFilters
+                    ? const Color(0xFF4F8EF7)
+                    : const Color(0xFF94A3B8),
               ),
             ),
           ],
@@ -472,11 +401,11 @@ class _StatisticsTabState extends State<StatisticsTab> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
         ),
-        child: Consumer<WaterProvider>(
-          builder: (context, waterProvider, child) {
+        child: Consumer<HistoryProvider>(
+          builder: (context, historyProvider, child) {
             final today = DateTime.now();
             final todayKey = DateHelpers.toDateKey(today);
-            final todayEntries = waterProvider.getDrinkEntriesForDate(todayKey);
+            final todayEntries = historyProvider.getDrinkEntriesForDate(todayKey);
 
             return _FilterBottomSheetContent(
               initialFilters: _selectedDrinkFilters,
@@ -485,7 +414,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                   _selectedDrinkFilters = filters;
                 });
               },
-              waterProvider: waterProvider,
+              historyProvider: historyProvider,
               todayEntries: todayEntries,
               drinkAmounts: {},
             );
@@ -496,18 +425,365 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 }
 
+String _filtersKey(Set<String> filters) {
+  if (filters.isEmpty) return '';
+  final list = filters.toList()..sort();
+  return list.join(',');
+}
+
+class _HistoryListComputeKey {
+  final int historyRevision;
+  final ChartPeriod period;
+  final String filtersKey;
+  final int? touchedBarIndex;
+  final _ChartComputeKey chartKey;
+
+  const _HistoryListComputeKey({
+    required this.historyRevision,
+    required this.period,
+    required this.filtersKey,
+    required this.touchedBarIndex,
+    required this.chartKey,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is _HistoryListComputeKey &&
+        other.historyRevision == historyRevision &&
+        other.period == period &&
+        other.filtersKey == filtersKey &&
+        other.touchedBarIndex == touchedBarIndex &&
+        other.chartKey == chartKey;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(historyRevision, period, filtersKey, touchedBarIndex, chartKey);
+}
+
+class _ChartComputeKey {
+  final int historyRevision;
+  final ChartPeriod period;
+  final String filtersKey;
+
+  const _ChartComputeKey({
+    required this.historyRevision,
+    required this.period,
+    required this.filtersKey,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ChartComputeKey &&
+        other.historyRevision == historyRevision &&
+        other.period == period &&
+        other.filtersKey == filtersKey;
+  }
+
+  @override
+  int get hashCode => Object.hash(historyRevision, period, filtersKey);
+}
+
+class _DeferredHistoryListSliver extends StatefulWidget {
+  final HistoryProvider historyProvider;
+  final _HistoryListComputeKey computeKey;
+  final ChartPeriod selectedPeriod;
+  final Set<String> selectedDrinkFilters;
+  final int? touchedBarIndex;
+  final List<ChartDataPoint> chartData;
+
+  const _DeferredHistoryListSliver({
+    required this.historyProvider,
+    required this.computeKey,
+    required this.selectedPeriod,
+    required this.selectedDrinkFilters,
+    required this.touchedBarIndex,
+    required this.chartData,
+  });
+
+  @override
+  State<_DeferredHistoryListSliver> createState() => _DeferredHistoryListSliverState();
+}
+
+class _DeferredHistoryListSliverState extends State<_DeferredHistoryListSliver> {
+  List<dynamic> _entries = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleRecompute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DeferredHistoryListSliver oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.computeKey != widget.computeKey) {
+      _scheduleRecompute();
+    }
+  }
+
+  void _scheduleRecompute() {
+    final scheduledKey = widget.computeKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (scheduledKey != widget.computeKey) return;
+
+      DateTime? selectedStartDate;
+      DateTime? selectedEndDate;
+
+      if (widget.touchedBarIndex != null &&
+          widget.touchedBarIndex! >= 0 &&
+          widget.touchedBarIndex! < widget.chartData.length) {
+        final dataPoint = widget.chartData[widget.touchedBarIndex!];
+        selectedStartDate = dataPoint.date;
+        selectedEndDate = dataPoint.date;
+      } else {
+        switch (widget.selectedPeriod) {
+          case ChartPeriod.day:
+            selectedStartDate = DateTime.now();
+            selectedEndDate = selectedStartDate;
+            break;
+          case ChartPeriod.week:
+            final today = DateTime.now();
+            final weekStart = today.subtract(Duration(days: today.weekday - 1));
+            selectedStartDate = weekStart;
+            selectedEndDate = weekStart.add(const Duration(days: 6));
+            break;
+          case ChartPeriod.month:
+            final today = DateTime.now();
+            selectedStartDate = DateTime(today.year, today.month, 1);
+            selectedEndDate = DateTime(today.year, today.month + 1, 0);
+            break;
+        }
+      }
+
+      final entries = widget.historyProvider.getDrinkEntriesForDateRange(
+        selectedStartDate,
+        selectedEndDate,
+      );
+
+      final filteredEntries = widget.selectedDrinkFilters.isEmpty
+          ? entries
+          : entries.where((e) => widget.selectedDrinkFilters.contains(e.drinkId)).toList();
+
+      final sortedEntries = List.from(filteredEntries)
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      if (!mounted) return;
+      if (scheduledKey != widget.computeKey) return;
+
+      setState(() {
+        _entries = sortedEntries;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        if (_entries.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Text(
+                  'Henüz sıvı alımı yapılmadı.',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 18.0,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final entry = _entries[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: _buildDrinkHistoryItemWidget(entry, userProvider.isMetric),
+              );
+            },
+            childCount: _entries.length,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Individual Drink History List Item (ListTile style)
+Widget _buildDrinkHistoryItemWidget(dynamic entry, bool isMetric) {
+  final drinkId = entry.drinkId;
+  final amount = entry.amount;
+  final timestamp = entry.timestamp;
+  final emoji = DrinkHelpers.getEmoji(drinkId);
+  final color = ChartDataService.drinkColors[drinkId] ?? Colors.grey;
+  final drinkName = DrinkHelpers.getName(drinkId);
+
+  // Format time from timestamp (timestamp is already a DateTime)
+  final timeString =
+      '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+
+  return Container(
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFFF5F9FF), // Very light blue tint (same as statistics card)
+          Color(0xFFF0F7FE), // Slightly more blue but still light
+        ],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: const Color(0xFFE3EEF9),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 20),
+          ),
+        ),
+      ),
+      title: Text(
+        drinkName,
+        style: AppTextStyles.bodyLarge.copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        UnitConverter.formatVolume(amount, isMetric),
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: color,
+          fontSize: 12,
+        ),
+      ),
+      trailing: Text(
+        timeString,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: Colors.grey[600],
+          fontSize: 12,
+        ),
+      ),
+    ),
+  );
+}
+
+class _DeferredChartView extends StatefulWidget {
+  final HistoryProvider historyProvider;
+  final _ChartComputeKey computeKey;
+  final ChartPeriod selectedPeriod;
+  final Set<String> selectedDrinkFilters;
+  final List<ChartDataPoint> initialChartData;
+  final int touchedBarIndex;
+  final ValueChanged<int?> onBarTouched;
+  final ValueChanged<List<ChartDataPoint>>? onChartDataComputed;
+
+  const _DeferredChartView({
+    required this.historyProvider,
+    required this.computeKey,
+    required this.selectedPeriod,
+    required this.selectedDrinkFilters,
+    required this.initialChartData,
+    required this.touchedBarIndex,
+    required this.onBarTouched,
+    this.onChartDataComputed,
+  });
+
+  @override
+  State<_DeferredChartView> createState() => _DeferredChartViewState();
+}
+
+class _DeferredChartViewState extends State<_DeferredChartView> {
+  late List<ChartDataPoint> _chartData;
+
+  @override
+  void initState() {
+    super.initState();
+    _chartData = widget.initialChartData;
+    _scheduleRecompute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DeferredChartView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.computeKey != widget.computeKey) {
+      _scheduleRecompute();
+    }
+  }
+
+  void _scheduleRecompute() {
+    final scheduledKey = widget.computeKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // If inputs changed again before this callback executed, skip and let the latest schedule run.
+      if (scheduledKey != widget.computeKey) return;
+
+      final data = ChartDataService.buildChartData(
+        widget.historyProvider,
+        widget.selectedPeriod,
+        widget.selectedDrinkFilters,
+      );
+
+      if (!mounted) return;
+      // If inputs changed while computing, don't apply stale results.
+      if (scheduledKey != widget.computeKey) return;
+
+      setState(() {
+        _chartData = data;
+      });
+      widget.onChartDataComputed?.call(data);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChartView(
+      chartData: _chartData,
+      selectedPeriod: widget.selectedPeriod,
+      touchedBarIndex: widget.touchedBarIndex,
+      onBarTouched: widget.onBarTouched,
+    );
+  }
+}
+
 // Filter Bottom Sheet Content (reuse from HistoryScreen)
 class _FilterBottomSheetContent extends StatefulWidget {
   final Set<String> initialFilters;
   final Function(Set<String>) onApply;
-  final WaterProvider waterProvider;
+  final HistoryProvider historyProvider;
   final List todayEntries;
   final Map<String, double> drinkAmounts;
 
   const _FilterBottomSheetContent({
     required this.initialFilters,
     required this.onApply,
-    required this.waterProvider,
+    required this.historyProvider,
     required this.todayEntries,
     required this.drinkAmounts,
   });

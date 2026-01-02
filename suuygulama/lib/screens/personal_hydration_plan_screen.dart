@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
-import '../providers/water_provider.dart';
+import '../providers/daily_hydration_provider.dart';
 import '../services/notification_service.dart';
 import 'main_navigation_screen.dart';
+import '../core/services/logger_service.dart';
 
 class PersonalHydrationPlanScreen extends StatelessWidget {
   final String? wakeUpTime;
@@ -22,8 +23,8 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundSubtle,
       body: SafeArea(
-        child: Consumer2<UserProvider, WaterProvider>(
-          builder: (context, userProvider, waterProvider, child) {
+        child: Consumer2<UserProvider, DailyHydrationProvider>(
+          builder: (context, userProvider, dailyHydrationProvider, child) {
             // Bilimsel hesaplamalar
             final bmi = userProvider.bmi;
             final idealGoal = userProvider.calculateIdealWaterGoal();
@@ -69,7 +70,7 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => _confirmPlan(context, userProvider, waterProvider, idealGoal),
+                      onPressed: () => _confirmPlan(context, userProvider, dailyHydrationProvider, idealGoal),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.softPinkButton,
                         foregroundColor: Colors.white,
@@ -421,7 +422,7 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
   Future<void> _confirmPlan(
     BuildContext context,
     UserProvider userProvider,
-    WaterProvider waterProvider,
+    DailyHydrationProvider dailyHydrationProvider,
     double idealGoal,
   ) async {
     if (!context.mounted) return;
@@ -432,10 +433,10 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
       await prefs.setBool('onboarding_completed', true);
       
       // Coin'i 0 yap
-      await waterProvider.resetCoins();
+      await dailyHydrationProvider.resetCoins();
       
       // İdeal su hedefini ayarla
-      await waterProvider.updateDailyGoal(idealGoal);
+      await dailyHydrationProvider.updateDailyGoal(idealGoal);
       
       if (!context.mounted) return;
       
@@ -455,8 +456,9 @@ class PersonalHydrationPlanScreen extends StatelessWidget {
         MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
         (route) => false,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Hata durumunda sessizce devam et
+      LoggerService.logError('Failed to save hydration plan', e, stackTrace);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
