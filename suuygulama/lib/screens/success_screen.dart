@@ -8,7 +8,6 @@ import '../utils/date_helpers.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/success/statistics_tab.dart';
 import '../widgets/success/achievements_tab.dart';
-import '../core/constants/app_constants.dart';
 
 class SuccessScreen extends StatefulWidget {
   const SuccessScreen({super.key});
@@ -63,22 +62,55 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundSubtle,
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Üst Bilgi - Tarih ve Kapatma Butonu
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Column(
+            children: [
+              // Header Row: Toggle Bar (Left) + Close Button (Right)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Toggle Bar (Expanded to fill available space)
                   Expanded(
-                    child: Text(
-                      _getFormattedDate(),
-                      style: AppTextStyles.dateText,
+                    child: Container(
+                      height: 46.0,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicator: BoxDecoration(
+                          color: AppColors.softPinkButton,
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        dividerColor: Colors.transparent,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: const Color(0xFF4A5568),
+                        labelStyle: AppTextStyles.tabLabelSelected,
+                        unselectedLabelStyle: AppTextStyles.tabLabelUnselected,
+                        tabs: const [
+                          Tab(text: 'İstatistikler'),
+                          Tab(text: 'Başarılar'),
+                        ],
+                      ),
                     ),
                   ),
-                  // Kapatma Butonu (X)
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Close Button (Compact Circle)
                   GestureDetector(
                     onTap: () {
                       if (mounted) {
@@ -86,79 +118,34 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
                       }
                     },
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.grey[200],
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
                       child: const Icon(
                         Icons.close,
                         color: Color(0xFF4A5568),
-                        size: 24,
+                        size: 20.0,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-            
-            // Üçlü Navigasyon - Tab Butonları
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppConstants.defaultPadding,
-                vertical: AppConstants.mediumSpacing,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TabBar(
+              
+              // İçerik
+              Expanded(
+                child: TabBarView(
                   controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: AppColors.softPinkButton,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: const Color(0xFF4A5568),
-                  labelStyle: AppTextStyles.tabLabelSelected,
-                  unselectedLabelStyle: AppTextStyles.tabLabelUnselected,
-                  tabs: const [
-                    Tab(text: 'İstatistikler'),
-                    Tab(text: 'Başarılar'),
+                  children: [
+                    _buildStatisticsTab(),
+                    const AchievementsTab(),
                   ],
                 ),
               ),
-            ),
-            
-            // İçerik
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildStatisticsTab(),
-                  const AchievementsTab(),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -168,6 +155,7 @@ class _SuccessScreenState extends State<SuccessScreen> with TickerProviderStateM
   Widget _buildStatisticsTab() {
     return StatisticsTab(
       lightbulbButton: _buildInsightLightbulbButton(context),
+      dateText: _getFormattedDate(),
     );
   }
 

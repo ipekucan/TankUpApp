@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_colors.dart';
 import '../providers/water_provider.dart';
 import '../providers/user_provider.dart';
@@ -36,7 +35,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    // Her ekran açılışında varsayılan olarak 'Gün' modunu seç
     _selectedPeriod = ChartPeriod.day;
     _touchedBarIndex = null;
   }
@@ -44,7 +42,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F6), // Cool grey background for better contrast
+      backgroundColor: Colors.white,
       appBar: widget.hideAppBar
           ? null
           : AppBar(
@@ -53,12 +51,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               automaticallyImplyLeading: false,
               title: Text(
                 'İstatistikler',
-                style: GoogleFonts.nunito(
-                  color: const Color(0xFF4A5568),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20.0,
-                  letterSpacing: -0.3,
-                ),
+                style: AppTextStyles.heading3,
               ),
               actions: [
                 // Akıllı Ampul İkonu (İçgörüler)
@@ -94,135 +87,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
               ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Filtre Butonu (En Solda)
-                    _buildFilterButton(context),
-                    const SizedBox(width: 12),
-                    // Zaman Butonları
-                    PeriodSelector(
-                      selectedPeriod: _selectedPeriod,
-                      onPeriodChanged: (period) {
-                        setState(() {
-                          _selectedPeriod = period;
-                          _touchedBarIndex = null;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
             ),
       body: Stack(
         children: [
-          // Layer 1 (Back): Scrollable content - fills entire screen
-          Positioned.fill(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), // Reduced top padding
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top Row (hideAppBar durumunda görünür)
-                  if (widget.hideAppBar)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Renkli Bardak Butonu (En Solda)
-                          _buildFilterButton(context),
-                          const SizedBox(width: 12),
-                          // Zaman Butonları
-                          PeriodSelector(
-                            selectedPeriod: _selectedPeriod,
-                            onPeriodChanged: (period) {
-                              setState(() {
-                                _selectedPeriod = period;
-                                _touchedBarIndex = null;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 16.0),
-
-                  // İçerik: İki Ayrı Kutu
-                  Column(
-                    children: [
-                      // KUTU 1: Grafik Kutusu (Premium Card Style - Compact)
-                      Container(
-                        height: 250.0, // Increased height for better balance
-                        width: double.infinity, // Force full width expansion
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08), // More visible shadow
-                              blurRadius: 20,
-                              offset: const Offset(0, 4),
-                              spreadRadius: 0,
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(16.0), // Reduced padding
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Section Title (Bold, left-aligned)
-                            Text(
-                              'Sıvı Tüketim Grafiği',
-                              style: GoogleFonts.nunito(
-                                fontSize: 18.0,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2D3748),
-                                letterSpacing: -0.3,
-                              ),
-                              textAlign: TextAlign.start, // Left-aligned
-                            ),
-                            const SizedBox(height: 12.0), // Reduced spacing
-                            // Grafik Alanı (Expanded to fill remaining space)
-                            Expanded(
-                              child: Consumer<WaterProvider>(
-                                builder: (context, waterProvider, child) {
-                                  final chartData =
-                                      ChartDataService.buildChartData(
-                                        waterProvider,
-                                        _selectedPeriod,
-                                        _selectedDrinkFilters,
-                                      );
-                                  return ChartView(
-                                    chartData: chartData,
-                                    selectedPeriod: _selectedPeriod,
-                                    touchedBarIndex: _touchedBarIndex ?? -1,
-                                    onBarTouched: (index) {
-                                      setState(() {
-                                        _touchedBarIndex = index;
-                                      });
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20.0),
-
-                      // KUTU 2: Drink Consumption Grid (Premium Card Style)
-                      _buildSummaryAndDetailArea(context),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          // Main scrollable content
+          CustomScrollView(
+            slivers: [
+              // Module 1: Header Sliver (FilterButton + PeriodSelector + CloseButton)
+              if (widget.hideAppBar) _buildHeaderSliver(context),
+              
+              // Module 2: Date Title Sliver
+              _buildDateTitleSliver(context),
+              
+              // Module 3: Chart Card Sliver
+              _buildChartCardSliver(context),
+              
+              // Module 4: History List Sliver (Lazy loading)
+              _buildHistoryListSliver(context),
+            ],
           ),
           // Layer 2 (Front): Lightbulb button - Fixed bottom-right corner (floating)
           if (widget.lightbulbButton != null)
@@ -236,7 +118,337 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Old _buildInsightLightbulbButton method removed - now using InsightCard widget
+  /// Module 1: Header Sliver (FilterButton + PeriodSelector + CloseButton)
+  Widget _buildHeaderSliver(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Left: FilterButton + PeriodSelector
+            Row(
+              children: [
+                _buildFilterButton(context),
+                const SizedBox(width: 12),
+                PeriodSelector(
+                  selectedPeriod: _selectedPeriod,
+                  onPeriodChanged: (period) {
+                    setState(() {
+                      _selectedPeriod = period;
+                      _touchedBarIndex = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+            // Right: Close Button
+            GestureDetector(
+              onTap: () {
+                if (mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Color(0xFF4A5568),
+                  size: 20.0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Module 2: Date Title Sliver (Left-aligned date text)
+  Widget _buildDateTitleSliver(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _getFormattedDate(),
+            style: AppTextStyles.dateText,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Module 3: Chart Card Sliver (Grey card with ChartView)
+  Widget _buildChartCardSliver(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0E0E0),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Dynamic Range Label (Centered, Bold)
+              Center(
+                child: Text(
+                  _getRangeLabel(),
+                  style: const TextStyle(
+                    color: Color(0xFF4A5568),
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Chart (Fixed height)
+              SizedBox(
+                height: 180.0,
+                child: Consumer<WaterProvider>(
+                  builder: (context, waterProvider, child) {
+                    final chartData = ChartDataService.buildChartData(
+                      waterProvider,
+                      _selectedPeriod,
+                      _selectedDrinkFilters,
+                    );
+                    return ChartView(
+                      chartData: chartData,
+                      selectedPeriod: _selectedPeriod,
+                      touchedBarIndex: _touchedBarIndex ?? -1,
+                      onBarTouched: (index) {
+                        setState(() {
+                          _touchedBarIndex = index;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Module 4: History List Sliver (SliverList with lazy loading)
+  Widget _buildHistoryListSliver(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: Consumer2<WaterProvider, UserProvider>(
+        builder: (context, waterProvider, userProvider, child) {
+          // Calculate date range
+          final dateRange = _calculateDateRange(waterProvider);
+          if (dateRange == null) {
+            return const SliverToBoxAdapter(child: SizedBox.shrink());
+          }
+
+          // Get entries for the date range
+          final entries = waterProvider.getDrinkEntriesForDateRange(
+            dateRange.startDate,
+            dateRange.endDate,
+          );
+
+          // Apply filters
+          final filteredEntries = _selectedDrinkFilters.isEmpty
+              ? entries
+              : entries
+                  .where((e) => _selectedDrinkFilters.contains(e.drinkId))
+                  .toList();
+
+          // Sort by timestamp (newest first)
+          final sortedEntries = List.from(filteredEntries)
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+          if (sortedEntries.isEmpty) {
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Center(
+                  child: Text(
+                    'Henüz sıvı alımı yapılmadı.',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 18.0,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // Use SliverList for lazy loading (NO shrinkWrap)
+          return SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: _buildHistoryItem(
+                    sortedEntries[index],
+                    userProvider.isMetric,
+                  ),
+                );
+              },
+              childCount: sortedEntries.length,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Helper: Build individual history item (Compact Row style)
+  Widget _buildHistoryItem(dynamic entry, bool isMetric) {
+    final drinkId = entry.drinkId;
+    final amount = entry.amount;
+    final timestamp = entry.timestamp;
+    final emoji = DrinkHelpers.getEmoji(drinkId);
+    final color = ChartDataService.drinkColors[drinkId] ?? Colors.grey;
+    final drinkName = DrinkHelpers.getName(drinkId);
+
+    // Format time from timestamp (timestamp is already a DateTime)
+    final timeString = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              emoji,
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
+        ),
+        title: Text(
+          drinkName,
+          style: AppTextStyles.bodyLarge.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          UnitConverter.formatVolume(amount, isMetric),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: color,
+            fontSize: 12,
+          ),
+        ),
+        trailing: Text(
+          timeString,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: Colors.grey[600],
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Helper: Calculate date range based on selected period and touched bar
+  _DateRange? _calculateDateRange(WaterProvider waterProvider) {
+    DateTime? selectedStartDate;
+    DateTime? selectedEndDate;
+
+    if (_touchedBarIndex != null && _touchedBarIndex! >= 0) {
+      final chartData = ChartDataService.buildChartData(
+        waterProvider,
+        _selectedPeriod,
+        _selectedDrinkFilters,
+      );
+      if (_touchedBarIndex! < chartData.length) {
+        final dataPoint = chartData[_touchedBarIndex!];
+        selectedStartDate = dataPoint.date;
+        selectedEndDate = dataPoint.date;
+      }
+    } else {
+      // Default to current period
+      switch (_selectedPeriod) {
+        case ChartPeriod.day:
+          selectedStartDate = DateTime.now();
+          selectedEndDate = selectedStartDate;
+          break;
+        case ChartPeriod.week:
+          final today = DateTime.now();
+          final weekStart = today.subtract(
+            Duration(days: today.weekday - 1),
+          );
+          selectedStartDate = weekStart;
+          selectedEndDate = weekStart.add(const Duration(days: 6));
+          break;
+        case ChartPeriod.month:
+          final today = DateTime.now();
+          selectedStartDate = DateTime(today.year, today.month, 1);
+          selectedEndDate = DateTime(today.year, today.month + 1, 0);
+          break;
+      }
+    }
+
+    if (selectedStartDate == null || selectedEndDate == null) {
+      return null;
+    }
+
+    return _DateRange(
+      startDate: selectedStartDate,
+      endDate: selectedEndDate,
+    );
+  }
+
+  /// Helper: Get formatted date string
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final weekdays = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    final months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    
+    return '${now.day} ${months[now.month - 1]} ${weekdays[now.weekday - 1]}';
+  }
+
+  /// Helper: Get range label based on selected period
+  String _getRangeLabel() {
+    switch (_selectedPeriod) {
+      case ChartPeriod.day:
+        return 'Son 7 Gün';
+      case ChartPeriod.week:
+        return 'Son 4 Hafta';
+      case ChartPeriod.month:
+        return 'Son 12 Ay';
+    }
+  }
 
   // Filtre butonu
   Widget _buildFilterButton(BuildContext context) {
@@ -260,9 +472,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Özel bardak ikonu (3 renkli daireler)
             _buildCustomDrinkIcon(),
-            // Aşağı ok
             Positioned(
               bottom: 4,
               child: Icon(
@@ -325,194 +535,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // Old _buildPeriodButton method removed - now using PeriodSelector widget
-  // Old _buildBarChart, _buildChartData, _buildBarGroups, _getMaxY methods removed
-  // Now using ChartDataService and ChartView widget
-
-  // Özet ve Detay Alanı
-  Widget _buildSummaryAndDetailArea(BuildContext context) {
-    return Consumer2<WaterProvider, UserProvider>(
-      builder: (context, waterProvider, userProvider, child) {
-        // Seçili bara göre tarih aralığını belirle
-        DateTime? selectedStartDate;
-        DateTime? selectedEndDate;
-
-        if (_touchedBarIndex != null && _touchedBarIndex! >= 0) {
-          final chartData = ChartDataService.buildChartData(
-            waterProvider,
-            _selectedPeriod,
-            _selectedDrinkFilters,
-          );
-          if (_touchedBarIndex! < chartData.length) {
-            final dataPoint = chartData[_touchedBarIndex!];
-            selectedStartDate = dataPoint.date;
-            selectedEndDate = dataPoint.date;
-          }
-        } else {
-          // Hiçbir bar seçili değilse, varsayılan olarak bugünü/bu haftayı/bu ayı göster
-          switch (_selectedPeriod) {
-            case ChartPeriod.day:
-              selectedStartDate = DateTime.now();
-              selectedEndDate = selectedStartDate;
-              break;
-            case ChartPeriod.week:
-              final today = DateTime.now();
-              final weekStart = today.subtract(
-                Duration(days: today.weekday - 1),
-              );
-              selectedStartDate = weekStart;
-              selectedEndDate = weekStart.add(const Duration(days: 6));
-              break;
-            case ChartPeriod.month:
-              final today = DateTime.now();
-              selectedStartDate = DateTime(today.year, today.month, 1);
-              selectedEndDate = DateTime(today.year, today.month + 1, 0);
-              break;
-          }
-        }
-
-        if (selectedStartDate == null || selectedEndDate == null) {
-          return const SizedBox.shrink();
-        }
-
-        final entries = waterProvider.getDrinkEntriesForDateRange(
-          selectedStartDate,
-          selectedEndDate,
-        );
-
-        // Filtre uygula
-        final filteredEntries = _selectedDrinkFilters.isEmpty
-            ? entries
-            : entries
-                  .where((e) => _selectedDrinkFilters.contains(e.drinkId))
-                  .toList();
-
-        Map<String, double> drinkAmounts = {};
-        for (var entry in filteredEntries) {
-          drinkAmounts[entry.drinkId] =
-              (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
-        }
-
-        // Sadece içilmiş içecekleri filtrele (amount > 0)
-        final consumedDrinks = drinkAmounts.entries
-            .where((entry) => entry.value > 0)
-            .toList();
-
-        if (consumedDrinks.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Text(
-                'Henüz sıvı alımı yapılmadı.',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 18.0, // Büyütüldü (16 -> 18)
-                ),
-              ),
-            ),
-          );
-        }
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 3.0, // Wide/flat cards (reverted from 2.1)
-            crossAxisSpacing: 16, // Increased spacing
-            mainAxisSpacing: 16, // Increased spacing
-          ),
-          itemCount: consumedDrinks.length,
-          itemBuilder: (context, index) {
-            final entry = consumedDrinks[index];
-            final drinkId = entry.key;
-            final amount = entry.value;
-            final emoji = DrinkHelpers.getEmoji(drinkId);
-            final color = ChartDataService.drinkColors[drinkId] ?? Colors.grey;
-
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced padding for compact layout
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08), // More visible shadow
-                    blurRadius: 10,
-                    offset: const Offset(0, 4), // Increased offset for better depth
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Left: Icon in a light-colored circle
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15), // Light colored circle
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        emoji,
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Right: Drink Name and Amount
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            DrinkHelpers.getName(drinkId),
-                            style: GoogleFonts.nunito(
-                              fontSize: 14.0, // Reduced from 15.0
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF2D3748), // Dark grey
-                              letterSpacing: -0.2,
-                              height: 1.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 2.0), // Reduced spacing
-                        Flexible(
-                          child: Text(
-                            UnitConverter.formatVolume(
-                              amount,
-                              userProvider.isMetric,
-                            ),
-                            style: GoogleFonts.nunito(
-                              fontSize: 13.0, // Reduced from 14.0
-                              fontWeight: FontWeight.w500,
-                              color: color, // Primary color for amount
-                              letterSpacing: 0.1,
-                              height: 1.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -773,8 +795,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
   }
+}
 
-  // Yardımcı metodlar (moved to DrinkHelpers and DateHelpers)
+/// Helper class for date range
+class _DateRange {
+  final DateTime startDate;
+  final DateTime endDate;
+
+  _DateRange({required this.startDate, required this.endDate});
 }
 
 // Filtre Bottom Sheet içeriği (StatefulWidget olarak ayrıldı)
@@ -849,7 +877,6 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 ),
                 child: InkWell(
                   onTap: () {
-                    // 1. 'Tümü' seçildiğinde: Liste tamamen temizlenir (boş liste = Tümü)
                     setState(() {
                       _dialogSelectedFilters.clear();
                     });
@@ -921,16 +948,10 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                   ),
                   child: InkWell(
                     onTap: () {
-                      // 2. Özel içecek seçildiğinde:
                       setState(() {
                         if (isSelected) {
-                          // İçecek zaten seçili, kaldır
                           _dialogSelectedFilters.remove(drink.id);
-                          // Liste boş kaldıysa otomatik olarak 'Tümü' seçili olur (boş liste = Tümü)
-                          // Ek işlem gerekmez
                         } else {
-                          // İçecek ekleniyor
-                          // Liste boşsa (Tümü seçili) direkt eklenir, zaten doğru davranış
                           _dialogSelectedFilters.add(drink.id);
                         }
                       });
@@ -998,7 +1019,6 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    // Tümü seçimini temizle (liste boş = Tümü seçili)
                     setState(() {
                       _dialogSelectedFilters.clear();
                     });
@@ -1017,7 +1037,6 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 flex: 2,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Parent widget'ın state'ini güncelle ve kapat
                     widget.onApply(Set<String>.from(_dialogSelectedFilters));
                     Navigator.pop(context);
                   },
@@ -1038,5 +1057,3 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
     );
   }
 }
-
-// Old _ChartDataPoint class removed - now using ChartDataPoint from ChartDataService

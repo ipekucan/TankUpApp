@@ -130,7 +130,7 @@ class AchievementsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
+                  color: Colors.amber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -186,7 +186,7 @@ class _MinimalistTrophyItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -210,7 +210,7 @@ class _MinimalistTrophyItem extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: iconColor.withOpacity(0.3),
+                          color: iconColor.withValues(alpha: 0.3),
                           blurRadius: 12,
                           spreadRadius: 1,
                         ),
@@ -223,7 +223,7 @@ class _MinimalistTrophyItem extends StatelessWidget {
                   emoji,
                   style: TextStyle(
                     fontSize: 48.0,
-                    color: isUnlocked ? null : Colors.grey.withOpacity(0.2),
+                    color: isUnlocked ? null : Colors.grey.withValues(alpha: 0.2),
                   ),
                 ),
                 
@@ -240,7 +240,7 @@ class _MinimalistTrophyItem extends StatelessWidget {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
