@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' as scheduler;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
@@ -33,6 +34,17 @@ class Bubble {
       x = math.Random().nextDouble(); // Yeni rastgele x pozisyonu
     }
   }
+  
+  // Create a copy of the bubble with updated position
+  Bubble copyWith({double? x, double? y, double? size, double? speed, double? opacity}) {
+    return Bubble(
+      x: x ?? this.x,
+      y: y ?? this.y,
+      size: size ?? this.size,
+      speed: speed ?? this.speed,
+      opacity: opacity ?? this.opacity,
+    );
+  }
 }
 
 class PlanLoadingScreen extends StatefulWidget {
@@ -51,12 +63,13 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   late AnimationController _bubbleController; // Baloncuk animasyonu
   final List<Bubble> _bubbles = [];
   final math.Random _random = math.Random();
+  scheduler.Ticker? _ticker;
 
   @override
   void initState() {
     super.initState();
     
-    // Baloncuk animasyonu (60 FPS - smooth animasyon)
+    // Baloncuk animasyonu
     _bubbleController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
@@ -65,8 +78,21 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
     // Baloncukları oluştur (20-30 arası)
     _initializeBubbles();
     
+    // Ticker kullanarak baloncukları güncelle
+    _ticker = scheduler.Ticker(_onTick)..start();
+    
     // Planı hesapla ve kaydet, sonra yönlendir
     _calculateAndSavePlan();
+  }
+  
+  void _onTick(Duration elapsed) {
+    // AnimationController 1 saniyede 1 tur döner, bu yüzden deltaTime = 1/60 ≈ 0.0167
+    final deltaTime = 0.0167; // ~60 FPS
+    for (var bubble in _bubbles) {
+      bubble.update(deltaTime);
+    }
+    // Repaint the CustomPainter
+    setState(() {});
   }
   
   void _initializeBubbles() {
@@ -86,15 +112,16 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
   
   @override
   void dispose() {
+    _ticker?.stop();
     _bubbleController.dispose();
     super.dispose();
   }
 
   Future<void> _calculateAndSavePlan() async {
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final dailyHydrationProvider =
-          Provider.of<DailyHydrationProvider>(context, listen: false);
+      // Provider'ları güvenli şekilde al
+      final userProvider = context.read<UserProvider>();
+      final dailyHydrationProvider = context.read<DailyHydrationProvider>();
       
       if (!mounted) return;
       
@@ -131,8 +158,8 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
         // Hata durumunda sessizce devam et
       });
       
-      // Kısa bir gecikme ekle (kullanıcıya loading animasyonunu göstermek için)
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Increased delay to ensure proper loading experience
+      await Future.delayed(const Duration(milliseconds: 2000));
       
       if (!mounted) return;
       
@@ -146,6 +173,7 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
       // Hata durumunda yine de navigasyon yap
       LoggerService.logError('Failed to initialize hydration plan', e, stackTrace);
       if (mounted) {
+        // Navigate to main screen even if there's an error
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
         );
@@ -177,13 +205,6 @@ class _PlanLoadingScreenState extends State<PlanLoadingScreen> with TickerProvid
               AnimatedBuilder(
                 animation: _bubbleController,
                 builder: (context, child) {
-                  // Her frame'de baloncukları güncelle
-                  // AnimationController 1 saniyede 1 tur döner, bu yüzden deltaTime = 1/60 ≈ 0.0167
-                  final deltaTime = 0.0167; // ~60 FPS
-                  for (var bubble in _bubbles) {
-                    bubble.update(deltaTime);
-                  }
-                  
                   return CustomPaint(
                     size: screenSize,
                     painter: _BubblePainter(_bubbles, screenSize),
@@ -272,7 +293,7 @@ class _BubblePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BubblePainter oldDelegate) {
-    return true; // Her frame'de yeniden çiz
+    return oldDelegate.bubbles != bubbles || oldDelegate.screenSize != screenSize;
   }
 }
 

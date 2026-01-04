@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
-import '../widgets/interactive_cup_modal.dart';
 import 'tank_screen.dart';
 import 'tank_room_screen.dart';
 import '../features/challenge/screens/challenge_screen.dart';
@@ -24,20 +23,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   late AnimationController _morphController;
   late AnimationController _iconController;
 
-  // Screens mapped to nav indices (excluding center button)
+  // Screens mapped to nav indices
   final List<Widget> _screens = [
     const TankScreen(),
     const TankRoomScreen(),
     const ChallengeScreen(),
     const ProfileScreen(),
   ];
-  
-  // Map nav bar index to screen index (skip center button)
-  int _getScreenIndex(int navIndex) {
-    if (navIndex < 2) return navIndex;
-    if (navIndex > 2) return navIndex - 1;
-    return 0; // Center button doesn't have a screen
-  }
 
   @override
   void initState() {
@@ -63,12 +55,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
   
   void _onItemTapped(int navIndex) {
-    // Center button (index 2) opens water modal
-    if (navIndex == 2) {
-      _showWaterModal();
-      return;
-    }
-    
     if (_currentIndex != navIndex) {
       setState(() {
         _previousIndex = _currentIndex;
@@ -80,26 +66,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       _iconController.forward(from: 0);
     }
   }
-  
-  void _showWaterModal() async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      isScrollControlled: true,
-      builder: (context) => const InteractiveCupModal(),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    final screenIndex = _getScreenIndex(_currentIndex);
-    
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       extendBody: true,
       body: IndexedStack(
-        index: screenIndex,
+        index: _currentIndex,
         sizing: StackFit.expand,
         children: _screens,
       ),
@@ -139,16 +113,14 @@ class _NavBarConfig {
 class _NavItemData {
   final IconData activeIcon;
   final IconData inactiveIcon;
-  final bool isCenter;
 
   const _NavItemData({
     required this.activeIcon,
     required this.inactiveIcon,
-    this.isCenter = false,
   });
 }
 
-/// Navigation items - Clean minimal icons (with center placeholder)
+/// Navigation items - Clean minimal icons
 const List<_NavItemData> _navItems = [
   _NavItemData(
     activeIcon: Icons.home_rounded,
@@ -157,12 +129,6 @@ const List<_NavItemData> _navItems = [
   _NavItemData(
     activeIcon: Icons.grid_view_rounded,
     inactiveIcon: Icons.grid_view_outlined,
-  ),
-  // Center is reserved for water button
-  _NavItemData(
-    activeIcon: Icons.local_drink_rounded,
-    inactiveIcon: Icons.local_drink_outlined,
-    isCenter: true,
   ),
   _NavItemData(
     activeIcon: Icons.pie_chart_rounded,
@@ -227,31 +193,18 @@ class _MorphingBubbleNavBar extends StatelessWidget {
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                // Morphing bubble indicator (behind icons) - skip center
-                if (currentIndex != 2)
-                  _MorphingBubble(
-                    currentIndex: currentIndex,
-                    previousIndex: previousIndex,
-                    morphController: morphController,
-                    itemWidth: itemWidth,
-                  ),
+                // Morphing bubble indicator (behind icons)
+                _MorphingBubble(
+                  currentIndex: currentIndex,
+                  previousIndex: previousIndex,
+                  morphController: morphController,
+                  itemWidth: itemWidth,
+                ),
                 // Navigation items row (on top)
                 Row(
                   children: List.generate(
                     _navItems.length,
                     (index) {
-                      // Center button is special
-                      if (index == 2) {
-                        return SizedBox(
-                          width: itemWidth,
-                          height: _NavBarConfig.navBarHeight,
-                          child: Center(
-                            child: _CenterWaterButton(
-                              onTap: () => onItemTapped(index),
-                            ),
-                          ),
-                        );
-                      }
                       return _NavBarItem(
                         index: index,
                         isSelected: currentIndex == index,
@@ -441,49 +394,4 @@ class _NavBarItem extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// CENTER WATER BUTTON
-// ============================================================================
 
-/// Floating center water button
-class _CenterWaterButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _CenterWaterButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFB2EBF2), // Light cyan
-              Color(0xFF80DEEA), // Cyan
-              Color(0xFF4DD0E1), // Deeper cyan
-            ],
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4DD0E1).withValues(alpha: 0.4),
-              blurRadius: 12,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.water_drop_rounded,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-    );
-  }
-}

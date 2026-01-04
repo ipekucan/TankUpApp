@@ -68,16 +68,15 @@ class _TankRoomScreenState extends State<TankRoomScreen>
 
       _animationTime += 0.016; // Zaman ilerlemesi
 
-      // Rastgele aralıklarla yeni baloncuk üret (alt kısımdan)
-      if (_random.nextDouble() < 0.02) { // %2 şansla her frame'de
-        final size = 6 + _random.nextDouble() * 20; // 6-26 arası boyut
+      // Rastgele aralıklarla yeni baloncuk üret (alt kısımdan) - ENHANCED DENSITY
+      if (_random.nextDouble() < 0.025) { // Increased spawn rate for more bubbles (2.5% chance)
+        final size = 8 + _random.nextDouble() * 24; // 8-32 arası boyut (larger variation)
         
-        // Hız: Büyük baloncuklar daha hızlı, küçükler daha yavaş
-        // Normalize edilmiş boyut (0.0-1.0) ile hız hesapla
-        final normalizedSize = (size - 6) / 20; // 6-26 -> 0.0-1.0
-        final baseSpeed = 0.0006; // Minimum hız
-        final speedRange = 0.0014; // Hız aralığı
-        final speed = baseSpeed + (normalizedSize * speedRange); // Büyükler daha hızlı
+        // Hız: Çok yavaş hareket (premium relaxing feel)
+        final normalizedSize = (size - 8) / 24; // 8-32 -> 0.0-1.0
+        final baseSpeed = 0.0003; // Much slower minimum speed
+        final speedRange = 0.0008; // Slower speed range
+        final speed = baseSpeed + (normalizedSize * speedRange);
         
         _bubbles.add(BubbleModel(
           x: _random.nextDouble(),
@@ -95,9 +94,9 @@ class _TankRoomScreenState extends State<TankRoomScreen>
         // Yukarı hareket (Suyun akışkanlığına uygun yavaş hız)
         bubble.y -= bubble.speed;
         
-        // Sinüs fonksiyonu ile sağa-sola yalpalam (wobble)
+        // Sinüs fonksiyonu ile sağa-sola yalpalama (wobble) - GENTLER
         final wobblePhase = bubble.wobbleOffset + (_animationTime * bubble.wobbleSpeed);
-        bubble.x += math.sin(wobblePhase + bubble.id) * 0.0015; // Gerçekçi yalpalam
+        bubble.x += math.sin(wobblePhase + bubble.id) * 0.0008; // Reduced wobble for smoother movement
         
         // Ekranın tepesinden çıkanları sil
         return bubble.y < -0.1;
@@ -120,281 +119,208 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      extendBodyBehindAppBar: true, // Extend behind status bar
+      backgroundColor: Colors.transparent,
       body: Consumer2<DailyHydrationProvider, AquariumProvider>(
         builder: (context, dailyHydrationProvider, aquariumProvider, child) {
-          final isDirty = dailyHydrationProvider.isTankDirty;
           final screenSize = MediaQuery.of(context).size;
-          
-          // Tank boyutları ve pozisyonu
-          final tankWidth = screenSize.width - 40.0; // Yatay padding: 20 * 2
-          final tankHeight = screenSize.height - 100.0; // Dikey padding: 50 * 2
           
           return Stack(
             children: [
-              // KATMAN 1: DERİN OKYANUS GRADYANI (Arka Plan)
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF006994), // Okyanus Mavisi (Üst)
-                      Color(0xFF001E3C), // Derin Karanlık (Alt)
-                    ],
-                  ),
-                ),
-              ),
-
-              // KATMAN 1.5: HAREKETLİ IŞIK HÜZMELERİ (God Rays) - AnimatedBuilder ile parıldama efekti
-              AnimatedBuilder(
-                animation: _godRayAnimationController,
-                builder: (context, child) {
-                  return Stack(
-                    children: List.generate(4, (index) {
-                      // Farklı açılar (-pi/12, -pi/10, pi/10, pi/12 gibi doğal açılar)
-                      final angles = [-math.pi / 12, -math.pi / 10, math.pi / 10, math.pi / 12];
-                      final angle = angles[index % angles.length];
-                      
-                      final screenWidth = screenSize.width;
-                      final rayWidth = 280.0;
-                      
-                      // Ekranı 4'e böl ve dağıt
-                      final offsetX = (screenWidth / 4) * index - (rayWidth / 2);
-                      
-                      // Her hüzme için farklı offset ile sinüs dalgası (doğal parıldama)
-                      final offset = index * (math.pi / 2); // Farklı offset'ler (0, pi/2, pi, 3pi/2)
-                      final opacityValue = 0.1 + 0.2 * math.sin(
-                        _godRayAnimationController.value * 2 * math.pi + offset
-                      );
-                      
-                      return Positioned(
-                        top: -100, // Ekranın tepesinden başla
-                        left: offsetX,
-                        width: rayWidth,
-                        height: screenSize.height + 200, // Ekranın dışına taşan uzun hüzme
-                        child: Transform.rotate(
-                          angle: angle,
-                          child: Opacity(
-                            opacity: opacityValue.clamp(0.0, 1.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: const [0.0, 0.3, 0.7, 1.0],
-                                  colors: [
-                                    Colors.white.withValues(alpha: 0.8), // Üst: Parlak
-                                    Colors.white.withValues(alpha: 0.4), // Orta üst: Orta parlaklık
-                                    Colors.white.withValues(alpha: 0.1), // Orta alt: Soluk
-                                    Colors.white.withValues(alpha: 0.0), // Alt: Tam şeffaf
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  );
-                },
-              ),
-
-              // KATMAN 3: MEVCUT BALIKLAR VE İÇERİK (Tank Container)
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 50.0),
-                  child: Container(
-                    width: tankWidth,
-                    height: tankHeight,
-                    clipBehavior: Clip.antiAlias, // KRİTİK: İçeriği tank sınırları içinde tutar
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
+              // LAYER 1: FULL-SCREEN SOFT PASTEL BLUE GRADIENT (Edge-to-Edge)
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFFD4F1F4), // Soft pastel cyan - top
+                        Color(0xFFB8E6E9), // Light aqua - middle top
+                        Color(0xFFA0DDE2), // Medium turquoise - middle
+                        Color(0xFF87D4DB), // Deeper turquoise - bottom
                       ],
-                    ),
-                    child: Stack(
-                      children: [
-                        // KATMAN 2: Baloncuklar
-                        ..._bubbles.map((bubble) {
-                          // Baloncuk pozisyonlarını tank sınırlarına göre hesapla
-                          final tankX = bubble.x * tankWidth;
-                          final tankY = (1.0 - bubble.y) * tankHeight; // Y eksenini ters çevir
-                          
-                          // Sadece tank sınırları içindeki baloncukları göster
-                          if (tankX < -bubble.size / 2 || tankX > tankWidth + bubble.size / 2 ||
-                              tankY < -bubble.size / 2 || tankY > tankHeight + bubble.size / 2) {
-                            return const SizedBox.shrink();
-                          }
-                          
-                          return Positioned(
-                            left: tankX - bubble.size / 2,
-                            top: tankY - bubble.size / 2,
-                            child: Container(
-                              width: bubble.size,
-                              height: bubble.size,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                // 3D Baloncuk efekti: RadialGradient (gerçekçi içi boş görünüm)
-                                gradient: RadialGradient(
-                                  center: Alignment.topLeft,
-                                  radius: 1.0,
-                                  colors: [
-                                    Colors.white.withValues(alpha: 0.1), // Merkez: Neredeyse şeffaf
-                                    Colors.white.withValues(alpha: 0.6), // Kenarlar: Parlak beyaz kenarlık
-                                  ],
-                                ),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                        
-                        // Yosunlanma efekti - Yeşil %30 opaklıkta overlay
-                        Visibility(
-                          visible: isDirty,
-                          child: Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: Stack(
-                                children: [
-                                  // Yosun çizimleri
-                                  CustomPaint(
-                                    painter: _AlgaePainter(),
-                                    size: Size(tankWidth, tankHeight),
-                                  ),
-                                  // Köşelerde yosun ikonları
-                                  Positioned(
-                                    top: 10,
-                                    left: 10,
-                                    child: Icon(
-                                      Icons.eco,
-                                      color: Colors.green.withValues(alpha: 0.6),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 10,
-                                    right: 10,
-                                    child: Icon(
-                                      Icons.eco,
-                                      color: Colors.green.withValues(alpha: 0.6),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 10,
-                                    left: 10,
-                                    child: Icon(
-                                      Icons.eco,
-                                      color: Colors.green.withValues(alpha: 0.6),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 10,
-                                    right: 10,
-                                    child: Icon(
-                                      Icons.eco,
-                                      color: Colors.green.withValues(alpha: 0.6),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        // Su seviyesi (her zaman %100)
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: tankHeight,
-                            decoration: BoxDecoration(
-                              color: isDirty
-                                  ? AppColors.waterColor.withValues(alpha: 0.4)
-                                  : AppColors.waterColor.withValues(alpha: 0.5),
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(30),
-                                bottomRight: Radius.circular(30),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.waterColor.withValues(alpha: 0.2),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, -2),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        // Modüler dekorasyonlar - Katmanlı yapı (layerOrder'a göre sıralı)
-                        ...aquariumProvider.activeDecorationsList.map((decoration) {
-                          return _buildDecoration(
-                            decoration,
-                            tankWidth,
-                            tankHeight,
-                          );
-                        }),
-                      ],
+                      stops: [0.0, 0.3, 0.6, 1.0],
                     ),
                   ),
                 ),
               ),
-              
-              // Mağaza butonu - Sağ alt köşe
-              Positioned(
-                bottom: 30,
-                right: 30,
-                child: FloatingActionButton(
-                  heroTag: 'tank_room_shop_fab',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ShopScreen(),
+
+              // LAYER 1.5: GOD RAYS (Light Shafts from top-left)
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _godRayAnimationController,
+                  builder: (context, child) {
+                    return CustomPaint(
+                      painter: _GodRaysPainter(
+                        animationValue: _godRayAnimationController.value,
                       ),
                     );
                   },
-                  backgroundColor: AppColors.softPinkButton,
-                  elevation: 8,
-                  child: const Icon(
-                    Icons.shopping_bag,
-                    color: Colors.white,
-                    size: 28,
-                  ),
                 ),
               ),
 
-
-              // KATMAN 5: SU ALTI FİLTRESİ (Overlay)
-              Positioned.fill(
-                child: IgnorePointer(
+              // LAYER 2: PREMIUM BUBBLES - Highly transparent, slow, varied sizes
+              ...List.generate(_bubbles.length, (index) {
+                final bubble = _bubbles[index];
+                final bubbleX = bubble.x * screenSize.width;
+                final bubbleY = bubble.y * screenSize.height;
+                
+                return Positioned(
+                  left: bubbleX - bubble.size / 2,
+                  top: bubbleY - bubble.size / 2,
                   child: Container(
+                    width: bubble.size,
+                    height: bubble.size,
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.3, -0.3),
+                        radius: 1.0,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.15), // Very subtle center
+                          Colors.white.withValues(alpha: 0.08), // Ultra transparent middle
+                          Colors.white.withValues(alpha: 0.0), // Fully transparent edge
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2), // Very subtle border
+                        width: 1.0,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+
+              // LAYER 3: FISH & DECORATIONS (Between background and HUD)
+              Positioned.fill(
+                child: Stack(
+                  children: aquariumProvider.activeDecorationsList.map((decoration) {
+                    return _buildDecoration(
+                      decoration,
+                      screenSize.width,
+                      screenSize.height,
+                    );
+                  }).toList(),
+                ),
+              ),
+              
+              // LAYER 4: TOP-RIGHT HUD - Pixel Perfect Geometry
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10.0, right: 20.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 1. SHOP BUTTON (Green Squircle)
+                        Container(
+                          height: 54,
+                          width: 54,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFC1E27C), // Pastel Green
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFC1E27C).withValues(alpha: 0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ShopScreen(),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.shopping_bag_outlined,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 20), // Spacer
+
+                        // 2. COIN CAPSULE (Seamless Stack Layout)
+                        Stack(
+                          alignment: Alignment.centerLeft,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // The Tail (White Pill) - Starts from center of coin
+                            Container(
+                              height: 54,
+                              margin: const EdgeInsets.only(left: 27), // Starts exactly at coin center radius
+                              padding: const EdgeInsets.only(left: 36, right: 32), // Extra padding for length
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(27),
+                                  bottomRight: Radius.circular(27),
+                                  // Left side is hidden/square because it's under the coin, or rounded doesn't matter
+                                  topLeft: Radius.circular(0), 
+                                  bottomLeft: Radius.circular(0),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(2, 2),
+                                  ),
+                                ],
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${dailyHydrationProvider.tankCoins}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF5D4037),
+                                ),
+                              ),
+                            ),
+                            
+                            // The Head (Yellow Coin) - Sits on top
+                            Container(
+                              height: 54,
+                              width: 54,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3E38D), // Pastel Yellow
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFF3E38D).withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.monetization_on_rounded,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -406,10 +332,10 @@ class _TankRoomScreenState extends State<TankRoomScreen>
     );
   }
 
-  // Dekorasyon çizimi
-  Widget _buildDecoration(DecorationItem decoration, double tankWidth, double tankHeight) {
-    final x = decoration.left * tankWidth;
-    final y = (1.0 - decoration.bottom) * tankHeight; // bottom 0.0 = alt, 1.0 = üst
+  // Dekorasyon çizimi (adjusted for full screen)
+  Widget _buildDecoration(DecorationItem decoration, double screenWidth, double screenHeight) {
+    final x = decoration.left * screenWidth;
+    final y = (1.0 - decoration.bottom) * screenHeight;
 
     // Kategoriye göre dekorasyon widget'ı
     Widget decorationWidget = _buildDecorationByCategory(decoration);
@@ -496,55 +422,57 @@ class _TankRoomScreenState extends State<TankRoomScreen>
   }
 }
 
-// Yosun çizim painter'ı
-class _AlgaePainter extends CustomPainter {
+/// God Rays Painter - Light shafts from top-left
+class _GodRaysPainter extends CustomPainter {
+  final double animationValue;
+
+  _GodRaysPainter({required this.animationValue});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.green.withValues(alpha: 0.4)
-      ..style = PaintingStyle.fill;
+      ..style = PaintingStyle.fill
+      ..blendMode = BlendMode.softLight;
 
-    final random = math.Random(42);
+    // Create 5 light rays from top-left
+    final rayCount = 5;
+    final rayWidth = size.width * 0.2;
+    final startX = -size.width * 0.3;
     
-    // Rastgele yosun çizgileri ve lekeler
-    for (int i = 0; i < 30; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
+    for (int i = 0; i < rayCount; i++) {
+      final xOffset = i * (size.width * 0.3) + (animationValue * 20); // Subtle animation
+      final path = Path();
       
-      // Yosun çizgileri
-      final length = 15 + random.nextDouble() * 40;
-      canvas.drawLine(
-        Offset(x, y),
-        Offset(x, y + length),
-        paint..strokeWidth = 2 + random.nextDouble() * 4,
+      // Start point (top)
+      path.moveTo(startX + xOffset, 0);
+      path.lineTo(startX + xOffset + rayWidth, 0);
+      
+      // End point (bottom, spreading wider)
+      path.lineTo(startX + xOffset + rayWidth * 2.5, size.height);
+      path.lineTo(startX + xOffset + rayWidth * 0.3, size.height);
+      path.close();
+      
+      // Gradient for each ray
+      final gradient = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.white.withValues(alpha: 0.12 - (i * 0.02)), // Varying opacity
+          Colors.white.withValues(alpha: 0.06 - (i * 0.01)),
+          Colors.white.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.4, 1.0],
       );
       
-      // Yosun lekeleri (küçük daireler)
-      if (i % 3 == 0) {
-        final radius = 3 + random.nextDouble() * 8;
-        canvas.drawCircle(
-          Offset(x, y),
-          radius,
-          paint..color = Colors.green.withValues(alpha: 0.5),
-        );
-      }
+      paint.shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+      canvas.drawPath(path, paint);
     }
-    
-    // Köşelerde daha yoğun yosun
-    final cornerPaint = Paint()
-      ..color = Colors.green.withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
-    
-    // Sol üst köşe
-    canvas.drawCircle(const Offset(20, 20), 15, cornerPaint);
-    // Sağ üst köşe
-    canvas.drawCircle(Offset(size.width - 20, 20), 15, cornerPaint);
-    // Sol alt köşe
-    canvas.drawCircle(Offset(20, size.height - 20), 15, cornerPaint);
-    // Sağ alt köşe
-    canvas.drawCircle(Offset(size.width - 20, size.height - 20), 15, cornerPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _GodRaysPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
 }
+
+

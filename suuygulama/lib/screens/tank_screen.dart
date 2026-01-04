@@ -8,8 +8,8 @@ import '../utils/unit_converter.dart';
 import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/tank/tank_visualization.dart';
-import 'drink_gallery_screen.dart';
-import 'success_screen.dart';
+import '../widgets/interactive_cup_modal.dart';
+
 
 class TankScreen extends StatefulWidget {
   const TankScreen({super.key});
@@ -20,7 +20,6 @@ class TankScreen extends StatefulWidget {
 
 class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late AnimationController _coinAnimationController;
-  late Animation<double> _coinScaleAnimation;
   late AnimationController _waveController;
   late AnimationController _fillController;
   late Animation<double> _fillAnimation;
@@ -32,19 +31,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     
-    // Coin animasyonu
+    // Coin animasyonu (removed - no longer using scale animation)
     _coinAnimationController = AnimationController(
       duration: AppConstants.defaultAnimationDuration,
       vsync: this,
-    );
-    _coinScaleAnimation = Tween<double>(
-      begin: AppConstants.coinScaleBegin,
-      end: AppConstants.coinScaleEnd,
-    ).animate(
-      CurvedAnimation(
-        parent: _coinAnimationController,
-        curve: Curves.elasticOut,
-      ),
     );
     
     // Dalga animasyonu
@@ -118,9 +108,10 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppConstants.backgroundGradientColor1,
-              AppConstants.backgroundGradientColor2,
-              AppConstants.backgroundGradientColor3,
+              // Lighter background colors - increased brightness by 10-15%
+              Color(0xFFE8F7F3), // Lighter soft mint/aqua top
+              Color(0xFFF8F5F0), // Lighter cream middle
+              Color(0xFFFEFAF6), // Lighter warm cream bottom
             ],
             stops: [
               AppConstants.backgroundGradientStop1,
@@ -185,10 +176,6 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
           }
         });
         
-        final progressPercentage = dailyGoal > 0 
-            ? (currentIntake / dailyGoal).clamp(0.0, 1.0)
-            : 0.0;
-        
         return Stack(
           children: [
             // Layer 2: Main Content Column
@@ -205,60 +192,107 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                        // Left: Fire/Streak Button (no label)
-                        _CircleIconButton(
-                          icon: Icons.local_fire_department,
-                          iconColor: const Color(0xFFFF8A80),
-                          progressPercentage: progressPercentage,
-                          size: 54,
-                          iconSize: 28,
-                          progressRingSpacing: 6, // More spacing from button
-                          onTap: () {
-                            Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SuccessScreen(),
+                        // Left: Fire/Streak Capsule Button
+                        Container(
+                          height: 54,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(27),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 10,
+                                offset: const Offset(2, 2),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                    
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.local_fire_department,
+                                color: const Color(0xFFF87D38), // Orange color as requested
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${userProvider.consecutiveDays}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF5D4037),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
                         const Spacer(),
                     
-                        // Right: Coin Button + Menu Button (stacked vertically)
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
+                        // Right: Coin Capsule Button (from TankRoomScreen)
+                        Stack(
+                          alignment: Alignment.centerLeft,
+                          clipBehavior: Clip.none,
                           children: [
-                            // Coin Button (same size as fire button)
-                    ScaleTransition(
-                      scale: _coinScaleAnimation,
-                              child: _CircleIconButton(
-                                icon: Icons.monetization_on,
-                                iconColor: const Color(0xFFFFD54F),
-                                size: 54,
-                                iconSize: 28,
-                                badgeText: '${dailyHydrationProvider.tankCoins}',
-                                onTap: () {
-                                  // Could open rewards/shop screen
-                                },
-                            ),
-                    ),
-                            const SizedBox(height: 12),
-                            // Menu Button (below coin, same size)
-                            _GradientMenuButton(
-                              size: 54,
-                              onTap: () {
-                                if (!mounted) return;
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const DrinkGalleryScreen(),
+                            // The Tail (White Pill) - Starts from center of coin
+                            Container(
+                              height: 54,
+                              margin: const EdgeInsets.only(left: 27), // Starts exactly at coin center radius
+                              padding: const EdgeInsets.only(left: 36, right: 32), // Extra padding for length
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(27),
+                                  bottomRight: Radius.circular(27),
+                                  // Left side is hidden/square because it's under the coin, or rounded doesn't matter
+                                  topLeft: Radius.circular(0), 
+                                  bottomLeft: Radius.circular(0),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(2, 2),
+                                  ),
+                                ],
                               ),
-                                );
-                              },
-                        ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${dailyHydrationProvider.tankCoins}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF5D4037),
+                                ),
+                              ),
+                            ),
+                            
+                            // The Head (Yellow Coin) - Sits on top
+                            Container(
+                              height: 54,
+                              width: 54,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3E38D), // Pastel Yellow
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFF3E38D).withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.monetization_on_rounded,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ),
+                            ),
                           ],
-                    ),
+                        ),
                   ],
                 ),
               ),
@@ -300,230 +334,71 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                 ],
               ),
           ),
+          
+          // Floating Add Water Button - Bottom Center
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 100, // Above nav bar
+            child: Center(
+              child: _FloatingAddWaterButton(
+                onTap: _showWaterModal,
+              ),
+            ),
+          ),
           ],
         );
       },
     );
   }
+  
+  void _showWaterModal() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      isScrollControlled: true,
+      builder: (context) => const InteractiveCupModal(),
+    );
+  }
 }
-
-/// Circle Icon Button - Clean design without label
-class _CircleIconButton extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final double? progressPercentage;
-  final String? badgeText;
-  final double size;
-  final double iconSize;
-  final double progressRingSpacing;
+/// Floating Add Water Button - Large circular button at bottom center
+class _FloatingAddWaterButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _CircleIconButton({
-    required this.icon,
-    required this.iconColor,
-    this.progressPercentage,
-    this.badgeText,
-    this.size = 52,
-    this.iconSize = 24,
-    this.progressRingSpacing = 4,
-    required this.onTap,
-  });
+  const _FloatingAddWaterButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final ringSize = size + (progressRingSpacing * 2);
-    final innerSize = size - 8;
-
-      return GestureDetector(
-      onTap: onTap,
-        child: SizedBox(
-        width: ringSize,
-        height: ringSize,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-            // Progress ring (if provided) - with more spacing
-            if (progressPercentage != null && progressPercentage! > 0)
-              SizedBox(
-                width: ringSize,
-                height: ringSize,
-                child: CustomPaint(
-                  painter: _SoftProgressPainter(
-                    progress: progressPercentage!,
-                    strokeWidth: 3.0,
-                    progressColor: iconColor.withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-            // Main icon container
-              Container(
-              width: innerSize,
-              height: innerSize,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                    color: iconColor.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 2),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              child: Stack(
-                alignment: Alignment.center,
-                  children: [
-                    Icon(
-                    icon,
-                    color: iconColor,
-                    size: iconSize,
-                  ),
-                  // Badge for reward count
-                  if (badgeText != null)
-                    Positioned(
-                      right: 2,
-                      top: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: iconColor,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          badgeText!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-}
-
-/// Gradient Menu Button - With multi-color gradient icon
-class _GradientMenuButton extends StatelessWidget {
-  final double size;
-  final VoidCallback onTap;
-
-  const _GradientMenuButton({
-    required this.size,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final innerSize = size - 8;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: innerSize,
-        height: innerSize,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-              color: Colors.purple.withValues(alpha: 0.1),
-              blurRadius: 12,
-              spreadRadius: 2,
-              offset: const Offset(0, 2),
-                          ),
+        width: 70,
+        height: 70,
+        decoration: BoxDecoration(
+          color: const Color(0xFF81B9C9), // Updated to requested color
+          shape: BoxShape.circle,
+          boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: const Color(0xFF81B9C9).withValues(alpha: 0.4),
+              blurRadius: 16,
+              spreadRadius: 2,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Center(
-          child: ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFF9A9E), // Soft pink
-                Color(0xFFFECFEF), // Light pink
-                Color(0xFFA18CD1), // Soft purple
-                Color(0xFF5FC3E4), // Soft blue
-              ],
-              stops: [0.0, 0.3, 0.6, 1.0],
-            ).createShader(bounds),
-            child: Icon(
-              Icons.grid_view_rounded,
-              color: Colors.white,
-              size: size * 0.45,
-            ),
-          ),
+        child: const Icon(
+          Icons.water_drop_rounded,
+          color: Colors.white,
+          size: 32,
         ),
       ),
     );
-  }
-}
-
-/// Soft progress ring painter
-class _SoftProgressPainter extends CustomPainter {
-  final double progress;
-  final double strokeWidth;
-  final Color progressColor;
-
-  _SoftProgressPainter({
-    required this.progress,
-    required this.strokeWidth,
-    required this.progressColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-    
-    // Background track
-    final bgPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.1)
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    
-    canvas.drawCircle(center, radius, bgPaint);
-    
-    // Progress arc
-    if (progress > 0) {
-      final sweepAngle = 2 * math.pi * progress;
-      final progressPaint = Paint()
-        ..color = progressColor
-        ..strokeWidth = strokeWidth
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -math.pi / 2,
-        sweepAngle,
-        false,
-        progressPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SoftProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress;
   }
 }
 

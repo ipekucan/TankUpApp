@@ -20,7 +20,7 @@ class GlassFishBowl extends StatelessWidget {
         shape: BoxShape.circle,
         color: Colors.white.withValues(alpha: 0.15), // Hafif açık arka plan
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5), // Daha görünür beyaz kenarlık
+          color: const Color(0xFF81B9C9), // Updated to requested color
           width: 3,
         ),
         // Dış çizgiye gölge ekle - arka plandan ayırt edilebilir olsun

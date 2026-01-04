@@ -9,9 +9,13 @@ import '../utils/drink_helpers.dart';
 import '../utils/date_helpers.dart';
 import '../theme/app_text_styles.dart';
 import '../services/chart_data_service.dart' show ChartDataService, ChartPeriod;
-import '../widgets/history/chart_view.dart';
+
 import '../widgets/history/period_selector.dart';
 import '../widgets/history/insight_card.dart';
+import '../widgets/history/history_filter_button.dart';
+
+import '../widgets/history/history_insight_dialog.dart';
+import '../widgets/history/deferred_chart_view.dart';
 import '../services/chart_data_service.dart' show ChartDataPoint;
 
 class HistoryScreen extends StatefulWidget {
@@ -231,25 +235,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   builder: (context, computeKey, child) {
                     final historyProvider = context.read<HistoryProvider>();
-                    return _DeferredChartView(
-                      historyProvider: historyProvider,
-                      computeKey: computeKey,
-                      selectedPeriod: _selectedPeriod,
-                      selectedDrinkFilters: _selectedDrinkFilters,
-                      initialChartData: _lastChartData,
-                      touchedBarIndex: _touchedBarIndex ?? -1,
+                    return DeferredChartView(
+                      chartData: ChartDataService.buildChartData(
+                        historyProvider,
+                        _selectedPeriod,
+                        _selectedDrinkFilters,
+                      ),
+                      touchedBarIndex: _touchedBarIndex,
                       onBarTouched: (int? index) {
                         setState(() {
                           _touchedBarIndex = index;
                         });
                       },
-                      onChartDataComputed: (data) {
-                        if (!mounted) return;
-                        if (identical(_lastChartData, data)) return;
-                        setState(() {
-                          _lastChartData = data;
-                        });
-                      },
+                      isLoading: false,
                     );
                   },
                 ),
@@ -456,91 +454,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // Filtre butonu
   Widget _buildFilterButton(BuildContext context) {
-    return GestureDetector(
+    return HistoryFilterButton(
       onTap: () => _showFilterBottomSheet(context),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: _selectedDrinkFilters.isEmpty
-              ? Colors.grey[200]
-              : AppColors.softPinkButton.withValues(alpha: 0.2),
-          border: Border.all(
-            color: _selectedDrinkFilters.isEmpty
-                ? Colors.grey[400]!
-                : AppColors.softPinkButton,
-            width: 2,
-          ),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            _buildCustomDrinkIcon(),
-            Positioned(
-              bottom: 4,
-              child: Icon(
-                Icons.keyboard_arrow_down,
-                size: 18,
-                color: _selectedDrinkFilters.isEmpty
-                    ? Colors.grey[600]
-                    : AppColors.softPinkButton,
-              ),
-            ),
-          ],
-        ),
-      ),
+      hasActiveFilters: _selectedDrinkFilters.isNotEmpty,
     );
   }
 
-  // Özel bardak ikonu (3 renkli daireler)
-  Widget _buildCustomDrinkIcon() {
-    return SizedBox(
-      width: 32,
-      height: 32,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Mavi daire (Su)
-          Positioned(
-            left: 4,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          // Kahverengi daire (Kahve)
-          Positioned(
-            top: 4,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Colors.brown,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          // Turuncu daire (Asitli)
-          Positioned(
-            right: 4,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Colors.orange,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   // İçgörüler Dialog'unu göster
   void _showInsightDialog(
@@ -548,214 +468,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     HistoryProvider historyProvider,
     UserProvider userProvider,
   ) {
-    // Bugünün verilerini al
-    final today = DateTime.now();
-    final todayKey = DateHelpers.toDateKey(today);
-    final entries = historyProvider.getDrinkEntriesForDate(todayKey);
-
-    // İçecek miktarlarını hesapla
-    final Map<String, double> drinkAmounts = {};
-    for (var entry in entries) {
-      drinkAmounts[entry.drinkId] =
-          (drinkAmounts[entry.drinkId] ?? 0.0) + entry.amount;
-    }
-
-    // Kafeinli içecekler
-    final caffeineDrinks = [
-      'coffee',
-      'tea',
-      'herbal_tea',
-      'green_tea',
-      'iced_coffee',
-      'cold_tea',
-      'energy_drink',
-    ];
-    double caffeineVolume = 0.0;
-    for (var drinkId in caffeineDrinks) {
-      caffeineVolume += drinkAmounts[drinkId] ?? 0.0;
-    }
-
-    // Şekerli içecekler
-    final sugaryDrinks = [
-      'juice',
-      'fresh_juice',
-      'soda',
-      'lemonade',
-      'cold_tea',
-      'smoothie',
-    ];
-    double sugaryVolume = 0.0;
-    for (var drinkId in sugaryDrinks) {
-      sugaryVolume += drinkAmounts[drinkId] ?? 0.0;
-    }
-
-    // Su miktarı
-    final waterVolume = drinkAmounts['water'] ?? 0.0;
-    final totalVolume = drinkAmounts.values.fold(
-      0.0,
-      (sum, amount) => sum + amount,
-    );
-
-    // İçgörüler
-    final hasHighCaffeine =
-        caffeineVolume > waterVolume && caffeineVolume > 500;
-    final hasHighSugar = sugaryVolume > waterVolume && sugaryVolume > 500;
-    final hasGoodBalance =
-        waterVolume >= (totalVolume * 0.6) && totalVolume > 0;
-    final hasAnyData = totalVolume > 0;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Günlük Sağlık Özeti', style: AppTextStyles.heading3),
-        content: SingleChildScrollView(
-          child: hasAnyData
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Kafein Kotası
-                    if (caffeineVolume > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildInsightCard(
-                          icon: Icons.local_cafe,
-                          iconColor: Colors.brown,
-                          title: 'Kafein Kotası',
-                          subtitle: UnitConverter.formatVolume(
-                            caffeineVolume,
-                            userProvider.isMetric,
-                          ),
-                          message: hasHighCaffeine
-                              ? '☕ Kafeinli içecekler suyunu geçti. Bir bardak suyla dengeleyin!'
-                              : 'Kafein alımınız dengeli görünüyor.',
-                          backgroundColor: hasHighCaffeine
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.green.withValues(alpha: 0.1),
-                        ),
-                      ),
-
-                    // Şeker Kotası
-                    if (sugaryVolume > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildInsightCard(
-                          icon: Icons.cake,
-                          iconColor: Colors.pink,
-                          title: 'Şeker Kotası',
-                          subtitle: UnitConverter.formatVolume(
-                            sugaryVolume,
-                            userProvider.isMetric,
-                          ),
-                          message: hasHighSugar
-                              ? '🍰 Şekerli içecekler suyunu geçti. Bir bardak suyla dengeleyin!'
-                              : 'Şeker alımınız dengeli görünüyor.',
-                          backgroundColor: hasHighSugar
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.green.withValues(alpha: 0.1),
-                        ),
-                      ),
-
-                    // Genel Sağlık Yorumu
-                    if (hasGoodBalance)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildInsightCard(
-                          icon: Icons.favorite,
-                          iconColor: Colors.red,
-                          title: 'Sağlık Durumu',
-                          subtitle: 'Mükemmel',
-                          message:
-                              '💚 Böbreklerin bayram etti! Su tüketimin harika.',
-                          backgroundColor: Colors.green.withValues(alpha: 0.1),
-                        ),
-                      )
-                    else if (totalVolume > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildInsightCard(
-                          icon: Icons.water_drop,
-                          iconColor: Colors.blue,
-                          title: 'Su Dengesi',
-                          subtitle:
-                              '${((waterVolume / totalVolume) * 100).toStringAsFixed(0)}% Su',
-                          message:
-                              'Su oranını artırmayı deneyin. Hidrasyon için önemli!',
-                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                        ),
-                      ),
-                  ],
-                )
-              : const Text(
-                  'Harika gidiyorsun! Her şey yolunda.',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Tamam',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: const Color(0xFF4A5568),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    showHistoryInsightDialog(context, historyProvider, userProvider);
   }
 
-  // Tek bir insight kartı
-  Widget _buildInsightCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required String message,
-    required Color backgroundColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: iconColor.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 32),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.bodyLarge),
-                const SizedBox(height: 4),
-                Text(subtitle, style: AppTextStyles.bodyGrey),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   // Filtre bottom sheet'i göster
   void _showFilterBottomSheet(BuildContext context) {
@@ -828,82 +544,6 @@ class _ChartComputeKey {
 
   @override
   int get hashCode => Object.hash(historyRevision, period, filtersKey);
-}
-
-class _DeferredChartView extends StatefulWidget {
-  final HistoryProvider historyProvider;
-  final _ChartComputeKey computeKey;
-  final ChartPeriod selectedPeriod;
-  final Set<String> selectedDrinkFilters;
-  final List<ChartDataPoint> initialChartData;
-  final int touchedBarIndex;
-  final ValueChanged<int?> onBarTouched;
-  final ValueChanged<List<ChartDataPoint>>? onChartDataComputed;
-
-  const _DeferredChartView({
-    required this.historyProvider,
-    required this.computeKey,
-    required this.selectedPeriod,
-    required this.selectedDrinkFilters,
-    required this.initialChartData,
-    required this.touchedBarIndex,
-    required this.onBarTouched,
-    this.onChartDataComputed,
-  });
-
-  @override
-  State<_DeferredChartView> createState() => _DeferredChartViewState();
-}
-
-class _DeferredChartViewState extends State<_DeferredChartView> {
-  late List<ChartDataPoint> _chartData;
-
-  @override
-  void initState() {
-    super.initState();
-    _chartData = widget.initialChartData;
-    _scheduleRecompute();
-  }
-
-  @override
-  void didUpdateWidget(covariant _DeferredChartView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.computeKey != widget.computeKey) {
-      _scheduleRecompute();
-    }
-  }
-
-  void _scheduleRecompute() {
-    final scheduledKey = widget.computeKey;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (scheduledKey != widget.computeKey) return;
-
-      final data = ChartDataService.buildChartData(
-        widget.historyProvider,
-        widget.selectedPeriod,
-        widget.selectedDrinkFilters,
-      );
-
-      if (!mounted) return;
-      if (scheduledKey != widget.computeKey) return;
-
-      setState(() {
-        _chartData = data;
-      });
-      widget.onChartDataComputed?.call(data);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChartView(
-      chartData: _chartData,
-      selectedPeriod: widget.selectedPeriod,
-      touchedBarIndex: widget.touchedBarIndex,
-      onBarTouched: widget.onBarTouched,
-    );
-  }
 }
 
 /// Helper class for date range

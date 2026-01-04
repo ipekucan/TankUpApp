@@ -221,9 +221,10 @@ class DailyHydrationProvider extends ChangeNotifier {
       await _updateStreakOnGoalCompletion();
     }
 
-    // Challenge tracking - unchanged logic flow (uses BuildContext like before)
+    // Challenge tracking - Check context before usage
     int challengeCoinsReward = 0;
     if (context != null &&
+        context.mounted &&
         drink.id == 'water' &&
         amount >= AppConstants.challengeBigCupMinMl) {
       try {
@@ -231,17 +232,19 @@ class DailyHydrationProvider extends ChangeNotifier {
         final challengeProvider = Provider.of<ChallengeProvider>(context, listen: false);
         if (challengeProvider.hasActiveChallenge('caffeine_hunter')) {
           challengeCoinsReward = await challengeProvider.updateProgress('caffeine_hunter', 1.0);
-          if (challengeCoinsReward > 0 && scaffoldMessenger != null) {
+          if (challengeCoinsReward > 0 && scaffoldMessenger != null && context.mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Tebrikler! Kafein Avcısı mücadelesini tamamladın! 🎉 +$challengeCoinsReward Coin',
+              if (context.mounted) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Tebrikler! Kafein Avcısı mücadelesini tamamladın! 🎉 +$challengeCoinsReward Coin',
+                    ),
+                    backgroundColor: const Color(0xFF8B4513),
+                    duration: const Duration(seconds: 3),
                   ),
-                  backgroundColor: const Color(0xFF8B4513),
-                  duration: const Duration(seconds: 3),
-                ),
-              );
+                );
+              }
             });
           }
         }
