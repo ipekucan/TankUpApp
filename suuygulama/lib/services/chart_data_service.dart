@@ -39,7 +39,7 @@ class ChartDataService {
     'iced_coffee': Color(0xFFEA580C),  // Burnt orange
     'ayran': Color(0xFF64748B),        // Slate
     'kefir': Color(0xFF94A3B8),        // Cool gray
-    'milk': Color(0xFFF1F5F9),         // Off-white
+    'milk': Color(0xFFE2E8F0),         // Light blue-gray (more visible)
     'juice': Color(0xFFEF4444),        // Red
     'smoothie': Color(0xFFA855F7),     // Purple
     'fresh_juice': Color(0xFF84CC16),  // Lime

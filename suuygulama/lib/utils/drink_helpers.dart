@@ -11,23 +11,47 @@ class DrinkHelpers {
   static String getEmoji(String drinkId) {
     switch (drinkId) {
       case 'water':
+        return '🚰'; // Glass with water
       case 'mineral_water':
-        return '💧';
+        return '🍶'; // Bottle
       case 'coffee':
-        return '☕';
+        return '☕'; // Coffee cup
       case 'tea':
+        return '🍵'; // Tea cup
       case 'herbal_tea':
+        return '🫖'; // Teapot
       case 'green_tea':
-        return '🍵';
+        return '🍃'; // Green leaf tea
       case 'soda':
-        return '🥤';
+        return '🥤'; // Cup with straw
       case 'juice':
+        return '🧃'; // Juice box
       case 'fresh_juice':
-        return '🧃';
+        return '🍹'; // Tropical drink
       case 'milk':
-        return '🥛';
+        return '🥛'; // Glass of milk
       case 'smoothie':
-        return '🥤';
+        return '🥤'; // Smoothie cup
+      case 'lemonade':
+        return '🍹'; // Yellow drink in glass
+      case 'sports':
+        return '🍼'; // Sports bottle
+      case 'cold_tea':
+        return '🧊'; // Iced tea
+      case 'iced_coffee':
+        return '🧋'; // Bubble tea/iced coffee
+      case 'ayran':
+        return '🥛'; // Yogurt drink
+      case 'kefir':
+        return '🍶'; // Fermented drink
+      case 'protein_shake':
+        return '🥤'; // Protein shake
+      case 'coconut_water':
+        return '🥥'; // Coconut
+      case 'energy_drink':
+        return '🥫'; // Energy drink can
+      case 'detox_water':
+        return '🧉'; // Herbal drink
       default:
         return '🥤';
     }

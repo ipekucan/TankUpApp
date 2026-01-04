@@ -8,7 +8,11 @@ import '../utils/unit_converter.dart';
 import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/tank/tank_visualization.dart';
-import '../widgets/interactive_cup_modal.dart';
+import '../widgets/drink_selection_modal.dart';
+import '../widgets/tank/challenge_button.dart';
+import '../widgets/tank/coin_button.dart';
+import '../widgets/tank/streak_button.dart';
+import '../features/challenge/screens/challenge_screen.dart';
 import 'history_screen.dart';
 
 
@@ -183,7 +187,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
             SafeArea(
               child: Column(
                 children: [
-                  // Header Row - Clean design without labels
+                  // Header Row - Clean design with 3 equal buttons
                 Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20.0,
@@ -193,8 +197,9 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                        // Left: Fire/Streak Capsule Button (Navigation to HistoryScreen)
-                        GestureDetector(
+                        // Left: Streak Button (54x54)
+                        StreakButton(
+                          streakCount: userProvider.consecutiveDays,
                           onTap: () {
                             Navigator.push(
                               context,
@@ -205,104 +210,32 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                               ),
                             );
                           },
-                          child: Container(
-                            height: 54,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(27),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.local_fire_department,
-                                  color: const Color(0xFFF87D38), // Orange color for visibility
-                                  size: 30,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${userProvider.consecutiveDays}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Color(0xFF5D4037),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                         
                         const Spacer(),
                     
-                        // Right: Coin Capsule Button (from TankRoomScreen)
-                        Stack(
-                          alignment: Alignment.centerLeft,
-                          clipBehavior: Clip.none,
+                        // Right: Coin + Challenge Button Column
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            // The Tail (White Pill) - Starts from center of coin
-                            Container(
-                              height: 54,
-                              margin: const EdgeInsets.only(left: 27), // Starts exactly at coin center radius
-                              padding: const EdgeInsets.only(left: 36, right: 32), // Extra padding for length
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.95),
-                                borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(27),
-                                  bottomRight: Radius.circular(27),
-                                  // Left side is hidden/square because it's under the coin, or rounded doesn't matter
-                                  topLeft: Radius.circular(0), 
-                                  bottomLeft: Radius.circular(0),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(2, 2),
-                                  ),
-                                ],
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '${dailyHydrationProvider.tankCoins}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Color(0xFF5D4037),
-                                ),
-                              ),
+                            // Coin Button (54x54)
+                            CoinButton(
+                              coinAmount: dailyHydrationProvider.tankCoins,
                             ),
-                            
-                            // The Head (Yellow Coin) - Sits on top
-                            Container(
-                              height: 54,
-                              width: 54,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3E38D), // Pastel Yellow
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFF3E38D).withValues(alpha: 0.5),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
+
+                            const SizedBox(height: 12), // Space between buttons
+
+                            // Challenge Button (54x54)
+                            ChallengeButton(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ChallengeScreen(),
                                   ),
-                                ],
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.monetization_on_rounded,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -371,7 +304,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       isScrollControlled: true,
-      builder: (context) => const InteractiveCupModal(),
+      builder: (context) => const DrinkSelectionModal(),
     );
   }
 }

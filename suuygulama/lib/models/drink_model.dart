@@ -66,7 +66,7 @@ class DrinkData {
       ),
       Drink(
         id: 'herbal_tea',
-        name: 'Bitki Çayı',
+        name: 'Bitki Çay',
         caloriePer100ml: 0.5,
         hydrationFactor: 0.85, // %85 hidrasyon
       ),
@@ -132,7 +132,7 @@ class DrinkData {
       ),
       Drink(
         id: 'fresh_juice',
-        name: 'Taze Sıkılmış Meyve Suyu',
+        name: 'Taze Suyu',
         caloriePer100ml: 50.0,
         hydrationFactor: 0.92, // %92 hidrasyon
       ),
@@ -146,13 +146,13 @@ class DrinkData {
       ),
       Drink(
         id: 'protein_shake',
-        name: 'Protein Shake',
+        name: 'Protein',
         caloriePer100ml: 80.0,
         hydrationFactor: 0.75, // %75 hidrasyon
       ),
       Drink(
         id: 'coconut_water',
-        name: 'Hindistan Cevizi Suyu',
+        name: 'Hindistan C.',
         caloriePer100ml: 20.0,
         hydrationFactor: 0.95, // %95 hidrasyon
       ),
@@ -160,19 +160,19 @@ class DrinkData {
       // Diğer
       Drink(
         id: 'soda',
-        name: 'Gazlı İçecek',
+        name: 'Gazlı',
         caloriePer100ml: 42.0,
         hydrationFactor: 0.6, // %60 hidrasyon
       ),
       Drink(
         id: 'energy_drink',
-        name: 'Enerji İçeceği',
+        name: 'Enerji',
         caloriePer100ml: 45.0,
         hydrationFactor: 0.65, // %65 hidrasyon
       ),
       Drink(
         id: 'detox_water',
-        name: 'Detoks Suyu',
+        name: 'Detoks',
         caloriePer100ml: 5.0,
         hydrationFactor: 0.98, // %98 hidrasyon
       ),

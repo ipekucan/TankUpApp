@@ -197,8 +197,39 @@ class _ChallengeScreenState extends State<ChallengeScreen> with TickerProviderSt
             right: 0,
             child: _buildHeader(),
           ),
+
+          // Layer 3: Back Button (Bottom Left)
+          Positioned(
+            bottom: 30,
+            left: 20,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+              },
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_back,
+                  color: Color(0xFF5D4037),
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
           
-          // Layer 3 (Overlay): The Onboarding Modal
+          // Layer 4 (Overlay): The Onboarding Modal
           if (_showWelcomeCard) _buildWelcomeCard(),
           
           // Floating Star for Onboarding
