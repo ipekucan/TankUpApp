@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/chart_data_service.dart';
+import '../../utils/app_colors.dart';
 
 class DeferredChartView extends StatefulWidget {
   final List<ChartDataPoint> chartData;
   final int? touchedBarIndex;
   final Function(int? touchedIndex)? onBarTouched;
   final bool isLoading;
+  final ChartPeriod? period; // Add period for change detection
 
   const DeferredChartView({
     super.key,
@@ -14,6 +16,7 @@ class DeferredChartView extends StatefulWidget {
     required this.touchedBarIndex,
     this.onBarTouched,
     this.isLoading = false,
+    this.period,
   });
 
   @override
@@ -22,17 +25,32 @@ class DeferredChartView extends StatefulWidget {
 
 class _DeferredChartViewState extends State<DeferredChartView> {
   final ValueNotifier<bool> _isChartReady = ValueNotifier<bool>(false);
+  ChartPeriod? _lastPeriod;
 
   @override
   void initState() {
     super.initState();
-    // Delay chart rendering to prevent performance issues during screen transitions
+    _lastPeriod = widget.period;
+    _prepareChart();
+  }
+
+  @override
+  void didUpdateWidget(DeferredChartView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If period changed, reset chart immediately
+    if (widget.period != _lastPeriod) {
+      _lastPeriod = widget.period;
+      _isChartReady.value = false;
+      _prepareChart();
+    }
+  }
+
+  void _prepareChart() {
+    // Immediate rendering for better performance (no delay)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 300)).then((_) {
-        if (mounted) {
-          _isChartReady.value = true;
-        }
-      });
+      if (mounted) {
+        _isChartReady.value = true;
+      }
     });
   }
 
@@ -42,16 +60,16 @@ class _DeferredChartViewState extends State<DeferredChartView> {
       valueListenable: _isChartReady,
       builder: (context, isReady, child) {
         if (widget.isLoading || !isReady) {
-          // Show loading indicator or empty state
-          return Container(
+          // Show loading indicator
+          return SizedBox(
             height: 200,
-            child: const Center(
+            child: Center(
               child: SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
                 ),
               ),
             ),
@@ -65,13 +83,13 @@ class _DeferredChartViewState extends State<DeferredChartView> {
 
   Widget _buildChart() {
     if (widget.chartData.isEmpty) {
-      return Container(
+      return SizedBox(
         height: 200,
-        child: const Center(
+        child: Center(
           child: Text(
             'Veri yok',
             style: TextStyle(
-              color: Color(0xFFA0AEC0),
+              color: AppColors.textTertiary,
               fontSize: 16,
             ),
           ),
@@ -94,15 +112,18 @@ class _DeferredChartViewState extends State<DeferredChartView> {
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (group) => Colors.grey[800]!,
+              getTooltipColor: (group) => AppColors.textPrimary.withValues(alpha: 0.9),
+              tooltipRoundedRadius: 8,
+              tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final point = widget.chartData[groupIndex];
                 final totalAmount = point.drinkAmounts.values.fold<double>(0, (a, b) => a + b);
                 return BarTooltipItem(
                   '${totalAmount.toInt()} ml',
-                  const TextStyle(
-                    color: Colors.white,
+                  TextStyle(
+                    color: AppColors.textWhite,
                     fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 );
               },
@@ -127,32 +148,58 @@ class _DeferredChartViewState extends State<DeferredChartView> {
       widget.chartData.length,
       (index) {
         final point = widget.chartData[index];
-        final totalAmount = point.drinkAmounts.values.fold<double>(0, (a, b) => a + b);
-
-        return BarChartGroupData(
-          x: index,
-          barsSpace: 4,
-          barRods: [
-            BarChartRodData(
-              toY: totalAmount,
-              color: widget.touchedBarIndex == index
-                  ? const Color(0xFF8B4513)
-                  : const Color(0xFFD6B689),
-              width: 16,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-              borderSide: BorderSide(
-                color: widget.touchedBarIndex == index
-                    ? const Color(0xFF8B4513)
-                    : const Color(0xFFD6B689),
-                width: 1,
-              ),
-            ),
-          ],
-        );
+        
+        // Build stacked bar with drink-specific colors
+        return _buildStackedBarGroup(index, point);
       },
+    );
+  }
+
+  BarChartGroupData _buildStackedBarGroup(int index, ChartDataPoint point) {
+    final rodStackItems = <BarChartRodStackItem>[];
+    double currentY = 0.0;
+
+    // Priority drinks first (water, coffee, tea, soda)
+    final priorityDrinks = ['water', 'coffee', 'tea', 'soda'];
+    for (var drinkId in priorityDrinks) {
+      final amount = point.drinkAmounts[drinkId] ?? 0.0;
+      if (amount > 0) {
+        final color = ChartDataService.drinkColors[drinkId] ?? AppColors.secondaryAqua;
+        rodStackItems.add(
+          BarChartRodStackItem(currentY, currentY + amount, color),
+        );
+        currentY += amount;
+      }
+    }
+
+    // Other drinks
+    for (var entry in point.drinkAmounts.entries) {
+      if (!priorityDrinks.contains(entry.key) && entry.value > 0) {
+        final color = ChartDataService.drinkColors[entry.key] ?? AppColors.secondaryAqua;
+        rodStackItems.add(
+          BarChartRodStackItem(currentY, currentY + entry.value, color),
+        );
+        currentY += entry.value;
+      }
+    }
+
+    final totalAmount = point.drinkAmounts.values.fold<double>(0, (a, b) => a + b);
+
+    return BarChartGroupData(
+      x: index,
+      barsSpace: 4,
+      barRods: [
+        BarChartRodData(
+          toY: totalAmount,
+          width: 20,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(6),
+            topRight: Radius.circular(6),
+          ),
+          rodStackItems: rodStackItems.isNotEmpty ? rodStackItems : null,
+          color: rodStackItems.isEmpty ? AppColors.cardBorder : null,
+        ),
+      ],
     );
   }
 
@@ -162,22 +209,21 @@ class _DeferredChartViewState extends State<DeferredChartView> {
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 30,
+          reservedSize: 36,
           getTitlesWidget: (value, meta) {
             if (value < 0 || value >= widget.chartData.length) {
               return const Text('');
             }
             final point = widget.chartData[value.toInt()];
-            // For day period, show day/month; for other periods, show month abbreviation
             return SideTitleWidget(
               axisSide: meta.axisSide,
               space: 4,
               child: Text(
                 _formatXAxisLabel(point),
-                style: const TextStyle(
-                  color: Color(0xFF718096),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             );
@@ -185,11 +231,7 @@ class _DeferredChartViewState extends State<DeferredChartView> {
         ),
       ),
       leftTitles: const AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 40,
-          interval: 500,
-        ),
+        sideTitles: SideTitles(showTitles: false),
       ),
       topTitles: const AxisTitles(
         sideTitles: SideTitles(showTitles: false),
@@ -209,9 +251,6 @@ class _DeferredChartViewState extends State<DeferredChartView> {
   }
 
   String _formatXAxisLabel(ChartDataPoint point) {
-    // This method formats the X-axis labels based on the chart period
-    // In the actual implementation, this would use the ChartPeriod enum
-    // For now, we'll use a simple date format
-    return '${point.date.day}.${point.date.month}';
+    return point.label;
   }
 }

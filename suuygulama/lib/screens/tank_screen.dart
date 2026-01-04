@@ -9,6 +9,7 @@ import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/tank/tank_visualization.dart';
 import '../widgets/interactive_cup_modal.dart';
+import 'history_screen.dart';
 
 
 class TankScreen extends StatefulWidget {
@@ -192,39 +193,51 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                        // Left: Fire/Streak Capsule Button
-                        Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(27),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(2, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.local_fire_department,
-                                color: const Color(0xFFF87D38), // Orange color as requested
-                                size: 24,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${userProvider.consecutiveDays}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Color(0xFF5D4037),
+                        // Left: Fire/Streak Capsule Button (Navigation to HistoryScreen)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const HistoryScreen(
+                                  hideAppBar: false,
                                 ),
                               ),
-                            ],
+                            );
+                          },
+                          child: Container(
+                            height: 54,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(27),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department,
+                                  color: const Color(0xFFF87D38), // Orange color for visibility
+                                  size: 30,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${userProvider.consecutiveDays}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: Color(0xFF5D4037),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         

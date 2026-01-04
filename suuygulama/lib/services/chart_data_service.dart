@@ -91,8 +91,8 @@ class ChartDataService {
           drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
         }
 
-        // Etiket: Haftanın günleri (single letter abbreviations: P, S, Ç, P, C, C, P)
-        final dayLabel = ChartDateUtils.getDaySingleLetter(date);
+        // Etiket: Haftanın günleri (short names: Pzt, Sal, Çar, Per, Cum, Cmt, Paz)
+        final dayLabel = ChartDateUtils.getDayLabel(date);
 
         iterationCounter++;
         if (iterationCounter % 7 == 0) {
@@ -131,9 +131,9 @@ class ChartDataService {
           drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
         }
 
-        // Label: Week number (1, 2, 3, 4) where 4 is the current week
+        // Label: Week number (1.Hafta, 2.Hafta, 3.Hafta, 4.Hafta)
         final weekNumber = 4 - i;
-        final label = '$weekNumber. Hafta';
+        final label = '$weekNumber.Hafta';
 
         iterationCounter++;
         if (iterationCounter % 7 == 0) {
@@ -149,37 +149,16 @@ class ChartDataService {
         ));
       }
     } else {
-      // AY Modu: Last 6 months ending with the current month
-      // Labels: Abbreviated Turkish month names (Oca, Şub, Mar, Nis, May, Haz, etc.)
-      const monthAbbreviations = [
-        'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
-        'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'
+      // AY Modu: First 6 months of the year (January to June)
+      const monthNames = [
+        'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'
       ];
       
-      final currentMonth = now.month;
       final currentYear = now.year;
 
-      // Generate data for the last 6 months
       for (int i = 0; i < 6; i++) {
-        // Calculate target month (going back from current month)
-        int targetMonth = currentMonth - (5 - i);
+        int targetMonth = i + 1;
         int targetYear = currentYear;
-
-        // Handle year rollover
-        int rolloverSafetyCounter = 0;
-        while (targetMonth <= 0) {
-          rolloverSafetyCounter++;
-          if (rolloverSafetyCounter > 24) {
-            LoggerService.logError(
-              'Infinite loop detected in ChartDataService month rollover',
-              'targetMonth=$targetMonth targetYear=$targetYear currentMonth=$currentMonth currentYear=$currentYear',
-              null,
-            );
-            break;
-          }
-          targetMonth += 12;
-          targetYear -= 1;
-        }
 
         final monthStart =
             DateHelpers.normalizeDate(ChartDateUtils.getMonthStart(targetYear, targetMonth));
@@ -198,8 +177,8 @@ class ChartDataService {
           drinkAmounts[entry.drinkId] = (drinkAmounts[entry.drinkId] ?? 0) + entry.amount;
         }
 
-        // Use abbreviated month name (Oca, Şub, Mar, etc.)
-        final label = monthAbbreviations[targetMonth - 1];
+        // Use full month name as requested (Ocak, Şubat, vb.)
+        final label = monthNames[i];
 
         iterationCounter++;
         if (iterationCounter % 7 == 0) {

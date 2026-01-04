@@ -18,11 +18,11 @@ class PeriodSelector extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildPeriodButton('Son 7 Gün', ChartPeriod.day),
+        _buildPeriodButton('Gün', ChartPeriod.day),
         const SizedBox(width: 8),
-        _buildPeriodButton('Son 4 Hafta', ChartPeriod.week),
+        _buildPeriodButton('Hafta', ChartPeriod.week),
         const SizedBox(width: 8),
-        _buildPeriodButton('Son 12 Ay', ChartPeriod.month),
+        _buildPeriodButton('Ay', ChartPeriod.month),
       ],
     );
   }
