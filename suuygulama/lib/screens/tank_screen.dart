@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/daily_hydration_provider.dart';
 import '../providers/aquarium_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/history_provider.dart';
 import '../utils/unit_converter.dart';
 import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
@@ -137,13 +138,17 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildTankView() {
-    return Consumer3<DailyHydrationProvider, AquariumProvider, UserProvider>(
-      builder: (context, dailyHydrationProvider, aquariumProvider, userProvider, child) {
+    return Consumer4<DailyHydrationProvider, AquariumProvider, UserProvider, HistoryProvider>(
+      builder: (context, dailyHydrationProvider, aquariumProvider, userProvider, historyProvider, child) {
         final currentIntake = dailyHydrationProvider.consumedAmount;
         final dailyGoal = dailyHydrationProvider.dailyGoal;
         final fillPercentage = (dailyGoal > 0) 
             ? (currentIntake / dailyGoal).clamp(0.0, 1.0) 
             : 0.0;
+        
+        // Calculate live streak based on current consumption and goal
+        // This recalculates immediately if goal changes in Profile
+        final liveStreak = historyProvider.calculateLiveStreak(currentIntake, dailyGoal);
         
         // Animasyonlu dolum: fillPercentage değiştiğinde animasyonu başlat
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -198,8 +203,12 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                         // Left: Streak Button (54x54)
+                        // Real-time progress: consumedAmount / dailyGoal
+                        // Dynamic: Updates immediately when goal changes in Profile
                         StreakButton(
-                          streakCount: userProvider.consecutiveDays,
+                          streakCount: liveStreak,
+                          consumedAmount: currentIntake,
+                          dailyGoal: dailyGoal,
                           onTap: () {
                             Navigator.push(
                               context,

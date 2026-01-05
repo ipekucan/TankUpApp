@@ -215,5 +215,96 @@ class HistoryProvider extends ChangeNotifier {
 
     _drinkHistory.removeWhere((key, value) => key.compareTo(cutoffKey) < 0);
   }
+
+  /// Calculate current hydration streak (consecutive days with water consumption).
+  ///
+  /// Logic:
+  /// - Iterate backwards from today (or yesterday if no water drunk today yet)
+  /// - Count consecutive days where consumption > 0
+  /// - Stop at first day with 0 consumption
+  /// - Return streak count (0 if no streak)
+  int calculateCurrentStreak() {
+    if (_drinkHistory.isEmpty) {
+      return 0;
+    }
+
+    final now = DateTime.now();
+    final today = DateHelpers.normalizeDate(now);
+    final todayKey = DateHelpers.toDateKey(today);
+
+    // Check if water was drunk today
+    final todayConsumption = _drinkHistory[todayKey] ?? 0.0;
+    
+    // Start from today if consumed, otherwise from yesterday
+    DateTime currentDate = todayConsumption > 0 ? today : today.subtract(const Duration(days: 1));
+    
+    int streak = 0;
+    const maxIterations = 365; // Safety limit
+
+    for (int i = 0; i < maxIterations; i++) {
+      final dateKey = DateHelpers.toDateKey(currentDate);
+      final consumption = _drinkHistory[dateKey] ?? 0.0;
+
+      if (consumption > 0) {
+        streak++;
+        currentDate = currentDate.subtract(const Duration(days: 1));
+      } else {
+        // First day with no consumption - break streak
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  /// Calculate live streak based on current consumption and goal.
+  ///
+  /// This is the REAL-TIME streak that considers:
+  /// - Historical streak (consecutive days from previous days)
+  /// - Today's progress: +1 if currentConsumption >= dailyGoal, otherwise +0
+  ///
+  /// Key Rules:
+  /// 1. Binary increment: Even if user drinks 200% of goal, streak only adds +1 for today
+  /// 2. Dynamic goal: If goal changes mid-day, progress recalculates immediately
+  /// 3. No double counting: Today's entry in history is ignored to prevent duplication
+  ///
+  /// Returns: Total streak count (historical + today's potential)
+  int calculateLiveStreak(double currentConsumption, double dailyGoal) {
+    if (dailyGoal <= 0) {
+      return 0; // Invalid goal
+    }
+
+    final now = DateTime.now();
+    final today = DateHelpers.normalizeDate(now);
+
+    // Calculate historical streak (excluding today)
+    int historicalStreak = 0;
+    
+    if (_drinkHistory.isNotEmpty) {
+      // Start from yesterday to avoid counting today twice
+      DateTime currentDate = today.subtract(const Duration(days: 1));
+      const maxIterations = 365; // Safety limit
+
+      for (int i = 0; i < maxIterations; i++) {
+        final dateKey = DateHelpers.toDateKey(currentDate);
+        final consumption = _drinkHistory[dateKey] ?? 0.0;
+
+        if (consumption > 0) {
+          historicalStreak++;
+          currentDate = currentDate.subtract(const Duration(days: 1));
+        } else {
+          // First day with no consumption - break streak
+          break;
+        }
+      }
+    }
+
+    // Check if today's goal is met (binary: either +1 or +0)
+    final isTodayGoalMet = currentConsumption >= dailyGoal;
+    final todayBonus = isTodayGoalMet ? 1 : 0;
+
+    // Return historical + today's bonus
+    return historicalStreak + todayBonus;
+  }
 }
 

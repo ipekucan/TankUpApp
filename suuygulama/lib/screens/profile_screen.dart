@@ -444,88 +444,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 
   void _showCustomGoalDialog(BuildContext context, DailyHydrationProvider dailyHydrationProvider) {
-    final controller = TextEditingController(
-      text: (dailyHydrationProvider.dailyGoal / 1000).toStringAsFixed(1),
-    );
-    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Günlük Su Hedefi'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Hedef (Litre)',
-                  hintText: 'Örn: 2.4',
-                  suffixText: 'L',
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Lütfen günlük su hedefinizi litre cinsinden girin',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF4A5568),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (mounted) {
-                controller.dispose();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('İptal'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (!mounted) return;
-              final goal = double.tryParse(controller.text);
-              if (goal != null && goal > 0 && goal <= 10) {
-                await dailyHydrationProvider.updateDailyGoal(goal * 1000); // ml'ye çevir
-                
-                // Kullanıcı hedef belirledi olarak işaretle
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('custom_goal_set', true);
-                
-                if (!context.mounted) return;
-                controller.dispose();
-                Navigator.pop(context);
-                _showSuccessSnackBar(context, 'Günlük su hedefiniz yenilendi!');
-              } else {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Lütfen 0 ile 10 litre arası bir değer girin'),
-                    backgroundColor: Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    margin: const EdgeInsets.all(16),
-                  ),
-                );
-              }
-            },
-            child: const Text('Kaydet'),
-          ),
-        ],
+      builder: (context) => _GoalUpdateDialog(
+        currentGoal: dailyHydrationProvider.dailyGoal,
+        dailyHydrationProvider: dailyHydrationProvider,
       ),
-    ).then((_) {
-      // Dialog kapandığında controller'ı temizle (güvenli dispose)
-      if (mounted) {
-        controller.dispose();
-      }
-    });
+    );
   }
 
   void _showUnitDialog(BuildContext context) {
@@ -575,6 +500,135 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Goal Update Dialog Widget - Fixes TextEditingController disposal bug
+/// 
+/// This StatefulWidget ensures the controller is only disposed when the widget
+/// is permanently removed from the tree, not during dialog exit animation.
+class _GoalUpdateDialog extends StatefulWidget {
+  final double currentGoal; // in ml
+  final DailyHydrationProvider dailyHydrationProvider;
+
+  const _GoalUpdateDialog({
+    required this.currentGoal,
+    required this.dailyHydrationProvider,
+  });
+
+  @override
+  State<_GoalUpdateDialog> createState() => _GoalUpdateDialogState();
+}
+
+class _GoalUpdateDialogState extends State<_GoalUpdateDialog> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controller with current goal (convert ml to liters)
+    _controller = TextEditingController(
+      text: (widget.currentGoal / 1000).toStringAsFixed(1),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Safe disposal: only happens when widget is permanently removed
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _handleSave() async {
+    if (!mounted) return;
+    
+    final goal = double.tryParse(_controller.text);
+    
+    if (goal != null && goal > 0 && goal <= 10) {
+      // Valid goal: update provider
+      await widget.dailyHydrationProvider.updateDailyGoal(goal * 1000); // Convert to ml
+      
+      // Mark that user has set custom goal
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('custom_goal_set', true);
+      
+      if (!mounted) return;
+      Navigator.pop(context);
+      _showSuccessSnackBar(context, 'Günlük su hedefiniz yenilendi!');
+    } else {
+      // Invalid goal: show error
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Lütfen 0 ile 10 litre arası bir değer girin'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Günlük Su Hedefi'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Hedef (Litre)',
+                hintText: 'Örn: 2.4',
+                suffixText: 'L',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Lütfen günlük su hedefinizi litre cinsinden girin',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF4A5568),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: const Text('İptal'),
+        ),
+        TextButton(
+          onPressed: _handleSave,
+          child: const Text('Kaydet'),
+        ),
+      ],
     );
   }
 }

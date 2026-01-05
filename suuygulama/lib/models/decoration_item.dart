@@ -8,6 +8,7 @@ class DecorationItem {
   final double left; // X pozisyonu (0.0 - 1.0)
   final int layerOrder; // Katman sırası (z-index)
   final String category; // 'Zemin/Kum', 'Arka Plan', 'Süs'
+  final int? requiredStreak; // Gerekli streak (null ise streak gereksiz)
 
   DecorationItem({
     required this.id,
@@ -18,6 +19,7 @@ class DecorationItem {
     required this.left,
     required this.layerOrder,
     required this.category,
+    this.requiredStreak,
   });
 
   // JSON'a dönüştürme
@@ -31,6 +33,7 @@ class DecorationItem {
       'left': left,
       'layerOrder': layerOrder,
       'category': category,
+      'requiredStreak': requiredStreak,
     };
   }
 
@@ -45,6 +48,7 @@ class DecorationItem {
       left: (json['left'] as num).toDouble(),
       layerOrder: json['layerOrder'] as int,
       category: json['category'] as String,
+      requiredStreak: json['requiredStreak'] as int?,
     );
   }
 
@@ -58,6 +62,7 @@ class DecorationItem {
     double? left,
     int? layerOrder,
     String? category,
+    int? requiredStreak,
   }) {
     return DecorationItem(
       id: id ?? this.id,
@@ -68,6 +73,7 @@ class DecorationItem {
       left: left ?? this.left,
       layerOrder: layerOrder ?? this.layerOrder,
       category: category ?? this.category,
+      requiredStreak: requiredStreak ?? this.requiredStreak,
     );
   }
 }

@@ -347,7 +347,7 @@ class AppConstants {
   // ============================================
 
   /// Daily hydration hard limit (ml). Used to prevent consuming beyond a safe cap.
-  static const double dailyHydrationLimitMl = 5000.0;
+  static const double dailyHydrationLimitMl = 1000000.0;
 
   /// Daily coin reward granted on day reset.
   static const int dailyResetCoinReward = 10;
