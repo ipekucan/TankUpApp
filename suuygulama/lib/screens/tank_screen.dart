@@ -8,12 +8,14 @@ import '../providers/history_provider.dart';
 import '../utils/unit_converter.dart';
 import '../core/constants/app_constants.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/app_colors.dart';
 import '../widgets/tank/tank_visualization.dart';
 import '../widgets/drink_selection_modal.dart';
-import '../widgets/tank/challenge_button.dart';
 import '../widgets/tank/coin_button.dart';
 import '../widgets/tank/streak_button.dart';
-import '../features/challenge/screens/challenge_screen.dart';
+import '../widgets/tank/drink_shortcut_button.dart';
+import '../models/shortcut_action.dart';
+import '../models/drink_model.dart';
 import 'history_screen.dart';
 
 
@@ -32,6 +34,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   late AnimationController _bubbleController;
   double _animatedFillPercentage = 0.0;
   final List<TankBubble> _bubbles = [];
+  final List<Drink> _drinkShortcuts = []; // Shortcut list
   
   @override
   void initState() {
@@ -223,30 +226,9 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
                         
                         const Spacer(),
                     
-                        // Right: Coin + Challenge Button Column
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // Coin Button (54x54)
-                            CoinButton(
-                              coinAmount: dailyHydrationProvider.tankCoins,
-                            ),
-
-                            const SizedBox(height: 12), // Space between buttons
-
-                            // Challenge Button (54x54)
-                            ChallengeButton(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ChallengeScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                        // Right: Coin Button (54x54)
+                        CoinButton(
+                          coinAmount: dailyHydrationProvider.tankCoins,
                         ),
                   ],
                 ),
@@ -290,14 +272,35 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               ),
           ),
           
-          // Floating Add Water Button - Bottom Center
+          // Unified Scrollable Button Train - Bottom Center
           Positioned(
             left: 0,
             right: 0,
             bottom: 100, // Above nav bar
             child: Center(
-              child: _FloatingAddWaterButton(
-                onTap: _showWaterModal,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center, // Center when small
+                  children: [
+                    // 1. Main Water Button (ALWAYS FIRST - Head of Train)
+                    _FloatingAddWaterButton(
+                      onTap: _showWaterModal,
+                    ),
+                    
+                    // 2. Shortcut Buttons (Tail of Train)
+                    if (_drinkShortcuts.isNotEmpty) ..._drinkShortcuts.map(
+                      (drink) => Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: DrinkShortcutButton(
+                          drink: drink,
+                          onTap: () => _showShortcutDrink(drink.id),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -308,12 +311,59 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
   }
   
   void _showWaterModal() async {
-    await showModalBottomSheet(
+    final result = await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       isScrollControlled: true,
       builder: (context) => const DrinkSelectionModal(),
+    );
+    
+    // Check if result is a shortcut action request
+    if (result is ShortcutAction) {
+      _addShortcut(result.drinkId);
+    }
+  }
+  
+  /// Add drink to shortcuts list
+  void _addShortcut(String drinkId) {
+    final drink = DrinkData.getDrinks().firstWhere((d) => d.id == drinkId);
+    
+    // Avoid duplicates
+    if (_drinkShortcuts.any((d) => d.id == drinkId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${drink.name} zaten kısayollarda!'),
+          backgroundColor: AppColors.primaryBlue,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      _drinkShortcuts.add(drink);
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${drink.name} kısayollara eklendi!'),
+        backgroundColor: AppColors.primaryBlue,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  /// Show drink amount selector for shortcut
+  void _showShortcutDrink(String drinkId) async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      isScrollControlled: true,
+      builder: (context) => DrinkSelectionModal(initialDrinkId: drinkId),
     );
   }
 }

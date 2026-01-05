@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import 'tank_screen.dart';
 import 'tank_room_screen.dart';
-import '../features/challenge/screens/challenge_screen.dart';
 import 'profile_screen.dart';
 
 /// Modern Animated Navigation Screen
@@ -27,7 +26,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final List<Widget> _screens = [
     const TankScreen(),
     const TankRoomScreen(),
-    const ChallengeScreen(),
     const ProfileScreen(),
   ];
 
@@ -129,10 +127,6 @@ const List<_NavItemData> _navItems = [
   _NavItemData(
     activeIcon: Icons.grid_view_rounded,
     inactiveIcon: Icons.grid_view_outlined,
-  ),
-  _NavItemData(
-    activeIcon: Icons.pie_chart_rounded,
-    inactiveIcon: Icons.pie_chart_outline_rounded,
   ),
   _NavItemData(
     activeIcon: Icons.favorite_rounded,

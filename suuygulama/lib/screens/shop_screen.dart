@@ -250,16 +250,14 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                             const SizedBox(height: 16),
                             
-                            // Coin + Streak butonları (dikdörtgen genişliğine yayılmış)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8), // Kenarlardan biraz içeri
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildCoinButton(dailyHydrationProvider),
-                                  _buildStreakButton(currentStreak),
-                                ],
-                              ),
+                            // Coin + Streak butonları (ortalanmış)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center, // Center aligned
+                              children: [
+                                _buildCoinButton(dailyHydrationProvider),
+                                const SizedBox(width: 12),
+                                _buildStreakButton(currentStreak),
+                              ],
                             ),
                             
                             const SizedBox(height: 12),

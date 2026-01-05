@@ -12,7 +12,9 @@ import 'drink_amount_selector.dart';
 
 /// Modern drink selection modal with horizontal scrollable drink buttons
 class DrinkSelectionModal extends StatefulWidget {
-  const DrinkSelectionModal({super.key});
+  final String? initialDrinkId; // Optional: Open directly to amount selector
+  
+  const DrinkSelectionModal({super.key, this.initialDrinkId});
 
   @override
   State<DrinkSelectionModal> createState() => _DrinkSelectionModalState();
@@ -29,6 +31,17 @@ class _DrinkSelectionModalState extends State<DrinkSelectionModal> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentPage);
+    
+    // If initialDrinkId provided, open amount selector directly
+    if (widget.initialDrinkId != null) {
+      final drink = DrinkData.getDrinks().firstWhere(
+        (d) => d.id == widget.initialDrinkId,
+        orElse: () => DrinkData.getDrinks().first,
+      );
+      _selectedDrinkId = widget.initialDrinkId;
+      _selectedDrink = drink;
+      _showAmountSelector = true;
+    }
   }
 
   // First page drinks (8 drinks including water)

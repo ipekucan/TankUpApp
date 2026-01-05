@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/drink_model.dart';
+import '../models/shortcut_action.dart';
 import '../providers/user_provider.dart';
 import '../services/chart_data_service.dart';
 import 'amount_slider_bar.dart';
-import 'animated_fill_glass.dart'; // Animated glass with fill
-import 'circular_close_button.dart';
+import 'animated_fill_glass.dart';
 
 /// Amount selector card for a specific drink
 class DrinkAmountSelector extends StatefulWidget {
@@ -61,7 +61,7 @@ class _DrinkAmountSelectorState extends State<DrinkAmountSelector> {
             ),
           ),
 
-          // Header with back button, drink name, and close button
+          // Header with back button and drink name with "+" button
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: Row(
@@ -89,47 +89,64 @@ class _DrinkAmountSelectorState extends State<DrinkAmountSelector> {
                 
                 const Spacer(),
                 
-                // Close button (right corner)
-                CircularCloseButton(
-                  onTap: widget.onBack,
-                  size: 36,
+                // Drink Name (Centered)
+                Text(
+                  widget.drink.name,
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.9),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
+                
+                const SizedBox(width: 8),
+                
+                // "+" Button (Add to Shortcuts)
+                GestureDetector(
+                  onTap: () {
+                    // Return shortcut action signal
+                    Navigator.pop(context, ShortcutAction(widget.drink.id));
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.add,
+                      size: 20,
+                      color: color,
+                    ),
+                  ),
+                ),
+                
+                const Spacer(),
               ],
             ),
           ),
 
-          // Drink name centered with underline - Higher position
+          // Underline decoration below header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8), // Less vertical padding
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.drink.name,
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.9), // More bold
-                    fontSize: 26, // Larger (was 24)
-                    fontWeight: FontWeight.w600, // Bold and rounded (was w300)
-                    letterSpacing: 0.5,
-                    height: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+            child: Container(
+              height: 2,
+              width: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.0),
+                    color.withValues(alpha: 0.4),
+                    color.withValues(alpha: 0.0),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  height: 2, // Thicker underline
-                  width: 120,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        color.withValues(alpha: 0.0),
-                        color.withValues(alpha: 0.4),
-                        color.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
