@@ -272,35 +272,37 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
               ),
           ),
           
-          // Unified Scrollable Button Train - Bottom Center
+          // Center-Anchored Scrollable Button Train - Bottom Center
           Positioned(
             left: 0,
             right: 0,
             bottom: 100, // Above nav bar
-            child: Center(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center, // Center when small
-                  children: [
-                    // 1. Main Water Button (ALWAYS FIRST - Head of Train)
-                    _FloatingAddWaterButton(
-                      onTap: _showWaterModal,
-                    ),
-                    
-                    // 2. Shortcut Buttons (Tail of Train)
-                    if (_drinkShortcuts.isNotEmpty) ..._drinkShortcuts.map(
-                      (drink) => Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: DrinkShortcutButton(
-                          drink: drink,
-                          onTap: () => _showShortcutDrink(drink.id),
-                        ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.only(
+                left: (MediaQuery.of(context).size.width / 2) - 35, // Anchor main button at center (70px button / 2)
+                right: 20, // Right padding so last item visible
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start, // NO center - keeps button anchored
+                children: [
+                  // 1. Main Water Button (Anchored at Center)
+                  _FloatingAddWaterButton(
+                    onTap: _showWaterModal,
+                  ),
+                  
+                  // 2. Shortcut Buttons (Append to Right)
+                  if (_drinkShortcuts.isNotEmpty) ..._drinkShortcuts.map(
+                    (drink) => Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: DrinkShortcutButton(
+                        drink: drink,
+                        onTap: () => _showShortcutDrink(drink.id),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -367,7 +369,7 @@ class _TankScreenState extends State<TankScreen> with TickerProviderStateMixin {
     );
   }
 }
-/// Floating Add Water Button - Large circular button at bottom center
+/// Ana Su Ekleme Butonu - Alt ortada büyük yuvarlak buton (düz, gölgesiz)
 class _FloatingAddWaterButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -381,21 +383,9 @@ class _FloatingAddWaterButton extends StatelessWidget {
         width: 70,
         height: 70,
         decoration: BoxDecoration(
-          color: const Color(0xFF81B9C9), // Updated to requested color
+          color: const Color(0xFF81B9C9),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF81B9C9).withValues(alpha: 0.4),
-              blurRadius: 16,
-              spreadRadius: 2,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          // Tüm gölgeler kaldırıldı - tamamen düz 2D sticker görünümü
         ),
         child: const Icon(
           Icons.water_drop_rounded,

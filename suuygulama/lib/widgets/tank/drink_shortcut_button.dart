@@ -31,14 +31,7 @@ class DrinkShortcutButton extends StatelessWidget {
             color: color.withValues(alpha: 0.3),
             width: 2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.2),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          // Gölge kaldırıldı - düz görünüm
         ),
         child: Center(
           child: Text(
