@@ -17,9 +17,9 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerProviderStateMixin {
-  // Pastel blue-white color palette
-  static const Color _backgroundPastelBlue = Color(0xFFE3F2FD); // Very light pastel blue
-  static const Color _textDeepBlue = Color(0xFF1976D2); // Deep blue for text
+  // Clean & Bold color palette
+  static const Color _backgroundOffWhite = Color(0xFFF7F7F7); // Off-white background
+  static const Color _primaryMutedBlue = Color(0xFF85B7D2); // Muted blue for text
   
   // Animation controller for breathing effect
   late AnimationController _breathingController;
@@ -104,19 +104,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundPastelBlue,
+      backgroundColor: _backgroundOffWhite,
       body: SafeArea(
         child: Column(
           children: [
             // Top Navigation Bar
             _buildTopBar(),
             
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
             
             // Header Section (Goal + Title)
             _buildHeader(),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             
             // Menu Buttons
             Expanded(
@@ -140,7 +140,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
             child: const Text(
               'Atla',
               style: TextStyle(
-                color: _textDeepBlue,
+                color: _primaryMutedBlue,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
@@ -164,14 +164,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
           goalValue,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            color: _textDeepBlue,
-            fontSize: 64,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2.0,
+            color: _primaryMutedBlue,
+            fontSize: 72,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
           ),
         ),
         
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         
         // Bottom Text: Title
         AnimatedBuilder(
@@ -185,10 +185,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
                   'Hedefini Belirle',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _textDeepBlue,
-                    fontSize: 28,
+                    color: _primaryMutedBlue,
+                    fontSize: 32,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    letterSpacing: 0,
                   ),
                 ),
               ),

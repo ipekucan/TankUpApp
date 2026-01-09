@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Modular menu button widget for onboarding screen
 class OnboardingMenuButton extends StatelessWidget {
+  // Clean & Bold color palette
+  static const Color _primaryMutedBlue = Color(0xFF85B7D2);
+  static const Color _buttonPaleBlue = Color(0xFFD2ECF9);
+  
   final String label;
   final IconData icon;
   final String? selectedValue;
@@ -25,31 +29,13 @@ class OnboardingMenuButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          gradient: hasSelection
-              ? const LinearGradient(
-                  colors: [
-                    Color(0xFF64B5F6), // Medium blue
-                    Color(0xFF42A5F5), // Slightly darker blue
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : const LinearGradient(
-                  colors: [
-                    Color(0xFFBBDEFB), // Light pastel blue
-                    Color(0xFFE3F2FD), // Very light blue
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+          color: _buttonPaleBlue,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: hasSelection
-                  ? const Color(0xFF1976D2).withValues(alpha: 0.2)
-                  : const Color(0xFF90CAF9).withValues(alpha: 0.15),
+              color: _primaryMutedBlue.withValues(alpha: 0.1),
               offset: const Offset(0, 2),
               blurRadius: 4,
             ),
@@ -62,26 +48,22 @@ class OnboardingMenuButton extends StatelessWidget {
             Flexible(
               child: Text(
                 hasSelection ? selectedValue! : label,
-                style: TextStyle(
-                  color: hasSelection 
-                      ? Colors.white 
-                      : const Color(0xFF1976D2),
-                  fontSize: 15,
-                  fontWeight: hasSelection ? FontWeight.w700 : FontWeight.w600,
+                style: const TextStyle(
+                  color: _primaryMutedBlue,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             
-            const SizedBox(width: 6),
+            const SizedBox(width: 12),
             
             // Icon on right (selected or default)
             Icon(
               hasSelection ? selectedIcon! : icon,
-              color: hasSelection 
-                  ? Colors.white 
-                  : const Color(0xFF1976D2),
-              size: 20,
+              color: _primaryMutedBlue,
+              size: 32,
             ),
           ],
         ),

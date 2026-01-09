@@ -5,7 +5,6 @@ import '../utils/app_colors.dart';
 import '../utils/unit_converter.dart';
 import '../providers/daily_hydration_provider.dart';
 import '../providers/user_provider.dart';
-import 'reset_time_screen.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/common/app_card.dart';
 import '../widgets/profile/gender_dialog.dart';
@@ -23,233 +22,226 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // Color palette constants
+  static const Color _profileCream = Color(0xFFFFF4E2);
+  static const Color _profileGold = Color(0xFFD0C6A4);
+  static const Color _unitsRemindersPink = Color(0xFFF7E1DE);
+  static const Color _unitsRemindersRose = Color(0xFFD19589);
+  static const Color _developerBlue = Color(0xFFD2ECF9);
+  static const Color _developerBlueGrey = Color(0xFF7595A7);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundSubtle,
-      resizeToAvoidBottomInset: true, // Klavye açıldığında ekranın yukarı kayması
-      appBar: AppBar(
-        title: const Text(
-          'Ayarlar',
-          style: TextStyle(
-            fontWeight: FontWeight.w300,
-            letterSpacing: 1.2,
+      backgroundColor: const Color(0xFFF5F8F9), // Clean off-white
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppConstants.defaultPadding,
+            vertical: 16,
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Consumer2<DailyHydrationProvider, UserProvider>(
-          builder: (context, dailyHydrationProvider, userProvider, child) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profil Bölümü
-                _buildSection(
-                  title: 'Profil',
-                  children: [
-                    _buildProfileButton(
-                      icon: Icons.person,
-                      label: 'Cinsiyet',
-                      value: _getGenderText(userProvider.userData.gender),
-                      isPlaceholder: userProvider.userData.gender == null,
-                      onTap: () => GenderDialog.show(
-                        context,
-                        userProvider,
-                        (message) => _showSuccessSnackBar(context, message),
+          child: Consumer2<DailyHydrationProvider, UserProvider>(
+            builder: (context, dailyHydrationProvider, userProvider, child) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile Section
+                  _buildSection(
+                    title: 'Profil',
+                    children: [
+                      _buildProfileButton(
+                        icon: Icons.person,
+                        label: 'Cinsiyet',
+                        value: _getGenderText(userProvider.userData.gender),
+                        isPlaceholder: userProvider.userData.gender == null,
+                        backgroundColor: _profileCream,
+                        iconColor: _profileGold,
+                        onTap: () => GenderDialog.show(
+                          context,
+                          userProvider,
+                          (message) => _showSuccessSnackBar(context, message),
+                        ),
                       ),
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.monitor_weight,
-                      label: 'Kilo',
-                      value: (userProvider.userData.weight != null && userProvider.userData.weight! > 0)
-                          ? UnitConverter.formatWeight(userProvider.userData.weight!, userProvider.isMetric)
-                          : 'Girilmemiş',
-                      isPlaceholder: (userProvider.userData.weight == null || userProvider.userData.weight! <= 0),
-                      onTap: () => WeightDialog.show(
-                        context,
-                        userProvider,
-                        (message) => _showSuccessSnackBar(context, message),
+                      _buildProfileButton(
+                        icon: Icons.monitor_weight,
+                        label: 'Kilo',
+                        value: (userProvider.userData.weight != null && userProvider.userData.weight! > 0)
+                            ? UnitConverter.formatWeight(userProvider.userData.weight!, userProvider.isMetric)
+                            : 'Girilmemiş',
+                        isPlaceholder: (userProvider.userData.weight == null || userProvider.userData.weight! <= 0),
+                        backgroundColor: _profileCream,
+                        iconColor: _profileGold,
+                        onTap: () => WeightDialog.show(
+                          context,
+                          userProvider,
+                          (message) => _showSuccessSnackBar(context, message),
+                        ),
                       ),
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.directions_run,
-                      label: 'Aktivite',
-                      value: _getActivityText(userProvider.userData.activityLevel),
-                      isPlaceholder: userProvider.userData.activityLevel == null,
-                      onTap: () => ActivityDialog.show(
-                        context,
-                        userProvider,
-                        (message) => _showSuccessSnackBar(context, message),
+                      _buildProfileButton(
+                        icon: Icons.directions_run,
+                        label: 'Aktivite',
+                        value: _getActivityText(userProvider.userData.activityLevel),
+                        isPlaceholder: userProvider.userData.activityLevel == null,
+                        backgroundColor: _profileCream,
+                        iconColor: _profileGold,
+                        onTap: () => ActivityDialog.show(
+                          context,
+                          userProvider,
+                          (message) => _showSuccessSnackBar(context, message),
+                        ),
                       ),
-                    ),
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, child) {
-                        return FutureBuilder<bool>(
-                          future: _isGoalCustomSet(dailyHydrationProvider),
-                          builder: (context, snapshot) {
-                            final isCustomGoal = snapshot.data ?? false;
-                            String goalValue = 'Belirtilmemiş';
-                            if (isCustomGoal) {
-                              goalValue = UnitConverter.formatVolume(
-                                dailyHydrationProvider.dailyGoal,
-                                userProvider.isMetric,
+                      Consumer<UserProvider>(
+                        builder: (context, userProvider, child) {
+                          return FutureBuilder<bool>(
+                            future: _isGoalCustomSet(dailyHydrationProvider),
+                            builder: (context, snapshot) {
+                              final isCustomGoal = snapshot.data ?? false;
+                              String goalValue = 'Belirtilmemiş';
+                              if (isCustomGoal) {
+                                goalValue = UnitConverter.formatVolume(
+                                  dailyHydrationProvider.dailyGoal,
+                                  userProvider.isMetric,
+                                );
+                              }
+                              return _buildProfileButton(
+                                icon: Icons.flag,
+                                label: 'Hedef',
+                                value: goalValue,
+                                isPlaceholder: !isCustomGoal,
+                                backgroundColor: _profileCream,
+                                iconColor: _profileGold,
+                                onTap: () => _showCustomGoalDialog(context, dailyHydrationProvider),
                               );
-                            }
-                            return _buildProfileButton(
-                              icon: Icons.flag,
-                              label: 'Hedef',
-                              value: goalValue,
-                              isPlaceholder: !isCustomGoal,
-                              onTap: () => _showCustomGoalDialog(context, dailyHydrationProvider),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.wb_sunny,
-                      label: 'İklim',
-                      value: _getClimateText(userProvider.userData.climate),
-                      isPlaceholder: userProvider.userData.climate == null,
-                      onTap: () => ClimateDialog.show(
-                        context,
-                        userProvider,
-                        (message) => _showSuccessSnackBar(context, message),
+                            },
+                          );
+                        },
                       ),
-                    ),
-                  ],
-                ),
-                
-                SizedBox(height: AppConstants.largePadding),
-                
-                // Birim ve Hatırlatıcılar
-                _buildSection(
-                  title: 'Birim ve Hatırlatıcılar',
-                  children: [
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, child) {
-                        return _buildProfileButton(
-                          icon: Icons.straighten,
-                          label: 'Birim',
-                          value: userProvider.isMetric ? 'ml' : 'oz',
-                          onTap: () => _showUnitDialog(context),
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.notifications,
-                      label: 'Hatırlatma Programı',
-                      value: 'Bildirim saatleri',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Hatırlatma Programı - Yakında'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.volume_up,
-                      label: 'Hatırlatma Sesi',
-                      value: 'Varsayılan',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Hatırlatma Sesi - Yakında'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                
-                SizedBox(height: AppConstants.largePadding),
-                
-                // Gün Sıfırlama Saati
-                _buildSection(
-                  title: 'Gün Ayarları',
-                  children: [
-                    FutureBuilder<String>(
-                      future: _getResetTimeAsync(),
-                      builder: (context, snapshot) {
-                        return _buildProfileButton(
-                          icon: Icons.refresh,
-                          label: 'Gün Sıfırlama Saati',
-                          value: snapshot.data ?? '00:00',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ResetTimeScreen(),
-                              ),
-                            ).then((_) {
-                              setState(() {}); // Geri dönünce güncelle
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                
-                SizedBox(height: AppConstants.largePadding),
-                
-                // Geliştirici Bölümü
-                _buildSection(
-                  title: 'Geliştirici',
-                  children: [
-                    _buildProfileButton(
-                      icon: Icons.feedback,
-                      label: 'Geri Bildirim',
-                      value: '',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Geri Bildirim - Yakında'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.star,
-                      label: 'Uygulamayı Değerlendir',
-                      value: '',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Uygulamayı Değerlendir - Yakında'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildProfileButton(
-                      icon: Icons.share,
-                      label: 'Uygulamayı Paylaş',
-                      value: '',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Uygulamayı Paylaş - Yakında'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                
-                SizedBox(height: AppConstants.extraLargePadding),
-              ],
-            );
-          },
+                      _buildProfileButton(
+                        icon: Icons.wb_sunny,
+                        label: 'İklim',
+                        value: _getClimateText(userProvider.userData.climate),
+                        isPlaceholder: userProvider.userData.climate == null,
+                        backgroundColor: _profileCream,
+                        iconColor: _profileGold,
+                        onTap: () => ClimateDialog.show(
+                          context,
+                          userProvider,
+                          (message) => _showSuccessSnackBar(context, message),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Units & Reminders Section
+                  _buildSection(
+                    title: 'Birim ve Hatırlatıcılar',
+                    children: [
+                      Consumer<UserProvider>(
+                        builder: (context, userProvider, child) {
+                          return _buildProfileButton(
+                            icon: Icons.straighten,
+                            label: 'Birim',
+                            value: userProvider.isMetric ? 'ml' : 'oz',
+                            backgroundColor: _unitsRemindersPink,
+                            iconColor: _unitsRemindersRose,
+                            onTap: () => _showUnitDialog(context),
+                          );
+                        },
+                      ),
+                      _buildProfileButton(
+                        icon: Icons.notifications,
+                        label: 'Hatırlatma Programı',
+                        value: 'Bildirim saatleri',
+                        backgroundColor: _unitsRemindersPink,
+                        iconColor: _unitsRemindersRose,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hatırlatma Programı - Yakında'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildProfileButton(
+                        icon: Icons.volume_up,
+                        label: 'Hatırlatma Sesi',
+                        value: 'Varsayılan',
+                        backgroundColor: _unitsRemindersPink,
+                        iconColor: _unitsRemindersRose,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hatırlatma Sesi - Yakında'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Developer Section
+                  _buildSection(
+                    title: 'Geliştirici',
+                    children: [
+                      _buildProfileButton(
+                        icon: Icons.feedback,
+                        label: 'Geri Bildirim',
+                        value: '',
+                        backgroundColor: _developerBlue,
+                        iconColor: _developerBlueGrey,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Geri Bildirim - Yakında'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildProfileButton(
+                        icon: Icons.star,
+                        label: 'Uygulamayı Değerlendir',
+                        value: '',
+                        backgroundColor: _developerBlue,
+                        iconColor: _developerBlueGrey,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Uygulamayı Değerlendir - Yakında'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildProfileButton(
+                        icon: Icons.share,
+                        label: 'Uygulamayı Paylaş',
+                        value: '',
+                        backgroundColor: _developerBlue,
+                        iconColor: _developerBlueGrey,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Uygulamayı Paylaş - Yakında'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 24),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -287,6 +279,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String label,
     required String value,
     required VoidCallback onTap,
+    required Color backgroundColor,
+    required Color iconColor,
     bool isPlaceholder = false,
   }) {
     return InkWell(
@@ -302,12 +296,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.softPinkButton.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(20), // Softer corners
               ),
               child: Icon(
                 icon,
-                color: AppColors.softPinkButton,
+                color: iconColor,
                 size: 20,
               ),
             ),
@@ -410,13 +404,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       LoggerService.logError('Failed to check if daily goal is custom set', e, stackTrace);
       return false;
     }
-  }
-
-  Future<String> _getResetTimeAsync() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hour = prefs.getInt('reset_time_hour') ?? 0;
-    final minute = prefs.getInt('reset_time_minute') ?? 0;
-    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
 
   // Pembe tonlarında, yuvarlatılmış köşeli ve modern SnackBar göster

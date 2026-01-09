@@ -1,13 +1,12 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/app_colors.dart';
 import '../providers/user_provider.dart';
 import '../core/services/logger_service.dart';
 import 'onboarding_screen.dart';
 import 'main_navigation_screen.dart';
 
+/// Splash screen with sophisticated breathing welcome animation
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -15,64 +14,28 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _waveController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _waveAnimation;
-
+class _SplashScreenState extends State<SplashScreen> {
+  bool _hasNavigated = false;
+  
   @override
   void initState() {
     super.initState();
-    
-    // Fade-in animasyonu
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _fadeController,
-        curve: Curves.easeIn,
-      ),
-    );
-    
-    // Dalga animasyonu (sürekli döngü)
-    _waveController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _waveAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
-      CurvedAnimation(
-        parent: _waveController,
-        curve: Curves.linear,
-      ),
-    );
-    
-    // Fade-in animasyonunu başlat
-    _fadeController.forward();
-    
-    // Dalga animasyonunu sürekli döngüde çalıştır
-    _waveController.repeat();
-    
-    _navigateToNextScreen();
+    _startNavigationTimer();
   }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _waveController.dispose();
-    super.dispose();
+  
+  void _startNavigationTimer() {
+    // Wait 3 seconds for animation to complete
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_hasNavigated) {
+        _navigateToNextScreen();
+      }
+    });
   }
 
   Future<void> _navigateToNextScreen() async {
-    // 3 saniye bekle
-    await Future.delayed(const Duration(seconds: 3));
+    if (_hasNavigated || !mounted) return;
     
-    if (!mounted) return;
+    _hasNavigated = true;
     
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -80,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
       
       final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
       
-      // Eğer onboarding tamamlanmamışsa veya weight verisi yoksa onboarding göster
+      // Check if onboarding is needed
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final hasWeight = userProvider.userData.weight != null;
       
@@ -98,7 +61,6 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } catch (e, stackTrace) {
-      // Hata durumunda onboarding göster
       LoggerService.logError('Failed to check onboarding status', e, stackTrace);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -109,118 +71,186 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundSubtle,
+    return const Scaffold(
+      backgroundColor: Color(0xFFF7F7F7), // Clean off-white
       body: SafeArea(
-        child: Center(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Dalga animasyonu (arka plan)
-              AnimatedBuilder(
-                animation: _waveAnimation,
-                builder: (context, child) {
-                  return CustomPaint(
-                    size: Size(
-                      MediaQuery.of(context).size.width,
-                      MediaQuery.of(context).size.height * 0.3,
-                    ),
-                    painter: WavePainter(
-                      waveHeight: 20.0,
-                      waveOffset: _waveAnimation.value * 2 * 3.14159,
-                    ),
-                  );
-                },
-              ),
-              
-              // Logo ve başlık (fade-in)
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo ikonu (su damlası)
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: AppColors.softPinkButton.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.water_drop,
-                        size: 70,
-                        color: AppColors.softPinkButton,
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    // Uygulama adı
-                    Text(
-                      'TankUp',
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.softPinkButton,
-                        letterSpacing: 2.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Hidrasyon Asistanınız',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w300,
-                        color: const Color(0xFF4A5568).withValues(alpha: 0.7),
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: _SplashBackground(),
       ),
     );
   }
 }
 
-// Dalga çizimi için CustomPainter
-class WavePainter extends CustomPainter {
-  final double waveHeight;
-  final double waveOffset;
-
-  WavePainter({
-    required this.waveHeight,
-    required this.waveOffset,
-  });
+/// Background layout wrapper for splash screen
+class _SplashBackground extends StatelessWidget {
+  const _SplashBackground();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.waterColor.withValues(alpha: 0.15)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height / 2);
-
-    for (double x = 0; x <= size.width; x++) {
-      final y = size.height / 2 +
-          waveHeight * 
-          math.sin((x / size.width * 2 * math.pi) + waveOffset);
-      path.lineTo(x, y);
-    }
-
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(WavePainter oldDelegate) {
-    return oldDelegate.waveOffset != waveOffset;
+  Widget build(BuildContext context) {
+    return const Center(
+      child: _BreathingLogo(),
+    );
   }
 }
 
+/// Breathing logo widget with sophisticated entrance and breathing animations
+class _BreathingLogo extends StatefulWidget {
+  const _BreathingLogo();
+
+  @override
+  State<_BreathingLogo> createState() => _BreathingLogoState();
+}
+
+class _BreathingLogoState extends State<_BreathingLogo>
+    with SingleTickerProviderStateMixin {
+  // Theme color
+  static const Color _themeColor = Color(0xFF85B7D2);
+  
+  late AnimationController _controller;
+  late Animation<double> _entranceOpacity;
+  late Animation<double> _entranceScale;
+  late Animation<double> _breathingScale;
+  
+  bool _entranceComplete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+  
+  void _initializeAnimations() {
+    // Single controller for both phases
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800), // Phase 1 duration
+      vsync: this,
+    );
+    
+    // Phase 1: Entrance animation (0.0 - 1.0)
+    _entranceOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut, // Safe curve for opacity (no overshoot)
+      ),
+    );
+    
+    _entranceScale = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack, // Pop effect (safe for scale)
+      ),
+    );
+    
+    // Phase 2: Breathing animation (1.0 - 1.05)
+    _breathingScale = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Add status listener for phase transition
+    _controller.addStatusListener(_onAnimationStatus);
+    
+    // Start entrance animation immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+  
+  void _onAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_entranceComplete) {
+      if (!mounted) return;
+      
+      // Entrance complete, start breathing loop
+      setState(() {
+        _entranceComplete = true;
+      });
+      
+      // Reset controller for breathing phase
+      _controller.duration = const Duration(milliseconds: 1500);
+      _controller.repeat(reverse: true); // Infinite breathing loop
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeStatusListener(_onAnimationStatus);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        // Clamp opacity to valid range [0.0, 1.0]
+        final opacity = (_entranceComplete ? 1.0 : _entranceOpacity.value).clamp(0.0, 1.0);
+        final scale = _entranceComplete ? _breathingScale.value : _entranceScale.value;
+        
+        return Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: scale,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo icon (water drop in circle)
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: _themeColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.water_drop,
+                    size: 70,
+                    color: _themeColor,
+                  ),
+                ),
+                
+                const SizedBox(height: 30),
+                
+                // App name
+                const Text(
+                  'TankUp',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: _themeColor,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                // Subtitle
+                Text(
+                  'Hidrasyon Asistanınız',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _themeColor.withValues(alpha: 0.6),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

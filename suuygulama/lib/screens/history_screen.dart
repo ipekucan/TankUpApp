@@ -37,6 +37,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   ChartPeriod _selectedPeriod = ChartPeriod.day;
   int? _touchedBarIndex;
   Set<String> _selectedDrinkFilters = {}; // Empty = All drinks
+  
+  // Memoization cache
+  List<ChartDataPoint>? _cachedChartData;
+  int? _cachedRevision;
+  ChartPeriod? _cachedPeriod;
+  Set<String>? _cachedFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +115,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   setState(() {
                     _selectedPeriod = period;
                     _touchedBarIndex = null;
+                    // Invalidate cache when period changes
+                    _cachedPeriod = null;
                   });
                 },
               ),
@@ -134,7 +142,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  /// Chart Section with Synchronous Rendering
+  /// Chart Section with Memoized Data Calculation
   Widget _buildChartSliver() {
     return SliverToBoxAdapter(
       child: Padding(
@@ -166,18 +174,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Chart with Selector for optimal performance
+              // Chart with Memoized Data
               SizedBox(
                 height: 200,
                 child: Selector<HistoryProvider, int>(
                   selector: (context, historyProvider) => historyProvider.historyRevision,
                   builder: (context, revision, child) {
-                    final historyProvider = context.read<HistoryProvider>();
-                    final chartData = ChartDataService.buildChartData(
-                      historyProvider,
-                      _selectedPeriod,
-                      _selectedDrinkFilters,
-                    );
+                    // Calculate chart data only if cache is invalid
+                    final chartData = _getChartData(context, revision);
 
                     return DeferredChartView(
                       chartData: chartData,
@@ -198,6 +202,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+  
+  /// Memoized chart data calculation
+  List<ChartDataPoint> _getChartData(BuildContext context, int revision) {
+    // Check if cache is still valid
+    final filtersChanged = _cachedFilters == null || 
+        !_setEquals(_cachedFilters!, _selectedDrinkFilters);
+    
+    if (_cachedChartData != null &&
+        _cachedRevision == revision &&
+        _cachedPeriod == _selectedPeriod &&
+        !filtersChanged) {
+      // Cache hit - return cached data
+      return _cachedChartData!;
+    }
+    
+    // Cache miss - recalculate
+    final historyProvider = context.read<HistoryProvider>();
+    final newChartData = ChartDataService.buildChartData(
+      historyProvider,
+      _selectedPeriod,
+      _selectedDrinkFilters,
+    );
+    
+    // Update cache
+    _cachedChartData = newChartData;
+    _cachedRevision = revision;
+    _cachedPeriod = _selectedPeriod;
+    _cachedFilters = Set.from(_selectedDrinkFilters);
+    
+    return newChartData;
+  }
+  
+  /// Helper to compare sets
+  bool _setEquals(Set<String> set1, Set<String> set2) {
+    if (set1.length != set2.length) return false;
+    return set1.every((element) => set2.contains(element));
   }
 
   /// Statistics Cards Section
