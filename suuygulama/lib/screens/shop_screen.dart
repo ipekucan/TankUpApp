@@ -16,172 +16,46 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen> {
-  String _selectedCategory = 'Kumlar'; // Varsayılan kategori
-  String _selectedTab = 'all'; // 'all' veya 'owned'
+  String _selectedCategory = 'Kumlar';
+  String _selectedTab = 'all'; 
 
-  // Kategoriler - Added "Ödüller" (Rewards) for streak-based items
   final List<String> _categories = ['Kumlar', 'Bitkiler', 'Objeler', 'Ödüller'];
 
-  // Mağaza ürünleri - Kategorize edilmiş
+  // Not: Bu listeyi const yapabilir veya dışarı taşıyabiliriz ama şimdilik burada kalsın.
+  // Her build'de yeniden oluşturulmaması için getter yerine variable yapabilirsin ama
+  // şimdilik performans sorunu bu değil.
   List<DecorationItem> _getShopItems() {
     return [
-      // Kumlar (Zemin/Kum kategorisi)
-      DecorationItem(
-        id: 'sand_basic',
-        name: 'Temel Kum',
-        imagePath: 'sand_basic',
-        price: 5, // Güncellendi: 50 → 5
-        bottom: 0.1,
-        left: 0.5,
-        layerOrder: 1,
-        category: 'Zemin/Kum',
-      ),
-      DecorationItem(
-        id: 'sand_golden',
-        name: 'Altın Kum',
-        imagePath: 'sand_golden',
-        price: 100,
-        bottom: 0.1,
-        left: 0.5,
-        layerOrder: 1,
-        category: 'Zemin/Kum',
-      ),
-      DecorationItem(
-        id: 'sand_white',
-        name: 'Beyaz Kum',
-        imagePath: 'sand_white',
-        price: 150,
-        bottom: 0.1,
-        left: 0.5,
-        layerOrder: 1,
-        category: 'Zemin/Kum',
-      ),
-      
-      // Bitkiler (Arka Plan kategorisi)
-      DecorationItem(
-        id: 'plant_seaweed',
-        name: 'Deniz Yosunu',
-        imagePath: 'plant_seaweed',
-        price: 80,
-        bottom: 0.3,
-        left: 0.2,
-        layerOrder: 2,
-        category: 'Arka Plan',
-      ),
-      DecorationItem(
-        id: 'plant_coral',
-        name: 'Mercan',
-        imagePath: 'plant_coral',
-        price: 120,
-        bottom: 0.3,
-        left: 0.5,
-        layerOrder: 2,
-        category: 'Arka Plan',
-      ),
-      DecorationItem(
-        id: 'plant_anemone',
-        name: 'Anemon',
-        imagePath: 'plant_anemone',
-        price: 150,
-        bottom: 0.3,
-        left: 0.8,
-        layerOrder: 2,
-        category: 'Arka Plan',
-      ),
-      
-      // Objeler (Süs kategorisi)
-      DecorationItem(
-        id: 'decoration_starfish',
-        name: 'Deniz Yıldızı',
-        imagePath: 'decoration_starfish',
-        price: 70,
-        bottom: 0.15,
-        left: 0.15,
-        layerOrder: 3,
-        category: 'Süs',
-      ),
-      DecorationItem(
-        id: 'decoration_shell',
-        name: 'Deniz Kabuğu',
-        imagePath: 'decoration_shell',
-        price: 60,
-        bottom: 0.15,
-        left: 0.85,
-        layerOrder: 3,
-        category: 'Süs',
-      ),
-      DecorationItem(
-        id: 'decoration_bubbles',
-        name: 'Hava Kabarcıkları',
-        imagePath: 'decoration_bubbles',
-        price: 90,
-        bottom: 0.5,
-        left: 0.5,
-        layerOrder: 3,
-        category: 'Süs',
-      ),
-      DecorationItem(
-        id: 'decoration_treasure',
-        name: 'Hazine Kutusu',
-        imagePath: 'decoration_treasure',
-        price: 200,
-        bottom: 0.2,
-        left: 0.5,
-        layerOrder: 3,
-        category: 'Süs',
-        requiredStreak: 7, // Requires 7-day streak to unlock
-      ),
-      
-      // Ödüller (Rewards) - Streak-based exclusive items
-      DecorationItem(
-        id: 'reward_coral_castle',
-        name: 'Mercan Kalesi',
-        imagePath: 'reward_coral_castle',
-        price: 300,
-        bottom: 0.35,
-        left: 0.5,
-        layerOrder: 3,
-        category: 'Ödül',
-        requiredStreak: 7, // 7-day streak
-      ),
-      DecorationItem(
-        id: 'reward_legendary_pearl',
-        name: 'Efsanevi İnci',
-        imagePath: 'reward_legendary_pearl',
-        price: 500,
-        bottom: 0.4,
-        left: 0.7,
-        layerOrder: 3,
-        category: 'Ödül',
-        requiredStreak: 14, // 14-day streak
-      ),
-      DecorationItem(
-        id: 'reward_poseidon_statue',
-        name: 'Poseidon Heykeli',
-        imagePath: 'reward_poseidon_statue',
-        price: 1000,
-        bottom: 0.45,
-        left: 0.5,
-        layerOrder: 3,
-        category: 'Ödül',
-        requiredStreak: 30, // 30-day streak
-      ),
+      // ... (Senin mevcut liste kodların aynı kalacak) ...
+      // KOD TASARRUFU İÇİN LİSTEYİ BURAYA TEKRAR YAZMIYORUM, 
+      // SENİN KODUNDAKİ LİSTENİN AYNISINI KULLANACAKSIN.
+      DecorationItem(id: 'sand_basic', name: 'Temel Kum', imagePath: 'sand_basic', price: 5, bottom: 0.1, left: 0.5, layerOrder: 1, category: 'Zemin/Kum'),
+      DecorationItem(id: 'sand_golden', name: 'Altın Kum', imagePath: 'sand_golden', price: 100, bottom: 0.1, left: 0.5, layerOrder: 1, category: 'Zemin/Kum'),
+      DecorationItem(id: 'sand_white', name: 'Beyaz Kum', imagePath: 'sand_white', price: 150, bottom: 0.1, left: 0.5, layerOrder: 1, category: 'Zemin/Kum'),
+      DecorationItem(id: 'plant_seaweed', name: 'Deniz Yosunu', imagePath: 'plant_seaweed', price: 80, bottom: 0.3, left: 0.2, layerOrder: 2, category: 'Arka Plan'),
+      DecorationItem(id: 'plant_coral', name: 'Mercan', imagePath: 'plant_coral', price: 120, bottom: 0.3, left: 0.5, layerOrder: 2, category: 'Arka Plan'),
+      DecorationItem(id: 'plant_anemone', name: 'Anemon', imagePath: 'plant_anemone', price: 150, bottom: 0.3, left: 0.8, layerOrder: 2, category: 'Arka Plan'),
+      DecorationItem(id: 'decoration_starfish', name: 'Deniz Yıldızı', imagePath: 'decoration_starfish', price: 70, bottom: 0.15, left: 0.15, layerOrder: 3, category: 'Süs'),
+      DecorationItem(id: 'decoration_shell', name: 'Deniz Kabuğu', imagePath: 'decoration_shell', price: 60, bottom: 0.15, left: 0.85, layerOrder: 3, category: 'Süs'),
+      DecorationItem(id: 'decoration_bubbles', name: 'Hava Kabarcıkları', imagePath: 'decoration_bubbles', price: 90, bottom: 0.5, left: 0.5, layerOrder: 3, category: 'Süs'),
+      DecorationItem(id: 'decoration_treasure', name: 'Hazine Kutusu', imagePath: 'decoration_treasure', price: 200, bottom: 0.2, left: 0.5, layerOrder: 3, category: 'Süs', requiredStreak: 7),
+      DecorationItem(id: 'reward_coral_castle', name: 'Mercan Kalesi', imagePath: 'reward_coral_castle', price: 300, bottom: 0.35, left: 0.5, layerOrder: 3, category: 'Ödül', requiredStreak: 7),
+      DecorationItem(id: 'reward_legendary_pearl', name: 'Efsanevi İnci', imagePath: 'reward_legendary_pearl', price: 500, bottom: 0.4, left: 0.7, layerOrder: 3, category: 'Ödül', requiredStreak: 14),
+      DecorationItem(id: 'reward_poseidon_statue', name: 'Poseidon Heykeli', imagePath: 'reward_poseidon_statue', price: 1000, bottom: 0.45, left: 0.5, layerOrder: 3, category: 'Ödül', requiredStreak: 30),
     ];
   }
 
-  // Seçili kategoriye göre ürünleri filtrele - FIXED LOGIC + TAB FILTER
-  List<DecorationItem> _getFilteredItems() {
-    final allItems = _getShopItems();
-    
-    // "Ödüller" (Rewards): Show ALL items with requiredStreak > 0
-    // Aggregates streak-based items regardless of category
+  // Bu fonksiyon artık Provider'a bağımlı DEĞİL. Sadece listeyi ve provider'ı parametre alır.
+  // Bu sayede "Context" karmaşası yaşanmaz.
+  List<DecorationItem> _filterItems(List<DecorationItem> allItems, AquariumProvider aquariumProvider) {
     List<DecorationItem> items;
+    
+    // 1. Kategori Filtresi
     if (_selectedCategory == 'Ödüller') {
       items = allItems.where((item) => 
         item.requiredStreak != null && item.requiredStreak! > 0
       ).toList();
     } else {
-      // Regular categories: Filter by category, EXCLUDE streak items to avoid duplicates
       final categoryMap = {
         'Kumlar': 'Zemin/Kum',
         'Bitkiler': 'Arka Plan',
@@ -194,9 +68,8 @@ class _ShopScreenState extends State<ShopScreen> {
       ).toList();
     }
     
-    // Tab filtreleme: 'owned' seçiliyse sadece sahip olunanlr
+    // 2. Tab (Sahip Olunanlar) Filtresi
     if (_selectedTab == 'owned') {
-      final aquariumProvider = Provider.of<AquariumProvider>(context, listen: false);
       items = items.where((item) => aquariumProvider.isDecorationOwned(item.id)).toList();
     }
     
@@ -205,108 +78,124 @@ class _ShopScreenState extends State<ShopScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold'ın body'sinde Consumer3 KULLANMIYORUZ.
+    // Böylece statik kısımlar (Arka plan, Menü, Başlık) gereksiz yere çizilmez.
     return Scaffold(
       backgroundColor: AppColors.backgroundSubtle,
       body: SafeArea(
-        child: Consumer3<DailyHydrationProvider, AquariumProvider, HistoryProvider>(
-          builder: (context, dailyHydrationProvider, aquariumProvider, historyProvider, child) {
-            final filteredItems = _getFilteredItems();
+        child: Column(
+          children: [
+            // Üst başlık (Sabit)
+            _buildTopHeaderRow(context),
             
-            // Use live streak calculation for consistent behavior
-            final currentStreak = historyProvider.calculateLiveStreak(
-              dailyHydrationProvider.consumedAmount,
-              dailyHydrationProvider.dailyGoal,
-            );
+            const SizedBox(height: 16),
             
-            return Column(
-              children: [
-                // Üst başlık satırı: X butonu (sol)
-                _buildTopHeaderRow(context),
-                
-                const SizedBox(height: 16),
-                
-                // Ana içerik: Sidebar + Content
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Spacer (Mağaza yazısı için)
-                      const SizedBox(width: 16),
-                      
-                      // RIGHT CONTENT AREA (ortalanmış)
-                      Expanded(
-                        child: Column(
+            // Ana içerik
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(width: 16),
+                  
+                  // Content Area
+                  Expanded(
+                    child: Column(
+                      children: [
+                        // Başlık (Sabit)
+                        const Text(
+                          'Mağaza',
+                          style: TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2C5282),
+                            letterSpacing: 2.0,
+                            fontFamily: 'Arial Rounded MT Bold',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Coin ve Streak (Dinamik - Sadece burası dinler)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Mağaza yazısı (büyük, kalın, yuvarlak)
-                            const Text(
-                              'Mağaza',
-                              style: TextStyle(
-                                fontSize: 40, // Büyütüldü: 36 → 40
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF2C5282),
-                                letterSpacing: 2.0, // Harf aralığı artırıldı: 0.5 → 2.0
-                                fontFamily: 'Arial Rounded MT Bold',
-                              ),
+                            // Sadece Coin değişince burası çizilir
+                            Consumer<DailyHydrationProvider>(
+                              builder: (context, provider, child) => _buildCoinButton(provider),
                             ),
-                            const SizedBox(height: 16),
-                            
-                            // Coin + Streak butonları (ortalanmış)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center, // Center aligned
-                              children: [
-                                _buildCoinButton(dailyHydrationProvider),
-                                const SizedBox(width: 12),
-                                _buildStreakButton(currentStreak),
-                              ],
+                            const SizedBox(width: 12),
+                            // Sadece Streak değişince burası çizilir
+                            Consumer2<HistoryProvider, DailyHydrationProvider>(
+                              builder: (context, history, hydration, child) {
+                                final streak = history.calculateLiveStreak(
+                                  hydration.consumedAmount,
+                                  hydration.dailyGoal,
+                                );
+                                return _buildStreakButton(streak);
+                              },
                             ),
-                            
-                            const SizedBox(height: 12),
-                            
-                            // Ana layout: Sidebar + Grid
-                            Expanded(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // LEFT SIDEBAR MENU (dikdörtgen başlangıcıyla aynı hizada)
-                                  _buildSidebarMenu(),
-                                  
-                                  const SizedBox(width: 12),
-                                  
-                                  // Ürün grid alanı (Tab içinde)
-                                  Expanded(
-                                    child: _buildContentArea(
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // Layout: Sidebar + Grid
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Sol Menü (Sabit - Provider dinlemez)
+                              _buildSidebarMenu(),
+                              
+                              const SizedBox(width: 12),
+                              
+                              // Ürün Listesi (Dinamik - AquariumProvider dinler)
+                              Expanded(
+                                child: Consumer2<AquariumProvider, DailyHydrationProvider>(
+                                  builder: (context, aquariumProvider, dailyHydrationProvider, child) {
+                                    // Listeyi burada hesaplıyoruz
+                                    final allItems = _getShopItems();
+                                    final filteredItems = _filterItems(allItems, aquariumProvider);
+                                    
+                                    // Streak'i tekrar alıyoruz (veya yukarıdan geçirebiliriz ama burada hesaplamak güvenli)
+                                    final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
+                                    final currentStreak = historyProvider.calculateLiveStreak(
+                                      dailyHydrationProvider.consumedAmount,
+                                      dailyHydrationProvider.dailyGoal,
+                                    );
+
+                                    return _buildContentArea(
                                       filteredItems,
                                       dailyHydrationProvider,
                                       aquariumProvider,
                                       currentStreak,
-                                    ),
-                                  ),
-                                ],
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      
-                      const SizedBox(width: 16),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                  
+                  const SizedBox(width: 16),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Üst başlık satırı: X butonu (sol)
+  // --- WIDGET METODLARI (Aynı kalabilir, sadece ufak düzenlemeler) ---
+
   Widget _buildTopHeaderRow(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // X butonu (kapat)
           IconButton(
             icon: const Icon(Icons.close, size: 28),
             onPressed: () => Navigator.pop(context),
@@ -317,20 +206,15 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  /// Tab butonları (Ev: Tümü, Tik: Sahip Olunanlar)
   Widget _buildTabButtons() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.2),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         children: [
-          // Ev ikonu (Tümü) - Expanded ile genişlet
           Expanded(
             child: _buildTabButton(
               icon: Icons.home_outlined,
@@ -338,14 +222,7 @@ class _ShopScreenState extends State<ShopScreen> {
               onTap: () => setState(() => _selectedTab = 'all'),
             ),
           ),
-          
-          Container(
-            width: 1,
-            height: 40, // Yükseklik artırıldı: 30 → 40
-            color: Colors.grey.withValues(alpha: 0.2),
-          ),
-          
-          // Tik ikonu (Sahip Olunanlar) - Expanded ile genişlet
+          Container(width: 1, height: 40, color: Colors.grey.withValues(alpha: 0.2)),
           Expanded(
             child: _buildTabButton(
               icon: Icons.check,
@@ -358,103 +235,69 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  /// Tek tab butonu
-  Widget _buildTabButton({
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildTabButton({required IconData icon, required bool isSelected, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: double.infinity, // Tam genişlik
-        padding: const EdgeInsets.symmetric(vertical: 12), // Dikey padding artırıldı: 10 → 12
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.secondaryAqua.withValues(alpha: 0.2)
-              : Colors.transparent,
+          color: isSelected ? AppColors.secondaryAqua.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Icon(
           icon,
-          size: 28, // Büyütüldü: 26 → 28
-          color: isSelected
-              ? AppColors.secondaryAqua
-              : const Color(0xFF4A5568),
+          size: 28,
+          color: isSelected ? AppColors.secondaryAqua : const Color(0xFF4A5568),
         ),
       ),
     );
   }
 
-  /// Coin butonu
   Widget _buildCoinButton(DailyHydrationProvider provider) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.goldCoin.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.goldCoin.withValues(alpha: 0.4),
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.4), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.monetization_on,
-            size: 20,
-            color: AppColors.goldCoin,
-          ),
+          Icon(Icons.monetization_on, size: 20, color: AppColors.goldCoin),
           const SizedBox(width: 6),
           Text(
             '${provider.tankCoins}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.goldCoin,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.goldCoin),
           ),
         ],
       ),
     );
   }
 
-  /// Streak butonu (kronometre + günlük seri)
   Widget _buildStreakButton(int streak) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.secondaryAqua.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.secondaryAqua.withValues(alpha: 0.4),
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.secondaryAqua.withValues(alpha: 0.4), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.timer_outlined,
-            size: 20,
-            color: AppColors.secondaryAqua,
-          ),
+          Icon(Icons.timer_outlined, size: 20, color: AppColors.secondaryAqua),
           const SizedBox(width: 6),
           Text(
             'Günlük Seri: $streak',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.secondaryAqua,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.secondaryAqua),
           ),
         ],
       ),
     );
   }
 
-  /// Left sidebar menu - Sadece ikonlar (küçük)
   Widget _buildSidebarMenu() {
     return SizedBox(
       width: 60,
@@ -467,7 +310,6 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  /// Category button widget - Sadece ikon (yazı yok)
   Widget _buildCategoryButton(String category, bool isSelected) {
     final iconMap = {
       'Kumlar': Icons.landscape,
@@ -483,44 +325,29 @@ class _ShopScreenState extends State<ShopScreen> {
         });
       },
       child: Container(
-        width: 50, // Küçük kare
+        width: 50,
         height: 50,
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.secondaryAqua.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.9),
+          color: isSelected ? AppColors.secondaryAqua.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
-            color: isSelected
-                ? AppColors.secondaryAqua
-                : Colors.grey.withValues(alpha: 0.2),
+            color: isSelected ? AppColors.secondaryAqua : Colors.grey.withValues(alpha: 0.2),
             width: isSelected ? 2.5 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.secondaryAqua.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
+          boxShadow: isSelected ? [BoxShadow(color: AppColors.secondaryAqua.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
         ),
         child: Center(
           child: Icon(
             iconMap[category] ?? Icons.auto_awesome,
             size: 26,
-            color: isSelected
-                ? AppColors.secondaryAqua
-                : const Color(0xFF4A5568),
+            color: isSelected ? AppColors.secondaryAqua : const Color(0xFF4A5568),
           ),
         ),
       ),
     );
   }
 
-  /// Right content area - Grid view with border + Tab at top
   Widget _buildContentArea(
     List<DecorationItem> items,
     DailyHydrationProvider dailyHydrationProvider,
@@ -532,27 +359,15 @@ class _ShopScreenState extends State<ShopScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: AppColors.tankBorder.withValues(alpha: 0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: AppColors.tankBorder.withValues(alpha: 0.3), width: 2),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 3))],
       ),
       child: Column(
         children: [
-          // Tab butonları (dikdörtgen içinde, en üstte)
           Padding(
             padding: const EdgeInsets.all(16),
             child: _buildTabButtons(),
           ),
-          
-          // Grid alanı
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -565,13 +380,15 @@ class _ShopScreenState extends State<ShopScreen> {
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
+                      addAutomaticKeepAlives: false, // Performans için önemli
+                      addRepaintBoundaries: true, // Performans için önemli
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
                         final isOwned = aquariumProvider.isDecorationOwned(item.id);
                         final isActive = aquariumProvider.isDecorationActive(item.id);
                         final canAfford = dailyHydrationProvider.tankCoins >= item.price;
-                        
+
                         return ShopItemCard(
                           item: item,
                           currentStreak: currentStreak,
@@ -581,12 +398,7 @@ class _ShopScreenState extends State<ShopScreen> {
                           categoryColor: _getCategoryColor(item.category),
                           categoryIcon: _getCategoryIcon(item.category),
                           onTap: _getItemTapHandler(
-                            item,
-                            isOwned,
-                            isActive,
-                            canAfford,
-                            dailyHydrationProvider,
-                            aquariumProvider,
+                            item, isOwned, isActive, canAfford, dailyHydrationProvider, aquariumProvider,
                           ),
                         );
                       },
@@ -598,33 +410,22 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  /// Empty state widget
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.inventory_2_outlined,
-            size: 64,
-            color: Colors.grey.withValues(alpha: 0.4),
-          ),
+          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text(
             'Bu kategoride ürün yok',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.withValues(alpha: 0.6),
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.withValues(alpha: 0.6), fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  // Mağaza kartı widget'ı - REPLACED with modular ShopItemCard
-  // This method now returns the tap handler callback
   VoidCallback? _getItemTapHandler(
     DecorationItem item,
     bool isOwned,
@@ -633,7 +434,6 @@ class _ShopScreenState extends State<ShopScreen> {
     DailyHydrationProvider dailyHydrationProvider,
     AquariumProvider aquariumProvider,
   ) {
-    // TÜM ÜRÜNLER İÇİN DIALOG AÇ
     return () {
       _showPurchaseDialog(
         context,
@@ -649,39 +449,26 @@ class _ShopScreenState extends State<ShopScreen> {
     };
   }
 
-  // Kategoriye göre renk
   Color _getCategoryColor(String category) {
     switch (category) {
-      case 'Zemin/Kum':
-        return const Color(0xFFD4A574);
-      case 'Arka Plan':
-        return const Color(0xFF6B9BD1);
-      case 'Süs':
-        return const Color(0xFFFF6B9D);
-      case 'Ödül':
-        return AppColors.goldCoin; // Golden color for rewards
-      default:
-        return AppColors.softPinkButton;
+      case 'Zemin/Kum': return const Color(0xFFD4A574);
+      case 'Arka Plan': return const Color(0xFF6B9BD1);
+      case 'Süs': return const Color(0xFFFF6B9D);
+      case 'Ödül': return AppColors.goldCoin;
+      default: return AppColors.softPinkButton;
     }
   }
 
-  // Kategoriye göre icon
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Zemin/Kum':
-        return Icons.landscape;
-      case 'Arka Plan':
-        return Icons.water;
-      case 'Süs':
-        return Icons.star;
-      case 'Ödül':
-        return Icons.emoji_events; // Trophy icon for rewards
-      default:
-        return Icons.auto_awesome;
+      case 'Zemin/Kum': return Icons.landscape;
+      case 'Arka Plan': return Icons.water;
+      case 'Süs': return Icons.star;
+      case 'Ödül': return Icons.emoji_events;
+      default: return Icons.auto_awesome;
     }
   }
 
-  // Satın alma dialog'unu göster - TÜM ÜRÜNLER İÇİN
   void _showPurchaseDialog(
     BuildContext context,
     DecorationItem item,
@@ -700,80 +487,53 @@ class _ShopScreenState extends State<ShopScreen> {
         itemIcon: itemIcon,
         itemIconColor: itemIconColor,
         onPurchase: () async {
-          // Eğer zaten sahipse, aktifleştir/kaldır
           if (isOwned) {
             if (isActive) {
               await aquariumProvider.removeActiveDecoration(item.category);
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${item.name} kaldırıldı!'),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
+                SnackBar(content: Text('${item.name} kaldırıldı!'), backgroundColor: Colors.orange, duration: const Duration(seconds: 2)),
               );
             } else {
               await aquariumProvider.setActiveDecoration(item.id);
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${item.name} aktif edildi!'),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 2),
-                ),
+                SnackBar(content: Text('${item.name} aktif edildi!'), backgroundColor: Colors.green, duration: const Duration(seconds: 2)),
               );
             }
           } else {
-            // Satın alma
             await _purchaseItem(context, item, dailyHydrationProvider, aquariumProvider);
           }
         },
         onWatchAd: () {
-          // Reklam izleme özelliği - Şimdilik placeholder
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Reklam izleme özelliği yakında eklenecek!'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 2),
-            ),
+            const SnackBar(content: Text('Reklam izleme özelliği yakında eklenecek!'), backgroundColor: Colors.orange, duration: Duration(seconds: 2)),
           );
         },
       ),
     );
   }
 
-  // Ürün satın alma
   Future<void> _purchaseItem(
     BuildContext context,
     DecorationItem item,
     DailyHydrationProvider dailyHydrationProvider,
     AquariumProvider aquariumProvider,
   ) async {
-    // Coin kontrolü ve düşürme
     if (!(await dailyHydrationProvider.spendCoins(item.price))) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Yeterli TankCoin\'iniz yok!'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Yeterli TankCoin\'iniz yok!'), backgroundColor: Colors.red),
       );
       return;
     }
 
-    // Dekorasyonu satın al
     final success = await aquariumProvider.purchaseDecoration(item);
     if (success) {
-      // Otomatik olarak aktif yap
       await aquariumProvider.setActiveDecoration(item.id);
-      
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${item.name} satın alındı ve aktif edildi!'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
+        SnackBar(content: Text('${item.name} satın alındı ve aktif edildi!'), backgroundColor: Colors.green, duration: const Duration(seconds: 2)),
       );
     }
   }

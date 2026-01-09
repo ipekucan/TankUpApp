@@ -37,17 +37,21 @@ class TankRoomScreen extends StatefulWidget {
 }
 
 class _TankRoomScreenState extends State<TankRoomScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   Timer? _dirtyCheckTimer;
   Timer? _bubbleTimer;
   final List<BubbleModel> _bubbles = [];
   final math.Random _random = math.Random();
   double _animationTime = 0.0;
   late AnimationController _godRayAnimationController; // Işık hüzmeleri için AnimationController
+  bool _isAppInForeground = true; // Track app lifecycle state
 
   @override
   void initState() {
     super.initState();
+    
+    // Register lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
     
     // Işık hüzmeleri AnimationController (10 saniye, repeat reverse)
     _godRayAnimationController = AnimationController(
@@ -55,16 +59,24 @@ class _TankRoomScreenState extends State<TankRoomScreen>
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
     
+    _startTimers();
+  }
+  
+  /// Start both timers (called on init and resume)
+  void _startTimers() {
+    // Cancel existing timers first
+    _stopTimers();
+    
     // Her saniye tank kirliliğini kontrol et
     _dirtyCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (mounted && _isAppInForeground) {
         setState(() {}); // Kirlilik durumunu güncelle
       }
     });
 
     // Baloncuk animasyon döngüsü (60fps = 16ms)
     _bubbleTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      if (!mounted) return;
+      if (!mounted || !_isAppInForeground) return;
 
       _animationTime += 0.016; // Zaman ilerlemesi
 
@@ -107,11 +119,42 @@ class _TankRoomScreenState extends State<TankRoomScreen>
       }
     });
   }
+  
+  /// Stop all timers (called on pause and dispose)
+  void _stopTimers() {
+    _dirtyCheckTimer?.cancel();
+    _dirtyCheckTimer = null;
+    _bubbleTimer?.cancel();
+    _bubbleTimer = null;
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground - restart timers
+        _isAppInForeground = true;
+        _godRayAnimationController.repeat(reverse: true);
+        _startTimers();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // App went to background - stop timers to prevent ANR
+        _isAppInForeground = false;
+        _godRayAnimationController.stop();
+        _stopTimers();
+        break;
+    }
+  }
 
   @override
   void dispose() {
-    _dirtyCheckTimer?.cancel();
-    _bubbleTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopTimers();
     _godRayAnimationController.dispose();
     super.dispose();
   }
@@ -235,13 +278,15 @@ class _TankRoomScreenState extends State<TankRoomScreen>
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () {
-                                Navigator.push(
+                              onTap: () async {
+                                _stopTimers(); // STOP BEFORE PUSH
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => const ShopScreen(),
                                   ),
                                 );
+                                _startTimers(); // RESTART AFTER POP
                               },
                               borderRadius: BorderRadius.circular(20),
                               child: const Center(

@@ -37,62 +37,64 @@ class ShopItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap, // TÜM ÜRÜNLER TİKLANABİLİR
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: _isLockedByStreak
-                ? Colors.grey.withValues(alpha: 0.1)
-                : Colors.white.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
+    return RepaintBoundary(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap, // TÜM ÜRÜNLER TİKLANABİLİR
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
               color: _isLockedByStreak
-                  ? Colors.grey.withValues(alpha: 0.3)
-                  : isActive
-                      ? AppColors.secondaryAqua
-                      : isOwned
-                          ? AppColors.softPinkButton.withValues(alpha: 0.5)
-                          : Colors.grey.withValues(alpha: 0.2),
-              width: isActive ? 2.5 : 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                  ? Colors.grey.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isLockedByStreak
+                    ? Colors.grey.withValues(alpha: 0.3)
+                    : isActive
+                        ? AppColors.secondaryAqua
+                        : isOwned
+                            ? AppColors.softPinkButton.withValues(alpha: 0.5)
+                            : Colors.grey.withValues(alpha: 0.2),
+                width: isActive ? 2.5 : 1.5,
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Ana içerik - Yeni layout: İsim üstte, ikon ortada, fiyat altta
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Ürün adı (üstte)
-                    _buildProductNameTop(),
-                    
-                    // Ürün ikonu (ortada)
-                    Expanded(
-                      child: Center(
-                        child: _buildCenteredIcon(),
-                      ),
-                    ),
-                    
-                    // Fiyat satırı (altta: coin icon + miktar)
-                    _buildPriceRowBottom(),
-                  ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              
-              // Kilit overlay (sadece kilitli itemlar için)
-              if (_isLockedByStreak) _buildLockOverlay(),
-            ],
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Ana içerik - Yeni layout: İsim üstte, ikon ortada, fiyat altta
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Ürün adı (üstte)
+                      _buildProductNameTop(),
+                      
+                      // Ürün ikonu (ortada)
+                      Expanded(
+                        child: Center(
+                          child: _buildCenteredIcon(),
+                        ),
+                      ),
+                      
+                      // Fiyat satırı (altta: coin icon + miktar)
+                      _buildPriceRowBottom(),
+                    ],
+                  ),
+                ),
+                
+                // Kilit overlay (sadece kilitli itemlar için)
+                if (_isLockedByStreak) _buildLockOverlay(),
+              ],
+            ),
           ),
         ),
       ),
